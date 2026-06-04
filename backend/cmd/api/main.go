@@ -12,6 +12,7 @@ import (
 	"github.com/ubcesports/memberships/internal/database"
 	"github.com/ubcesports/memberships/internal/database/db"
 	"github.com/ubcesports/memberships/internal/handlers"
+	"github.com/ubcesports/memberships/internal/mailer"
 	"github.com/ubcesports/memberships/internal/repository"
 	"github.com/ubcesports/memberships/internal/service"
 )
@@ -21,6 +22,8 @@ func main() {
 		log.Println("No .env file found!")
 		return
 	}
+
+	mailer.Init()
 
 	pool, err := database.ConnectDB()
 	if err != nil {
@@ -52,4 +55,5 @@ func main() {
 	if err := http.ListenAndServe(":"+port, r); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
+
 }
