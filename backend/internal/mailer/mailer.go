@@ -2,6 +2,7 @@ package mailer
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 
@@ -9,23 +10,27 @@ import (
 )
 
 var client *resend.Client
-var sender string
+var senderEmail string
 
 // Initialize the mailing service. To be called only once at application startup
 //
 // Requirements from .env file:
 //   - RESEND_API_KEY: API key from Resend
 //   - SENDER_EMAIL: Name and email of sender (eg. "Sudi from UBCEA <sudi@ubcesports.ca>")
-func Init() {
+func Init() error {
 	resend_api_key := os.Getenv("RESEND_API_KEY")
 	if resend_api_key == "" {
-		log.Println("WARNING: Resend API key not set.")
+		return errors.New("required environment variable 'RESEND_API_KEY' is missing")
 	}
+
 	sender := os.Getenv("SENDER_EMAIL")
 	if sender == "" {
-		log.Println("WARNING: Sender email not set.")
+		return errors.New("required environment variable 'SENDER_EMAIL' is missing")
 	}
+
 	client = resend.NewClient(resend_api_key)
+	senderEmail = sender
+	return nil
 }
 
 // Dispatches an HTML email to one or more recipients asynchronously
@@ -45,7 +50,7 @@ func Init() {
 func SendEmailAsync(to []string, subject string, htmlContent string) {
 	go func() {
 		params := &resend.SendEmailRequest{
-			From:    sender,
+			From:    senderEmail,
 			To:      to,
 			Html:    htmlContent,
 			Subject: subject,
