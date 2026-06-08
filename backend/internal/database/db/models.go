@@ -3,3 +3,238 @@
 //   sqlc v1.31.1
 
 package db
+
+import (
+	"database/sql/driver"
+	"fmt"
+
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type GroupType string
+
+const (
+	GroupTypeMember          GroupType = "member"
+	GroupTypeCompetitiveTeam GroupType = "competitive_team"
+	GroupTypeExecutive       GroupType = "executive"
+	GroupTypeDirector        GroupType = "director"
+	GroupTypeBoard           GroupType = "board"
+)
+
+func (e *GroupType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = GroupType(s)
+	case string:
+		*e = GroupType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for GroupType: %T", src)
+	}
+	return nil
+}
+
+type NullGroupType struct {
+	GroupType GroupType
+	Valid     bool // Valid is true if GroupType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullGroupType) Scan(value interface{}) error {
+	if value == nil {
+		ns.GroupType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.GroupType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullGroupType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.GroupType), nil
+}
+
+type RoleType string
+
+const (
+	RoleTypeMember RoleType = "member"
+	RoleTypeAdmin  RoleType = "admin"
+)
+
+func (e *RoleType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RoleType(s)
+	case string:
+		*e = RoleType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RoleType: %T", src)
+	}
+	return nil
+}
+
+type NullRoleType struct {
+	RoleType RoleType
+	Valid    bool // Valid is true if RoleType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRoleType) Scan(value interface{}) error {
+	if value == nil {
+		ns.RoleType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RoleType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRoleType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RoleType), nil
+}
+
+type TransactionStatusType string
+
+const (
+	TransactionStatusTypePending   TransactionStatusType = "pending"
+	TransactionStatusTypeCompleted TransactionStatusType = "completed"
+	TransactionStatusTypeFailed    TransactionStatusType = "failed"
+	TransactionStatusTypeRefunded  TransactionStatusType = "refunded"
+)
+
+func (e *TransactionStatusType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TransactionStatusType(s)
+	case string:
+		*e = TransactionStatusType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TransactionStatusType: %T", src)
+	}
+	return nil
+}
+
+type NullTransactionStatusType struct {
+	TransactionStatusType TransactionStatusType
+	Valid                 bool // Valid is true if TransactionStatusType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTransactionStatusType) Scan(value interface{}) error {
+	if value == nil {
+		ns.TransactionStatusType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TransactionStatusType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTransactionStatusType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TransactionStatusType), nil
+}
+
+type Account struct {
+	ID                   pgtype.UUID
+	UserID               pgtype.UUID
+	Provider             string
+	ProviderAccountID    pgtype.Text
+	AccessToken          string
+	RefreshToken         pgtype.Text
+	AccessTokenExpiresAt pgtype.Timestamptz
+	Scope                string
+	IDToken              pgtype.Text
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+}
+
+type Membership struct {
+	ID              pgtype.UUID
+	UserID          pgtype.UUID
+	TierID          pgtype.UUID
+	TransactionID   pgtype.UUID
+	GroupAtPurchase GroupType
+	StartedAt       pgtype.Timestamptz
+	ExpiresAt       pgtype.Timestamptz
+	CancelledAt     pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+type MembershipTier struct {
+	ID              pgtype.UUID
+	Title           string
+	Description     pgtype.Text
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+	StripeProductID pgtype.Text
+	IsActive        bool
+}
+
+type MembershipTierPrice struct {
+	ID            pgtype.UUID
+	TierID        pgtype.UUID
+	Group         GroupType
+	Price         pgtype.Numeric
+	StripePriceID pgtype.Text
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+}
+
+type Session struct {
+	ID         pgtype.UUID
+	Token      string
+	UserID     pgtype.UUID
+	CreatedAt  pgtype.Timestamptz
+	ExpiresAt  pgtype.Timestamptz
+	LastAccess pgtype.Timestamptz
+	Metadata   pgtype.Text
+}
+
+type Transaction struct {
+	ID                    pgtype.UUID
+	UserID                pgtype.UUID
+	MembershipID          pgtype.UUID
+	StripePaymentIntentID pgtype.Text
+	PriceAmount           pgtype.Numeric
+	Status                TransactionStatusType
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+}
+
+type User struct {
+	ID                    pgtype.UUID
+	Email                 string
+	StudentID             pgtype.Text
+	Role                  RoleType
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FullName              string
+	EmailVerifiedAt       pgtype.Timestamptz
+	Password              pgtype.Text
+	IsStudent             bool
+	OnboardingCompletedAt pgtype.Timestamptz
+}
+
+type UserGroup struct {
+	UserID     pgtype.UUID
+	Group      GroupType
+	AssignedAt pgtype.Timestamptz
+}
+
+type Verification struct {
+	ID        pgtype.UUID
+	Subject   string
+	Value     string
+	ExpiresAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
