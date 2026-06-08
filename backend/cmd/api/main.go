@@ -6,6 +6,7 @@ import (
 	"github.com/joho/godotenv"
 	"go.uber.org/fx"
 
+	"github.com/ubcesports/memberships/internal/auth"
 	"github.com/ubcesports/memberships/internal/database"
 	"github.com/ubcesports/memberships/internal/handlers"
 	"github.com/ubcesports/memberships/internal/mailer"
@@ -22,6 +23,7 @@ func main() {
 
 	fx.New(
 		database.Module,
+		auth.Module,
 		repository.Module,
 		service.Module,
 		handlers.Module,
