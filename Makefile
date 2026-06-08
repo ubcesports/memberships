@@ -3,15 +3,29 @@ ifneq (,$(wildcard backend/.env))
     export
 endif
 
-.PHONY: run build sqlc migration-new migration-up migration-down DB_CHECK
+.PHONY: be fe dev build-be build-fe sqlc migration-new migration-up migration-down DB_CHECK
+
+# nextjs commands
+
+fe:
+	cd frontend && npm run dev
+
+build-fe:
+	cd frontend && npm run build
 
 # go commands
 
-run:
+be:
 	cd backend && go run cmd/api/main.go
 
-build:
+build-be:
 	cd backend && go build -o bin/api cmd/api/main.go
+
+# run both backend + frontend
+dev:
+	npx concurrently \
+		"make be" \
+		"make fe"
 
 # sqlc commands
 
