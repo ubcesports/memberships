@@ -3,25 +3,18 @@ package dto
 type RoleType string
 
 const (
-	RoleMember      RoleType = "member"
-	RoleExec        RoleType = "exec"
-	RoleCompetitive RoleType = "competitive"
-	RoleAdmin       RoleType = "admin"
+	RoleMember RoleType = "member"
+	RoleAdmin  RoleType = "admin"
 )
 
-type VerificationTokenType string
+type GroupType string
 
 const (
-	VerificationEmail VerificationTokenType = "email_verification"
-	VerificationMagic VerificationTokenType = "magic_link"
-)
-
-type MembershipStatusType string
-
-const (
-	MembershipActive   MembershipStatusType = "active"
-	MembershipExpired  MembershipStatusType = "expired"
-	MembershipCancelled MembershipStatusType = "cancelled"
+	GroupMember          GroupType = "member"
+	GroupCompetitiveTeam GroupType = "competitive_team"
+	GroupExecutive       GroupType = "executive"
+	GroupDirector        GroupType = "director"
+	GroupBoard           GroupType = "board"
 )
 
 type TransactionStatusType string
