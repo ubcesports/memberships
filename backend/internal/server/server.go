@@ -28,20 +28,18 @@ func provideRouter(healthHandler *handlers.HealthHandler, limen *limen.Limen) *c
 
 	r.Mount("/", limen.Handler())
 
-	r.Route("", func(r chi.Router) {
-		// All public routes
-		r.Get("/health", healthHandler.IsDatabaseHealthy)
+	// All public routes
+	r.Get("/health", healthHandler.IsDatabaseHealthy)
 
-		// All protected routes
-		r.Group(func(r chi.Router) {
-			r.Use(auth.RequireAuth(limen))
-		})
+	// All protected routes
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RequireAuth(limen))
+	})
 
-		// All admin routes
-		r.Group(func(r chi.Router) {
-			r.Use(auth.RequireAuth(limen))
-			r.Use(auth.RequireRole("admin"))
-		})
+	// All admin routes
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RequireAuth(limen))
+		r.Use(auth.RequireRole("admin"))
 	})
 
 	return r
