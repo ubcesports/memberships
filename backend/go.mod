@@ -11,12 +11,11 @@ require (
 	github.com/thecodearcher/limen v0.1.1
 	github.com/thecodearcher/limen/adapters/sql v0.1.0
 	github.com/thecodearcher/limen/plugins/oauth v0.1.0
-	github.com/thecodearcher/limen/plugins/oauth-google v0.1.0
+	github.com/thecodearcher/limen/plugins/oauth-generic v0.1.0
 	go.uber.org/fx v1.24.0
 )
 
 require (
-	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
