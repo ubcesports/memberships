@@ -34,6 +34,7 @@ func provideRouter(healthHandler *handlers.HealthHandler, limen *limen.Limen) *c
 	// All protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAuth(limen))
+		r.Use(auth.RequireOnboarded)
 	})
 
 	// All admin routes

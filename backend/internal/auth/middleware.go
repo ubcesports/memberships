@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/thecodearcher/limen"
 )
@@ -42,12 +44,53 @@ func RequireRole(roles ...string) func(http.Handler) http.Handler {
 			}
 			role, _ := session.User.Raw()["role"].(string)
 			if !allowed[role] {
-				http.Error(w, "Forbidden", http.StatusForbidden)
+				writeError(w, http.StatusForbidden, "FORBIDDEN", "Forbidden")
 				return
 			}
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// Requires user to have completed onboarding to access endpoints under this.
+// Use after RequireAuth so the current session is already in the request context.
+func RequireOnboarded(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session := SessionFromContext(r.Context())
+		if session == nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if !isUserOnboarded(session.User) {
+			writeError(w, http.StatusForbidden, "ONBOARDING_REQUIRED", "Onboarding required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func isUserOnboarded(user *limen.User) bool {
+	if user == nil {
+		return false
+	}
+	completedAt := user.Raw()["onboarding_completed_at"]
+	switch v := completedAt.(type) {
+	case time.Time:
+		return !v.IsZero()
+	case *time.Time:
+		return v != nil && !v.IsZero()
+	default:
+		return completedAt != nil
+	}
+}
+
+func writeError(w http.ResponseWriter, status int, code, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"code":    code,
+		"message": message,
+	})
 }
 
 // Extract session from context
