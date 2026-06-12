@@ -8,7 +8,6 @@ pkgs.mkShell {
     go
 
     # CLI tools
-    sql-migrate
     goose
   ];
 }
