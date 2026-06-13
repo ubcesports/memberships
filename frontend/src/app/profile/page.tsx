@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useState } from "react";
 import {
   AlertTriangle,
   ExternalLink,
@@ -11,63 +11,14 @@ import {
 } from "lucide-react";
 import { BasePage } from "@/components/layout/base-page";
 import apiClient from "@/lib/client";
-import { redirectToJasperLabsSignIn } from "@/lib/auth";
-
-type UserDetails = Record<string, unknown>;
-
-type SessionResponse = {
-  user?: UserDetails;
-};
+import { redirectToSignIn } from "@/lib/auth";
+import { StatusBadge, StatusBadgeProps } from "@/components/status-badge";
+import { formatDate } from "@/lib/utils/formatting";
+import { useProfile } from "@/lib/profile.hook";
 
 const JASPERLABS_ACCOUNT_URL =
   process.env.NEXT_PUBLIC_JASPERLABS_ACCOUNT_URL ||
   "https://auth.jasperlabs.net/dashboard";
-
-function stringValue(value: unknown) {
-  return typeof value === "string" && value.trim() ? value : null;
-}
-
-function booleanValue(value: unknown) {
-  return typeof value === "boolean" ? value : false;
-}
-
-function formatDate(value: unknown) {
-  const raw = stringValue(value);
-  if (!raw) {
-    return null;
-  }
-
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) {
-    return raw;
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function formatDateOnly(value: unknown) {
-  const raw = stringValue(value);
-  if (!raw) {
-    return null;
-  }
-
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) {
-    return raw;
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
-}
 
 function titleCase(value: string) {
   return value
@@ -90,28 +41,6 @@ function getInitials(name: string, email: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
-}
-
-type StatusBadgeProps = {
-  children: string;
-  tone?: "default" | "success" | "warning" | "muted";
-};
-
-function StatusBadge({ children, tone = "default" }: StatusBadgeProps) {
-  const toneClass = {
-    default: "border-brand-primary/40 bg-brand-primary/15 text-brand-text",
-    success: "border-green-400/35 bg-green-400/10 text-green-100",
-    warning: "border-amber-300/35 bg-amber-300/10 text-amber-100",
-    muted: "border-brand-border bg-white/5 text-brand-text-muted",
-  }[tone];
-
-  return (
-    <span
-      className={`inline-flex min-h-7 items-center border px-2.5 text-xs font-semibold ${toneClass}`}
-    >
-      {children}
-    </span>
-  );
 }
 
 type SummaryTileProps = {
@@ -155,143 +84,22 @@ function DetailRow({ label, children }: DetailRowProps) {
 }
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<UserDetails | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isSyncingAccount, setIsSyncingAccount] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const didStartAuth = useRef(false);
 
-  useEffect(() => {
-    let isMounted = true;
+  const { data: profile, isPending } = useProfile();
 
-    async function loadProfile() {
-      try {
-        const response = await apiClient.get<SessionResponse>("/auth/me", {
-          validateStatus: (status) => status === 200 || status === 401,
-        });
-
-        if (!isMounted) {
-          return;
-        }
-
-        if (response.status === 401) {
-          if (!didStartAuth.current) {
-            didStartAuth.current = true;
-            await redirectToJasperLabsSignIn(window.location.href);
-          }
-          return;
-        }
-
-        setUser(response.data.user ?? null);
-      } catch {
-        if (isMounted) {
-          setError("Profile details could not be loaded.");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    loadProfile();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const displayName = useMemo(() => {
-    if (!user) {
-      return "Profile";
-    }
-
-    return (
-      stringValue(user.full_name) ||
-      stringValue(user.name) ||
-      stringValue(user.email) ||
-      "Profile"
-    );
-  }, [user]);
-
-  const profile = useMemo(() => {
-    if (!user) {
-      return null;
-    }
-
-    const email = stringValue(user.email) ?? "No email provided";
-    const role = stringValue(user.role) ?? "member";
-    const isAdmin = role === "admin";
-    const isStudent = booleanValue(user.is_student);
-    const studentId = stringValue(user.student_id);
-    const avatarURL = stringValue(user.avatar_url);
-    const emailVerifiedAt = formatDate(user.email_verified_at);
-    const onboardingCompletedAt = formatDate(user.onboarding_completed_at);
-    const createdAt = formatDateOnly(user.created_at);
-
-    return {
-      email,
-      role,
-      roleLabel: titleCase(role),
-      initials: getInitials(displayName, email),
-      avatarURL,
-      accountType: isAdmin ? "Admin" : "Member",
-      accountDetail: isAdmin
-        ? "Can manage membership administration."
-        : "Standard UBCEA membership account.",
-      accountTone: isAdmin ? "warning" : "default",
-      studentStatus: isStudent ? "Student" : "Non-student",
-      studentDetail: isStudent
-        ? "Student pricing and eligibility can apply."
-        : "Registered as a community member.",
-      studentTone: isStudent ? "success" : "muted",
-      studentId,
-      emailVerifiedAt,
-      onboardingCompletedAt,
-      onboardingStatus: onboardingCompletedAt ? "Complete" : "Needs setup",
-      onboardingDetail: onboardingCompletedAt
-        ? `Completed ${onboardingCompletedAt}.`
-        : "Finish setup to unlock the full account flow.",
-      onboardingTone: onboardingCompletedAt ? "success" : "warning",
-      createdAt,
-    } satisfies {
-      email: string;
-      role: string;
-      roleLabel: string;
-      initials: string;
-      avatarURL: string | null;
-      accountType: string;
-      accountDetail: string;
-      accountTone: StatusBadgeProps["tone"];
-      studentStatus: string;
-      studentDetail: string;
-      studentTone: StatusBadgeProps["tone"];
-      studentId: string | null;
-      emailVerifiedAt: string | null;
-      onboardingCompletedAt: string | null;
-      onboardingStatus: string;
-      onboardingDetail: string;
-      onboardingTone: StatusBadgeProps["tone"];
-      createdAt: string | null;
-    };
-  }, [displayName, user]);
+  const displayName = profile?.name ?? profile?.email ?? "Profile";
 
   async function handleSignOut() {
     setIsSigningOut(true);
     setError(null);
 
     try {
-      await apiClient.post(
-        "/auth/signout",
-        {},
-        {
-          validateStatus: (status) => status === 204 || status === 401,
-        },
-      );
-
+      await apiClient.post("/auth/signout", {});
       window.location.replace("/");
     } catch {
       setError("Sign out failed. Try again.");
@@ -309,7 +117,6 @@ export default function ProfilePage() {
         headers: {
           "Content-Type": "application/json",
         },
-        validateStatus: (status) => status === 204 || status === 401,
       });
 
       window.location.replace("/");
@@ -324,7 +131,7 @@ export default function ProfilePage() {
     setError(null);
 
     try {
-      await redirectToJasperLabsSignIn(window.location.href);
+      await redirectToSignIn(window.location.href);
     } catch {
       setError("Unable to start account sync. Try again.");
       setIsSyncingAccount(false);
@@ -345,7 +152,7 @@ export default function ProfilePage() {
                   Your profile and account status.
                 </p>
               </div>
-              {user ? (
+              {profile ? (
                 <button
                   type="button"
                   onClick={handleSignOut}
@@ -365,7 +172,7 @@ export default function ProfilePage() {
               ) : null}
             </div>
 
-            {isLoading ? (
+            {isPending ? (
               <div className="flex min-h-56 items-center justify-center gap-3 px-6 py-12 text-brand-text-muted">
                 <Loader2 aria-hidden="true" className="size-5 animate-spin" />
                 <span>Loading profile</span>
@@ -377,16 +184,15 @@ export default function ProfilePage() {
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.78fr)]">
                   <div className="border border-brand-border bg-white/[0.03] p-5 sm:p-6">
                     <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                      {profile.avatarURL ? (
-                        // eslint-disable-next-line @next/next/no-img-element
+                      {profile.avatarUrl ? (
                         <img
-                          src={profile.avatarURL}
+                          src={profile.avatarUrl}
                           alt=""
                           className="size-18 shrink-0 border border-brand-primary/40 bg-brand-primary/15 object-cover"
                         />
                       ) : (
                         <div className="flex size-18 shrink-0 items-center justify-center border border-brand-primary/40 bg-brand-primary/15 text-2xl font-semibold text-brand-text">
-                          {profile.initials}
+                          {getInitials(profile.name, profile.email)}
                         </div>
                       )}
                       <div className="min-w-0">
@@ -399,12 +205,12 @@ export default function ProfilePage() {
                               profile.role === "admin" ? "warning" : "default"
                             }
                           >
-                            {profile.roleLabel}
+                            {titleCase(profile.role)}
                           </StatusBadge>
                         </div>
                         <p className="mt-2 break-words text-sm text-brand-text-muted">
                           {profile.createdAt
-                            ? `Member since ${profile.createdAt}`
+                            ? `Member since ${formatDate(profile.createdAt)}`
                             : "Membership start date unavailable"}
                         </p>
                       </div>
@@ -413,15 +219,19 @@ export default function ProfilePage() {
                     <div className="mt-6 grid gap-3.5">
                       <SummaryTile
                         label="Account type"
-                        value={profile.accountType}
-                        detail={profile.accountDetail}
-                        tone={profile.accountTone}
+                        value={titleCase(profile.role)}
+                        detail="Standard UBCEA membership account."
+                        tone="default"
                       />
                       <SummaryTile
                         label="Student status"
-                        value={profile.studentStatus}
-                        detail={profile.studentDetail}
-                        tone={profile.studentTone}
+                        value={profile.isStudent ? "Student" : "Non-student"}
+                        detail={
+                          profile.isStudent
+                            ? "Student pricing and eligibility can apply."
+                            : "Registered as a community member."
+                        }
+                        tone={profile.isStudent ? "success" : "muted"}
                       />
                     </div>
                   </div>
@@ -453,8 +263,16 @@ export default function ProfilePage() {
                         )}
                       </DetailRow>
                       <DetailRow label="Onboarding">
-                        <StatusBadge tone={profile.onboardingTone}>
-                          {profile.onboardingStatus}
+                        <StatusBadge
+                          tone={
+                            profile.onboardingCompletedAt
+                              ? "success"
+                              : "warning"
+                          }
+                        >
+                          {profile.onboardingCompletedAt
+                            ? `Completed ${formatDate(profile.onboardingCompletedAt)}`
+                            : "Pending"}
                         </StatusBadge>
                       </DetailRow>
                     </dl>
