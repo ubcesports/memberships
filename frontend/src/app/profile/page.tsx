@@ -1,18 +1,19 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
-import {
-  ExternalLink,
-  Loader2,
-  LogOut,
-  RefreshCw,
-} from "lucide-react";
+import { ExternalLink, Loader2, LogOut, RefreshCw } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { ActionButton } from "@/components/action-button";
+import { ActionLink } from "@/components/action-link";
+import { DetailRow } from "@/components/detail-row";
 import { BasePage } from "@/components/layout/base-page";
+import { StatusBadge } from "@/components/status-badge";
+import { SummaryTile } from "@/components/summary-tile";
+import { SurfacePanel } from "@/components/surface-panel";
 import apiClient from "@/lib/client";
 import { redirectToSignIn } from "@/lib/auth";
-import { StatusBadge, StatusBadgeProps } from "@/components/status-badge";
 import { formatDate } from "@/lib/utils/formatting";
 import { useProfile } from "@/lib/profile.hook";
+import Image from "next/image";
 
 const JASPERLABS_ACCOUNT_URL =
   process.env.NEXT_PUBLIC_JASPERLABS_ACCOUNT_URL ||
@@ -41,79 +42,33 @@ function getInitials(name: string, email: string) {
     .join("");
 }
 
-type SummaryTileProps = {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: StatusBadgeProps["tone"];
-};
-
-function SummaryTile({
-  label,
-  value,
-  detail,
-  tone = "default",
-}: SummaryTileProps) {
-  return (
-    <div className="min-w-0 border border-brand-border bg-white/[0.03] p-4">
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
-        <p className="text-sm font-medium leading-5 text-brand-text-subtle">
-          {label}
-        </p>
-        <StatusBadge tone={tone}>{value}</StatusBadge>
-      </div>
-      <p className="mt-3 text-sm leading-6 text-brand-text-muted">{detail}</p>
-    </div>
-  );
-}
-
-type DetailRowProps = {
-  label: string;
-  children: ReactNode;
-};
-
-function DetailRow({ label, children }: DetailRowProps) {
-  return (
-    <div className="grid gap-2 border-t border-brand-border px-5 py-3.5 sm:grid-cols-[130px_minmax(0,1fr)] sm:items-center">
-      <dt className="text-sm font-medium text-brand-text-subtle">{label}</dt>
-      <dd className="min-w-0 text-sm text-brand-text">{children}</dd>
-    </div>
-  );
-}
-
 export default function ProfilePage() {
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isSyncingAccount, setIsSyncingAccount] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const { data: profile, isPending } = useProfile();
 
+  const {
+    mutate: signOut,
+    error: signOutError,
+    isPending: signOutPending,
+  } = useMutation({
+    mutationFn: async () => await apiClient.post("/auth/signout", {}),
+    onSuccess: () => window.location.replace("/"),
+  });
+
+  const {
+    mutate: syncAccount,
+    error: syncAccountError,
+    isPending: syncAccountPending,
+  } = useMutation({
+    mutationFn: async () => await redirectToSignIn(window.location.href),
+  });
+
+  const error = signOutError
+    ? "Sign out failed. Try again."
+    : syncAccountError
+      ? "Unable to sync account. Try again."
+      : null;
+
   const displayName = profile?.name ?? profile?.email ?? "Profile";
-
-  async function handleSignOut() {
-    setIsSigningOut(true);
-    setError(null);
-
-    try {
-      await apiClient.post("/auth/signout", {});
-      window.location.replace("/");
-    } catch {
-      setError("Sign out failed. Try again.");
-      setIsSigningOut(false);
-    }
-  }
-
-  async function handleSyncAccount() {
-    setIsSyncingAccount(true);
-    setError(null);
-
-    try {
-      await redirectToSignIn(window.location.href);
-    } catch {
-      setError("Unable to start account sync. Try again.");
-      setIsSyncingAccount(false);
-    }
-  }
 
   return (
     <BasePage>
@@ -130,22 +85,19 @@ export default function ProfilePage() {
                 </p>
               </div>
               {profile ? (
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  disabled={isSigningOut}
-                  className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 border border-brand-border px-4 text-sm font-semibold text-brand-text transition hover:border-brand-text-muted hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSigningOut ? (
+                <ActionButton
+                  onClick={() => signOut()}
+                  loading={signOutPending}
+                  icon={<LogOut aria-hidden="true" className="size-4" />}
+                  loadingIcon={
                     <Loader2
                       aria-hidden="true"
                       className="size-4 animate-spin"
                     />
-                  ) : (
-                    <LogOut aria-hidden="true" className="size-4" />
-                  )}
-                  <span>{isSigningOut ? "Signing out" : "Sign out"}</span>
-                </button>
+                  }
+                >
+                  {signOutPending ? "Signing out" : "Sign out"}
+                </ActionButton>
               ) : null}
             </div>
 
@@ -159,12 +111,14 @@ export default function ProfilePage() {
             ) : profile ? (
               <div className="p-5 sm:p-6">
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.78fr)]">
-                  <div className="border border-brand-border bg-white/[0.03] p-5 sm:p-6">
+                  <SurfacePanel className="p-5 sm:p-6">
                     <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                       {profile.avatarUrl ? (
-                        <img
+                        <Image
                           src={profile.avatarUrl}
                           alt=""
+                          width={72}
+                          height={72}
                           className="size-18 shrink-0 border border-brand-primary/40 bg-brand-primary/15 object-cover"
                         />
                       ) : (
@@ -211,9 +165,9 @@ export default function ProfilePage() {
                         tone={profile.isStudent ? "success" : "muted"}
                       />
                     </div>
-                  </div>
+                  </SurfacePanel>
 
-                  <div className="border border-brand-border bg-white/[0.03]">
+                  <SurfacePanel>
                     <div className="px-5 py-4">
                       <h3 className="text-base font-semibold text-brand-text">
                         Account Details
@@ -254,31 +208,31 @@ export default function ProfilePage() {
                       </DetailRow>
                     </dl>
                     <div className="grid gap-3 border-t border-brand-border px-5 py-4 sm:grid-cols-2">
-                      <a
+                      <ActionLink
                         href={JASPERLABS_ACCOUNT_URL}
-                        className="inline-flex h-10 items-center justify-center gap-2 border border-brand-border px-4 text-sm font-semibold text-brand-text transition hover:border-brand-text-muted hover:bg-white/5"
+                        icon={
+                          <ExternalLink aria-hidden="true" className="size-4" />
+                        }
                       >
-                        <ExternalLink aria-hidden="true" className="size-4" />
-                        <span>Manage</span>
-                      </a>
-                      <button
-                        type="button"
-                        onClick={handleSyncAccount}
-                        disabled={isSyncingAccount}
-                        className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 border border-brand-border px-4 text-sm font-semibold text-brand-text transition hover:border-brand-text-muted hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isSyncingAccount ? (
+                        Manage
+                      </ActionLink>
+                      <ActionButton
+                        onClick={() => syncAccount()}
+                        loading={syncAccountPending}
+                        icon={
+                          <RefreshCw aria-hidden="true" className="size-4" />
+                        }
+                        loadingIcon={
                           <Loader2
                             aria-hidden="true"
                             className="size-4 animate-spin"
                           />
-                        ) : (
-                          <RefreshCw aria-hidden="true" className="size-4" />
-                        )}
-                        <span>{isSyncingAccount ? "Syncing" : "Sync"}</span>
-                      </button>
+                        }
+                      >
+                        {syncAccountPending ? "Syncing" : "Sync"}
+                      </ActionButton>
                     </div>
-                  </div>
+                  </SurfacePanel>
                 </div>
               </div>
             ) : (
