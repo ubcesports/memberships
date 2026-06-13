@@ -2,12 +2,10 @@
 
 import { type ReactNode, useState } from "react";
 import {
-  AlertTriangle,
   ExternalLink,
   Loader2,
   LogOut,
   RefreshCw,
-  Trash2,
 } from "lucide-react";
 import { BasePage } from "@/components/layout/base-page";
 import apiClient from "@/lib/client";
@@ -86,8 +84,6 @@ function DetailRow({ label, children }: DetailRowProps) {
 export default function ProfilePage() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isSyncingAccount, setIsSyncingAccount] = useState(false);
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { data: profile, isPending } = useProfile();
@@ -104,25 +100,6 @@ export default function ProfilePage() {
     } catch {
       setError("Sign out failed. Try again.");
       setIsSigningOut(false);
-    }
-  }
-
-  async function handleDeleteAccount() {
-    setIsDeletingAccount(true);
-    setError(null);
-
-    try {
-      await apiClient.delete("/auth/users/me", {
-        data: {},
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      window.location.replace("/");
-    } catch {
-      setError("Account deletion failed. Try again.");
-      setIsDeletingAccount(false);
     }
   }
 
@@ -302,74 +279,6 @@ export default function ProfilePage() {
                       </button>
                     </div>
                   </div>
-                </div>
-
-                <div className="mt-6 border border-brand-border bg-white/[0.03]">
-                  <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 gap-4">
-                      <div className="flex size-10 shrink-0 items-center justify-center border border-red-400/35 bg-red-400/10 text-red-100">
-                        <AlertTriangle aria-hidden="true" className="size-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-base font-semibold text-brand-text">
-                          Delete account
-                        </h3>
-                        <p className="mt-1 max-w-xl text-sm leading-6 text-brand-text-muted">
-                          Permanently remove this user account and membership
-                          records from this system.
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsConfirmingDelete(true)}
-                      disabled={isDeletingAccount}
-                      className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 border border-red-400/40 px-4 text-sm font-semibold text-red-100 transition hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <Trash2 aria-hidden="true" className="size-4" />
-                      <span>Delete account</span>
-                    </button>
-                  </div>
-
-                  {isConfirmingDelete ? (
-                    <div className="border-t border-brand-border px-5 py-5">
-                      <p className="text-sm leading-6 text-brand-text-muted">
-                        This action cannot be undone. Confirm that you want to
-                        delete this account.
-                      </p>
-                      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                        <button
-                          type="button"
-                          onClick={handleDeleteAccount}
-                          disabled={isDeletingAccount}
-                          className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 bg-red-500 px-4 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {isDeletingAccount ? (
-                            <Loader2
-                              aria-hidden="true"
-                              className="size-4 animate-spin"
-                            />
-                          ) : (
-                            <Trash2 aria-hidden="true" className="size-4" />
-                          )}
-                          <span>
-                            {isDeletingAccount
-                              ? "Deleting account"
-                              : "Confirm deletion"}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsConfirmingDelete(false)}
-                          disabled={isDeletingAccount}
-                          className="inline-flex h-10 cursor-pointer items-center justify-center border border-brand-border px-4 text-sm font-semibold text-brand-text transition hover:border-brand-text-muted hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
               </div>
             ) : (
