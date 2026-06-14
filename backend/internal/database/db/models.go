@@ -222,6 +222,7 @@ type User struct {
 	Password              pgtype.Text
 	IsStudent             bool
 	OnboardingCompletedAt pgtype.Timestamptz
+	AvatarUrl             pgtype.Text
 }
 
 type UserGroup struct {
