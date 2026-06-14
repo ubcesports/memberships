@@ -3,7 +3,7 @@ ifneq (,$(wildcard backend/.env))
     export
 endif
 
-.PHONY: be fe dev build-be build-fe sqlc migration-new migration-up migration-down DB_CHECK
+.PHONY: be fe dev build-be build-fe sqlc migration-new migration-up migration-down seed DB_CHECK
 
 # nextjs commands
 
@@ -51,3 +51,10 @@ migration-up: DB_CHECK
 
 migration-down: DB_CHECK
 	cd backend && goose -dir sql/migrations postgres "$(DATABASE_URL)" down
+
+# (usage: make seed file=membership_tiers_and_prices.sql)
+seed: DB_CHECK
+ifndef file
+	$(error Error: Please provide a seed file. Example: make seed file=membership_tiers_and_prices.sql)
+endif
+	psql "$(DATABASE_URL)" -f "backend/sql/seeds/$(file)"
