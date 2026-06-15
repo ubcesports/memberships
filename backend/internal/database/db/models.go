@@ -98,6 +98,92 @@ func (ns NullRoleType) Value() (driver.Value, error) {
 	return string(ns.RoleType), nil
 }
 
+type StudentStatusType string
+
+const (
+	StudentStatusTypeStudent    StudentStatusType = "student"
+	StudentStatusTypeNonStudent StudentStatusType = "non_student"
+)
+
+func (e *StudentStatusType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = StudentStatusType(s)
+	case string:
+		*e = StudentStatusType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for StudentStatusType: %T", src)
+	}
+	return nil
+}
+
+type NullStudentStatusType struct {
+	StudentStatusType StudentStatusType
+	Valid             bool // Valid is true if StudentStatusType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullStudentStatusType) Scan(value interface{}) error {
+	if value == nil {
+		ns.StudentStatusType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.StudentStatusType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullStudentStatusType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.StudentStatusType), nil
+}
+
+type TierCodeType string
+
+const (
+	TierCodeTypeRegular TierCodeType = "regular"
+	TierCodeTypePremium TierCodeType = "premium"
+	TierCodeTypeCab     TierCodeType = "cab"
+	TierCodeTypeDay     TierCodeType = "day"
+)
+
+func (e *TierCodeType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TierCodeType(s)
+	case string:
+		*e = TierCodeType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TierCodeType: %T", src)
+	}
+	return nil
+}
+
+type NullTierCodeType struct {
+	TierCodeType TierCodeType
+	Valid        bool // Valid is true if TierCodeType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTierCodeType) Scan(value interface{}) error {
+	if value == nil {
+		ns.TierCodeType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TierCodeType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTierCodeType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TierCodeType), nil
+}
+
 type TransactionStatusType string
 
 const (
@@ -157,16 +243,17 @@ type Account struct {
 }
 
 type Membership struct {
-	ID              pgtype.UUID
-	UserID          pgtype.UUID
-	TierID          pgtype.UUID
-	TransactionID   pgtype.UUID
-	GroupAtPurchase GroupType
-	StartedAt       pgtype.Timestamptz
-	ExpiresAt       pgtype.Timestamptz
-	CancelledAt     pgtype.Timestamptz
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
+	ID                      pgtype.UUID
+	UserID                  pgtype.UUID
+	TierID                  pgtype.UUID
+	TransactionID           pgtype.UUID
+	GroupAtPurchase         GroupType
+	StartedAt               pgtype.Timestamptz
+	ExpiresAt               pgtype.Timestamptz
+	CancelledAt             pgtype.Timestamptz
+	CreatedAt               pgtype.Timestamptz
+	UpdatedAt               pgtype.Timestamptz
+	StudentStatusAtPurchase StudentStatusType
 }
 
 type MembershipTier struct {
@@ -177,6 +264,7 @@ type MembershipTier struct {
 	UpdatedAt       pgtype.Timestamptz
 	StripeProductID pgtype.Text
 	IsActive        bool
+	Code            TierCodeType
 }
 
 type MembershipTierPrice struct {
@@ -187,6 +275,7 @@ type MembershipTierPrice struct {
 	StripePriceID pgtype.Text
 	CreatedAt     pgtype.Timestamptz
 	UpdatedAt     pgtype.Timestamptz
+	StudentStatus StudentStatusType
 }
 
 type Session struct {
@@ -202,7 +291,6 @@ type Session struct {
 type Transaction struct {
 	ID                    pgtype.UUID
 	UserID                pgtype.UUID
-	MembershipID          pgtype.UUID
 	StripePaymentIntentID pgtype.Text
 	PriceAmount           pgtype.Numeric
 	Status                TransactionStatusType

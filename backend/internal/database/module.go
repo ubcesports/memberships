@@ -6,17 +6,19 @@ import (
 	"log"
 	"os"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/ubcesports/memberships/internal/database/db"
 	"go.uber.org/fx"
 )
 
 var Module = fx.Module("database",
-	fx.Provide(provideDatabase),
+	fx.Provide(providePool),
+	fx.Provide(provideQueries),
 	fx.Provide(provideStdlibDB),
 )
 
-func provideDatabase(lc fx.Lifecycle) (*db.Queries, error) {
+func providePool(lc fx.Lifecycle) (*pgxpool.Pool, error) {
 	pool, err := ConnectDB()
 	if err != nil {
 		return nil, err
@@ -31,7 +33,11 @@ func provideDatabase(lc fx.Lifecycle) (*db.Queries, error) {
 	})
 
 	log.Println("Database connection established successfully.")
-	return db.New(pool), nil
+	return pool, nil
+}
+
+func provideQueries(pool *pgxpool.Pool) *db.Queries {
+	return db.New(pool)
 }
 
 func provideStdlibDB(lc fx.Lifecycle) (*sql.DB, error) {
