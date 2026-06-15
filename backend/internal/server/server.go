@@ -21,7 +21,7 @@ var Module = fx.Module("server",
 )
 
 // Add all new routes here
-func provideRouter(healthHandler *handlers.HealthHandler, limen *limen.Limen) *chi.Mux {
+func provideRouter(healthHandler *handlers.HealthHandler, membershipHandler *handlers.MembershipHandler, limen *limen.Limen) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -30,11 +30,16 @@ func provideRouter(healthHandler *handlers.HealthHandler, limen *limen.Limen) *c
 
 	// All public routes
 	r.Get("/health", healthHandler.IsDatabaseHealthy)
+	r.Post("/stripe/webhook", membershipHandler.HandleStripeWebhook)
 
 	// All protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAuth(limen))
 		r.Use(auth.RequireOnboarded)
+
+		r.Get("/membership/tiers", membershipHandler.ListTiers)
+		r.Get("/membership/current", membershipHandler.GetCurrent)
+		r.Post("/membership/checkout", membershipHandler.StartCheckout)
 	})
 
 	// All admin routes

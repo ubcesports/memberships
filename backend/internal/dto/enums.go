@@ -17,6 +17,22 @@ const (
 	GroupBoard           GroupType = "board"
 )
 
+type StudentStatusType string
+
+const (
+	StudentStatusStudent    StudentStatusType = "student"
+	StudentStatusNonStudent StudentStatusType = "non_student"
+)
+
+type TierCodeType string
+
+const (
+	TierCodeRegular TierCodeType = "regular"
+	TierCodePremium TierCodeType = "premium"
+	TierCodeCab     TierCodeType = "cab"
+	TierCodeDay     TierCodeType = "day"
+)
+
 type TransactionStatusType string
 
 const (
