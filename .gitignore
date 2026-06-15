@@ -1,2 +1,8 @@
 .env
-AGENTS.md
+
+# direnv
+.direnv/
+.envrc
+
+# nix
+shell.nix

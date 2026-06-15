@@ -21,10 +21,11 @@ var Module = fx.Module("server",
 )
 
 // Add all new routes here
-func provideRouter(healthHandler *handlers.HealthHandler, limen *limen.Limen) *chi.Mux {
+func provideRouter(healthHandler *handlers.HealthHandler, profileHandler *handlers.ProfileHandler, limen *limen.Limen) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(corsMiddleware)
 
 	r.Mount("/", limen.Handler())
 
@@ -32,6 +33,12 @@ func provideRouter(healthHandler *handlers.HealthHandler, limen *limen.Limen) *c
 	r.Get("/health", healthHandler.IsDatabaseHealthy)
 
 	// All protected routes
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RequireAuth(limen))
+		r.Get("/profile", profileHandler.GetCurrentProfile)
+	})
+
+	// All onboarded routes
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAuth(limen))
 		r.Use(auth.RequireOnboarded)
@@ -44,6 +51,31 @@ func provideRouter(healthHandler *handlers.HealthHandler, limen *limen.Limen) *c
 	})
 
 	return r
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	allowedOrigins := make(map[string]struct{})
+	for _, origin := range auth.TrustedFrontendOrigins() {
+		allowedOrigins[origin] = struct{}{}
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if _, ok := allowedOrigins[origin]; ok {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Add("Vary", "Origin")
+		}
+
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 func startServer(lc fx.Lifecycle, r *chi.Mux) {
