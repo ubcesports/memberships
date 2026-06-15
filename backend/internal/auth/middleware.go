@@ -2,11 +2,12 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/thecodearcher/limen"
+	"github.com/ubcesports/memberships/internal/utils"
 )
 
 type contextKey string
@@ -19,7 +20,7 @@ func RequireAuth(auth *limen.Limen) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session, err := auth.GetSession(r)
 			if err != nil || session == nil {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				utils.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 				return
 			}
 			ctx := context.WithValue(r.Context(), sessionKey, session)
@@ -39,12 +40,12 @@ func RequireRole(roles ...string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session := SessionFromContext(r.Context())
 			if session == nil {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				utils.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 				return
 			}
 			role, _ := session.User.Raw()["role"].(string)
 			if !allowed[role] {
-				writeError(w, http.StatusForbidden, "FORBIDDEN", "Forbidden")
+				utils.WriteError(w, http.StatusForbidden, "FORBIDDEN", "Forbidden")
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -58,11 +59,11 @@ func RequireOnboarded(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session := SessionFromContext(r.Context())
 		if session == nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			utils.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 			return
 		}
 		if !isUserOnboarded(session.User) {
-			writeError(w, http.StatusForbidden, "ONBOARDING_REQUIRED", "Onboarding required")
+			utils.WriteError(w, http.StatusForbidden, "ONBOARDING_REQUIRED", "Onboarding required")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -84,17 +85,16 @@ func isUserOnboarded(user *limen.User) bool {
 	}
 }
 
-func writeError(w http.ResponseWriter, status int, code, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"code":    code,
-		"message": message,
-	})
-}
-
 // Extract session from context
 func SessionFromContext(ctx context.Context) *limen.ValidatedSession {
 	session, _ := ctx.Value(sessionKey).(*limen.ValidatedSession)
 	return session
+}
+
+func UserIDFromContext(ctx context.Context) (string, bool) {
+	session := SessionFromContext(ctx)
+	if session == nil || session.User == nil || session.User.ID == nil {
+		return "", false
+	}
+	return fmt.Sprint(session.User.ID), true
 }

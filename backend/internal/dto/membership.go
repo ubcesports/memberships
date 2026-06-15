@@ -2,6 +2,18 @@ package dto
 
 import "time"
 
+/*
+Request
+*/
+
+type StartCheckoutRequest struct {
+	TierCode TierCodeType `json:"tier_code"`
+}
+
+/*
+Response
+*/
+
 type MembershipTierDTO struct {
 	Code             TierCodeType      `json:"code"`
 	Title            string            `json:"title"`
@@ -35,10 +47,6 @@ type CurrentMembershipDTO struct {
 
 type CurrentMembershipResponse struct {
 	Membership *CurrentMembershipDTO `json:"membership"`
-}
-
-type StartCheckoutRequest struct {
-	TierCode TierCodeType `json:"tier_code"`
 }
 
 type StartCheckoutResponse struct {

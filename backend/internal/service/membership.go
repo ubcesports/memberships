@@ -9,19 +9,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ubcesports/memberships/internal/database/db"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/repository"
+	"github.com/ubcesports/memberships/internal/utils"
 )
 
 var (
@@ -67,9 +66,9 @@ func NewMembershipService(membershipRepo *repository.MembershipRepository) *Memb
 }
 
 func (s *MembershipService) ListAvailableTiers(ctx context.Context, userID string) (dto.ListMembershipTiersResponse, error) {
-	userUUID, err := parseUUID(userID)
+	userUUID, err := utils.ParseUUID(userID)
 	if err != nil {
-		return dto.ListMembershipTiersResponse{}, err
+		return dto.ListMembershipTiersResponse{}, ErrInvalidUserID
 	}
 
 	pricing, err := s.resolvePricingContext(ctx, userUUID)
@@ -90,12 +89,12 @@ func (s *MembershipService) ListAvailableTiers(ctx context.Context, userID strin
 		tiers = append(tiers, dto.MembershipTierDTO{
 			Code:             dto.TierCodeType(row.Code),
 			Title:            row.Title,
-			Description:      nullableText(row.Description),
-			Price:            numericToString(row.Price),
+			Description:      utils.TextPtr(row.Description),
+			Price:            utils.NumericString(row.Price),
 			Currency:         "CAD",
 			Group:            dto.GroupType(row.Group),
 			StudentStatus:    dto.StudentStatusType(row.StudentStatus),
-			RequiresCheckout: !numericIsZero(row.Price),
+			RequiresCheckout: !utils.NumericIsZero(row.Price),
 		})
 	}
 
@@ -103,9 +102,9 @@ func (s *MembershipService) ListAvailableTiers(ctx context.Context, userID strin
 }
 
 func (s *MembershipService) GetCurrentMembership(ctx context.Context, userID string) (dto.CurrentMembershipResponse, error) {
-	userUUID, err := parseUUID(userID)
+	userUUID, err := utils.ParseUUID(userID)
 	if err != nil {
-		return dto.CurrentMembershipResponse{}, err
+		return dto.CurrentMembershipResponse{}, ErrInvalidUserID
 	}
 
 	row, err := s.membershipRepo.GetCurrentMembershipByUserID(ctx, userUUID)
@@ -121,9 +120,9 @@ func (s *MembershipService) GetCurrentMembership(ctx context.Context, userID str
 }
 
 func (s *MembershipService) StartCheckout(ctx context.Context, userID string, tierCode dto.TierCodeType) (dto.StartCheckoutResponse, error) {
-	userUUID, err := parseUUID(userID)
+	userUUID, err := utils.ParseUUID(userID)
 	if err != nil {
-		return dto.StartCheckoutResponse{}, err
+		return dto.StartCheckoutResponse{}, ErrInvalidUserID
 	}
 	code, err := parseTierCode(tierCode)
 	if err != nil {
@@ -157,7 +156,7 @@ func (s *MembershipService) StartCheckout(ctx context.Context, userID string, ti
 	startedAt := pgtype.Timestamptz{Time: now, Valid: true}
 	expiresAt := pgtype.Timestamptz{Time: expiryForTier(code, now), Valid: true}
 
-	if numericIsZero(tierPrice.Price) {
+	if utils.NumericIsZero(tierPrice.Price) {
 		result, err := s.membershipRepo.CreateCompletedPurchase(ctx, repository.CompletedPurchaseParams{
 			UserID:                  userUUID,
 			TierID:                  tierPrice.TierID,
@@ -171,7 +170,7 @@ func (s *MembershipService) StartCheckout(ctx context.Context, userID string, ti
 		if err != nil {
 			return dto.StartCheckoutResponse{}, err
 		}
-		membershipID := uuidToString(result.Membership.ID)
+		membershipID := utils.UUIDToString(result.Membership.ID)
 		return dto.StartCheckoutResponse{
 			Status:       "completed",
 			MembershipID: &membershipID,
@@ -185,7 +184,7 @@ func (s *MembershipService) StartCheckout(ctx context.Context, userID string, ti
 	session, err := s.createStripeCheckoutSession(ctx, stripeCheckoutRequest{
 		StripePriceID: tierPrice.StripePriceID.String,
 		UserID:        userID,
-		TierID:        uuidToString(tierPrice.TierID),
+		TierID:        utils.UUIDToString(tierPrice.TierID),
 		TierCode:      string(tierPrice.Code),
 		Group:         string(pricing.group),
 		StudentStatus: string(pricing.studentStatus),
@@ -226,7 +225,7 @@ func (s *MembershipService) HandleStripeWebhook(ctx context.Context, body []byte
 		return err
 	}
 
-	userUUID, err := parseUUID(session.Metadata["user_id"])
+	userUUID, err := utils.ParseUUID(session.Metadata["user_id"])
 	if err != nil {
 		return ErrInvalidStripeEvent
 	}
@@ -313,14 +312,6 @@ func effectiveGroup(groups []db.GroupType) db.GroupType {
 	}
 
 	return db.GroupTypeMember
-}
-
-func parseUUID(value string) (pgtype.UUID, error) {
-	parsed, err := uuid.Parse(value)
-	if err != nil {
-		return pgtype.UUID{}, ErrInvalidUserID
-	}
-	return pgtype.UUID{Bytes: parsed, Valid: true}, nil
 }
 
 func parseTierCode(code dto.TierCodeType) (db.TierCodeType, error) {
@@ -460,67 +451,18 @@ func currentMembershipDTO(row db.GetCurrentMembershipByUserIDRow) dto.CurrentMem
 	}
 
 	return dto.CurrentMembershipDTO{
-		ID:                      uuidToString(row.MembershipID),
+		ID:                      utils.UUIDToString(row.MembershipID),
 		TierCode:                dto.TierCodeType(row.Code),
 		TierTitle:               row.Title,
-		TierDescription:         nullableText(row.Description),
+		TierDescription:         utils.TextPtr(row.Description),
 		GroupAtPurchase:         dto.GroupType(row.GroupAtPurchase),
 		StudentStatusAtPurchase: dto.StudentStatusType(row.StudentStatusAtPurchase),
 		StartedAt:               row.StartedAt.Time,
 		ExpiresAt:               row.ExpiresAt.Time,
-		CancelledAt:             nullableTime(row.CancelledAt),
-		Price:                   nullableNumeric(row.PriceAmount),
+		CancelledAt:             utils.TimestamptzPtr(row.CancelledAt),
+		Price:                   utils.NumericStringPtr(row.PriceAmount),
 		Currency:                "CAD",
 		TransactionStatus:       transactionStatus,
-		StripePaymentIntentID:   nullableText(row.StripePaymentIntentID),
-	}
-}
-
-func uuidToString(value pgtype.UUID) string {
-	if !value.Valid {
-		return ""
-	}
-	return uuid.UUID(value.Bytes).String()
-}
-
-func nullableText(value pgtype.Text) *string {
-	if !value.Valid {
-		return nil
-	}
-	return &value.String
-}
-
-func nullableTime(value pgtype.Timestamptz) *time.Time {
-	if !value.Valid {
-		return nil
-	}
-	return &value.Time
-}
-
-func nullableNumeric(value pgtype.Numeric) *string {
-	if !value.Valid {
-		return nil
-	}
-	formatted := numericToString(value)
-	return &formatted
-}
-
-func numericToString(value pgtype.Numeric) string {
-	driverValue, err := value.Value()
-	if err != nil || driverValue == nil {
-		return ""
-	}
-	return fmt.Sprint(driverValue)
-}
-
-func numericIsZero(value pgtype.Numeric) bool {
-	return !value.Valid || value.Int == nil || value.Int.Sign() == 0
-}
-
-func numericFromCents(cents int64) pgtype.Numeric {
-	return pgtype.Numeric{
-		Int:   big.NewInt(cents),
-		Exp:   -2,
-		Valid: true,
+		StripePaymentIntentID:   utils.TextPtr(row.StripePaymentIntentID),
 	}
 }
