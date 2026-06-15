@@ -9,6 +9,8 @@ type SessionResponse = {
     email: string;
     email_verified_at: string | null;
     full_name: string;
+    groups: string[];
+    id: string;
     is_student: boolean;
     onboarding_completed_at: string | null;
     role: string;
@@ -20,7 +22,7 @@ type SessionResponse = {
 const query = queryOptions({
   queryKey: ["auth", "profile"],
   queryFn: async ({ signal }) => {
-    const response = await apiClient.get<SessionResponse>("/auth/me", {
+    const response = await apiClient.get<SessionResponse>("/profile", {
       signal,
       validateStatus: (status) => status === 200 || status === 401,
     });
@@ -38,6 +40,7 @@ const query = queryOptions({
       emailVerifiedAt: user.email_verified_at
         ? new Date(user.email_verified_at)
         : undefined,
+      groups: user.groups ?? [],
       avatarUrl: user.avatar_url ?? undefined,
       onboardingCompletedAt: user.onboarding_completed_at
         ? new Date(user.onboarding_completed_at)

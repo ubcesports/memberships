@@ -13,8 +13,11 @@ func TrustedFrontendOrigins() []string {
 		"http://127.0.0.1:3001",
 	}
 
-	if frontendURL := strings.TrimRight(os.Getenv("FRONTEND_URL"), "/"); frontendURL != "" {
-		origins = append(origins, frontendURL)
+	for _, value := range strings.Split(os.Getenv("FRONTEND_URL"), ",") {
+		origin := strings.TrimRight(strings.TrimSpace(value), "/")
+		if origin != "" {
+			origins = append(origins, origin)
+		}
 	}
 
 	return origins

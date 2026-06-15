@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { StatusBadge, type StatusBadgeProps } from "@/components/status-badge";
 
 export type SummaryTileProps = {
   label: string;
-  value: string;
-  detail: string;
+  value?: string;
+  detail: ReactNode;
   tone?: StatusBadgeProps["tone"];
 };
 
@@ -19,9 +20,11 @@ export function SummaryTile({
         <p className="text-sm font-medium leading-5 text-brand-text-subtle">
           {label}
         </p>
-        <StatusBadge tone={tone}>{value}</StatusBadge>
+        {value && <StatusBadge tone={tone}>{value}</StatusBadge>}
       </div>
-      <p className="mt-3 text-sm leading-6 text-brand-text-muted">{detail}</p>
+      <div className="mt-3 text-sm leading-6 text-brand-text-muted">
+        {detail}
+      </div>
     </div>
   );
 }

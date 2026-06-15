@@ -19,10 +19,25 @@ const JASPERLABS_ACCOUNT_URL =
   process.env.NEXT_PUBLIC_JASPERLABS_ACCOUNT_URL ||
   "https://auth.jasperlabs.net/dashboard";
 
+const GROUP_BADGE_STYLES = {
+  member: "border-sky-300/35 bg-sky-400/12 text-sky-100",
+  competitive_team: "border-fuchsia-300/35 bg-fuchsia-400/12 text-fuchsia-100",
+  executive: "border-emerald-300/35 bg-emerald-400/12 text-emerald-100",
+  director: "border-amber-300/35 bg-amber-400/12 text-amber-100",
+  board: "border-rose-300/35 bg-rose-400/12 text-rose-100",
+} as const;
+
 function titleCase(value: string) {
   return value
     .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getGroupBadgeClass(group: string) {
+  return (
+    GROUP_BADGE_STYLES[group as keyof typeof GROUP_BADGE_STYLES] ||
+    "border-brand-border bg-white/5 text-brand-text-muted"
+  );
 }
 
 function getInitials(name: string, email: string) {
@@ -149,9 +164,24 @@ export default function ProfilePage() {
 
                     <div className="mt-6 grid gap-3.5">
                       <SummaryTile
-                        label="Account type"
-                        value={titleCase(profile.role)}
-                        detail="Standard UBCEA membership account."
+                        label="Assigned groups"
+                        detail={
+                          profile.groups.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {profile.groups.map((group) => (
+                                <StatusBadge
+                                  key={group}
+                                  tone="default"
+                                  className={getGroupBadgeClass(group)}
+                                >
+                                  {titleCase(group)}
+                                </StatusBadge>
+                              ))}
+                            </div>
+                          ) : (
+                            "No groups assigned"
+                          )
+                        }
                         tone="default"
                       />
                       <SummaryTile

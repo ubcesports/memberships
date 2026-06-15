@@ -21,7 +21,7 @@ var Module = fx.Module("server",
 )
 
 // Add all new routes here
-func provideRouter(healthHandler *handlers.HealthHandler, limen *limen.Limen) *chi.Mux {
+func provideRouter(healthHandler *handlers.HealthHandler, profileHandler *handlers.ProfileHandler, limen *limen.Limen) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -35,6 +35,7 @@ func provideRouter(healthHandler *handlers.HealthHandler, limen *limen.Limen) *c
 	// All protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAuth(limen))
+		r.Get("/profile", profileHandler.GetCurrentProfile)
 	})
 
 	// All onboarded routes
