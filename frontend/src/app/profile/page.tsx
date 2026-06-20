@@ -12,33 +12,13 @@ import { SurfacePanel } from "@/components/surface-panel";
 import apiClient from "@/lib/client";
 import { redirectToSignIn } from "@/lib/auth";
 import { formatDate } from "@/lib/utils/formatting";
+import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
 import { useProfile } from "@/lib/profile.hook";
 import Image from "next/image";
 
 const JASPERLABS_ACCOUNT_URL =
   process.env.NEXT_PUBLIC_JASPERLABS_ACCOUNT_URL ||
   "https://auth.jasperlabs.net/dashboard";
-
-const GROUP_BADGE_STYLES = {
-  member: "border-sky-300/35 bg-sky-400/12 text-sky-100",
-  competitive_team: "border-fuchsia-300/35 bg-fuchsia-400/12 text-fuchsia-100",
-  executive: "border-emerald-300/35 bg-emerald-400/12 text-emerald-100",
-  director: "border-amber-300/35 bg-amber-400/12 text-amber-100",
-  board: "border-rose-300/35 bg-rose-400/12 text-rose-100",
-} as const;
-
-function titleCase(value: string) {
-  return value
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function getGroupBadgeClass(group: string) {
-  return (
-    GROUP_BADGE_STYLES[group as keyof typeof GROUP_BADGE_STYLES] ||
-    "border-brand-border bg-white/5 text-brand-text-muted"
-  );
-}
 
 function getInitials(name: string, email: string) {
   const source = name !== "Profile" ? name : email;
