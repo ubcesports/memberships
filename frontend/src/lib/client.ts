@@ -7,8 +7,7 @@ type ApiErrorResponse = {
 };
 
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-  "http://localhost:8080";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8080";
 
 const apiClient = axios.create({
   baseURL: `${API_BASE}`,
@@ -20,8 +19,7 @@ apiClient.interceptors.response.use(
   (error: AxiosError<ApiErrorResponse>) => {
     const status = error.response?.status;
     const code = error.response?.data?.code;
-    const currentPath =
-      typeof window !== "undefined" ? window.location.pathname : "";
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
 
     if (typeof window === "undefined") {
       return Promise.reject(error);

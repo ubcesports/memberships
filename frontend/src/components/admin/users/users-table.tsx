@@ -99,23 +99,16 @@ export function UsersTable({ users, isLoading, isFetching }: UsersTableProps) {
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr
-                key={user.id}
-                className="border-b border-brand-border/70 last:border-b-0"
-              >
+              <tr key={user.id} className="border-b border-brand-border/70 last:border-b-0">
                 <td className="whitespace-nowrap px-4 py-3 font-medium text-brand-text">
                   {user.full_name}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-brand-text-muted">
-                  {user.email}
-                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-brand-text-muted">{user.email}</td>
                 <td className="whitespace-nowrap px-4 py-3 font-mono text-brand-text-muted">
                   {user.student_id ?? <EmptyValue />}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">
-                  <StatusBadge
-                    tone={user.role === "admin" ? "warning" : "default"}
-                  >
+                  <StatusBadge tone={user.role === "admin" ? "warning" : "default"}>
                     {titleCase(user.role)}
                   </StatusBadge>
                 </td>

@@ -14,11 +14,7 @@ type UsersPaginationProps = {
   onLimitChange: (limit: number) => void;
 };
 
-function getRangeLabel(
-  offset: number,
-  usersCount: number,
-  total: number,
-): string {
+function getRangeLabel(offset: number, usersCount: number, total: number): string {
   if (total === 0) {
     return "0 users";
   }
@@ -45,9 +41,7 @@ export function UsersPagination({
 
   return (
     <div className="flex flex-col gap-4 border-t border-brand-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm text-brand-text-muted">
-        {getRangeLabel(offset, usersCount, total)}
-      </p>
+      <p className="text-sm text-brand-text-muted">{getRangeLabel(offset, usersCount, total)}</p>
 
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-brand-text-subtle">

@@ -32,9 +32,7 @@ export function StatusPage({
         <h1 className="text-5xl font-semibold leading-[1.02] text-brand-text sm:text-7xl">
           {title}
         </h1>
-        <p className="mt-6 max-w-xl text-lg leading-8 text-brand-text-muted">
-          {description}
-        </p>
+        <p className="mt-6 max-w-xl text-lg leading-8 text-brand-text-muted">{description}</p>
         <div className="mt-10 flex flex-col gap-3 sm:flex-row">
           <Link
             href={primaryAction.href}
@@ -55,9 +53,7 @@ export function StatusPage({
 
       <div className="relative min-h-72 border border-brand-border bg-brand-surface/80 p-6 shadow-2xl shadow-black/30">
         <div className="flex items-center justify-between border-b border-brand-border pb-5">
-          <span className="font-mono text-sm text-brand-text-muted">
-            status
-          </span>
+          <span className="font-mono text-sm text-brand-text-muted">status</span>
           <span className="font-mono text-sm text-brand-text-subtle">
             memberships.ubcesports.ca
           </span>

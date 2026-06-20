@@ -1,11 +1,6 @@
 export type RoleType = "member" | "admin";
 
-export type GroupType =
-  | "member"
-  | "competitive_team"
-  | "executive"
-  | "director"
-  | "board";
+export type GroupType = "member" | "competitive_team" | "executive" | "director" | "board";
 
 export type SearchMode = "full_name" | "email" | "student_id";
 

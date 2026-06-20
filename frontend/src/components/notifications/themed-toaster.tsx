@@ -15,10 +15,8 @@ export function ThemedToaster() {
         },
         classNames: {
           description: "text-brand-text-muted",
-          actionButton:
-            "bg-brand-primary text-white hover:bg-brand-primary-hover",
-          cancelButton:
-            "border border-brand-border bg-transparent text-brand-text",
+          actionButton: "bg-brand-primary text-white hover:bg-brand-primary-hover",
+          cancelButton: "border border-brand-border bg-transparent text-brand-text",
         },
       }}
     />

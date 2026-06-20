@@ -10,10 +10,7 @@ import { UsersPagination } from "@/components/admin/users/users-pagination";
 import { UsersTable } from "@/components/admin/users/users-table";
 import { UsersToolbar } from "@/components/admin/users/users-toolbar";
 import { BasePage } from "@/components/layout/base-page";
-import {
-  downloadCSVBlob,
-  exportAdminUsersCSV,
-} from "@/lib/admin-users.api";
+import { downloadCSVBlob, exportAdminUsersCSV } from "@/lib/admin-users.api";
 import { useAdminUsers } from "@/lib/admin-users.hook";
 import type {
   AdminUserFilters,
@@ -45,8 +42,7 @@ export default function AdminUsersPage() {
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebouncedValue(searchInput.trim(), 300);
   const appliedSearch = useMemo<AppliedSearch>(
-    () =>
-      debouncedSearch ? { mode: searchMode, value: debouncedSearch } : null,
+    () => (debouncedSearch ? { mode: searchMode, value: debouncedSearch } : null),
     [debouncedSearch, searchMode],
   );
   const [filters, setFilters] = useState<AdminUserFilters>({});
@@ -54,25 +50,20 @@ export default function AdminUsersPage() {
   const [pagination, setPagination] = useState({ offset: 0, anchor: "" });
 
   const searchAnchor = `${searchMode}|${debouncedSearch}`;
-  const offset =
-    pagination.anchor === searchAnchor ? pagination.offset : 0;
+  const offset = pagination.anchor === searchAnchor ? pagination.offset : 0;
 
   const isAdmin = profile?.role === "admin";
 
-  const {
-    data,
-    error,
-    isPending,
-    isFetching,
-    isPlaceholderData,
-  } = useAdminUsers(appliedSearch, filters, { limit, offset }, {
-    enabled: isAdmin,
-  });
+  const { data, error, isPending, isFetching, isPlaceholderData } = useAdminUsers(
+    appliedSearch,
+    filters,
+    { limit, offset },
+    {
+      enabled: isAdmin,
+    },
+  );
 
-  const {
-    mutate: exportUsers,
-    isPending: isExporting,
-  } = useMutation({
+  const { mutate: exportUsers, isPending: isExporting } = useMutation({
     mutationFn: () => exportAdminUsersCSV(appliedSearch, filters),
     onSuccess: (blob) => {
       downloadCSVBlob(blob);
@@ -120,8 +111,7 @@ export default function AdminUsersPage() {
   const handleIsStudentChange = (value: "all" | "yes" | "no") => {
     setFilters((current) => ({
       ...current,
-      isStudent:
-        value === "all" ? undefined : value === "yes",
+      isStudent: value === "all" ? undefined : value === "yes",
     }));
     setPagination({ offset: 0, anchor: searchAnchor });
   };
