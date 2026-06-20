@@ -7,9 +7,7 @@ export const GROUP_BADGE_STYLES = {
 } as const;
 
 export function titleCase(value: string) {
-  return value
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export function getGroupBadgeClass(group: string) {

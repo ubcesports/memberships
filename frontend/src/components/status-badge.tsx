@@ -13,11 +13,7 @@ const TONE_STYLES = {
   muted: "border-brand-border bg-white/5 text-brand-text-muted",
 } as const;
 
-export function StatusBadge({
-  children,
-  tone = "default",
-  className,
-}: StatusBadgeProps) {
+export function StatusBadge({ children, tone = "default", className }: StatusBadgeProps) {
   const toneClass = TONE_STYLES[tone];
 
   return (

@@ -1,16 +1,7 @@
 import { Download, Loader2, RotateCcw } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
-import type {
-  AdminUserFilters,
-  GroupType,
-  RoleType,
-  SearchMode,
-} from "@/lib/admin-users.types";
-import {
-  GROUP_OPTIONS,
-  ROLE_OPTIONS,
-  SEARCH_MODE_OPTIONS,
-} from "@/lib/admin-users.types";
+import type { AdminUserFilters, GroupType, RoleType, SearchMode } from "@/lib/admin-users.types";
+import { GROUP_OPTIONS, ROLE_OPTIONS, SEARCH_MODE_OPTIONS } from "@/lib/admin-users.types";
 
 const FIELD_CLASS_NAME =
   "h-10 border border-brand-border bg-brand-surface px-3 text-sm text-brand-text";
@@ -47,9 +38,7 @@ function getIsStudentFilterValue(filters: AdminUserFilters): IsStudentFilter {
 
 function hasActiveFilters(filters: AdminUserFilters) {
   return (
-    filters.role !== undefined ||
-    filters.group !== undefined ||
-    filters.isStudent !== undefined
+    filters.role !== undefined || filters.group !== undefined || filters.isStudent !== undefined
   );
 }
 
@@ -75,9 +64,7 @@ export function UsersToolbar({
           <span>Search by</span>
           <select
             value={searchMode}
-            onChange={(event) =>
-              onSearchModeChange(event.target.value as SearchMode)
-            }
+            onChange={(event) => onSearchModeChange(event.target.value as SearchMode)}
             className={FIELD_CLASS_NAME}
             aria-label="Search method"
           >
@@ -119,11 +106,7 @@ export function UsersToolbar({
             <select
               value={filters.group ?? ""}
               onChange={(event) =>
-                onGroupChange(
-                  event.target.value
-                    ? (event.target.value as GroupType)
-                    : undefined,
-                )
+                onGroupChange(event.target.value ? (event.target.value as GroupType) : undefined)
               }
               className={FIELD_CLASS_NAME}
               aria-label="Filter by group"
@@ -142,11 +125,7 @@ export function UsersToolbar({
             <select
               value={filters.role ?? ""}
               onChange={(event) =>
-                onRoleChange(
-                  event.target.value
-                    ? (event.target.value as RoleType)
-                    : undefined,
-                )
+                onRoleChange(event.target.value ? (event.target.value as RoleType) : undefined)
               }
               className={FIELD_CLASS_NAME}
               aria-label="Filter by role"
@@ -164,9 +143,7 @@ export function UsersToolbar({
             <span>Is student</span>
             <select
               value={getIsStudentFilterValue(filters)}
-              onChange={(event) =>
-                onIsStudentChange(event.target.value as IsStudentFilter)
-              }
+              onChange={(event) => onIsStudentChange(event.target.value as IsStudentFilter)}
               className={FIELD_CLASS_NAME}
               aria-label="Filter by student status"
             >
@@ -190,9 +167,7 @@ export function UsersToolbar({
             disabled={total === 0 || isExporting}
             loading={isExporting}
             icon={<Download aria-hidden="true" className="size-4" />}
-            loadingIcon={
-              <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-            }
+            loadingIcon={<Loader2 aria-hidden="true" className="size-4 animate-spin" />}
           >
             {isExporting ? "Exporting" : "Export CSV"}
           </ActionButton>
