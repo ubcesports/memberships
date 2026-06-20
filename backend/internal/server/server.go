@@ -20,34 +20,46 @@ var Module = fx.Module("server",
 	fx.Invoke(startServer),
 )
 
+type RouterParams struct {
+	fx.In
+
+	HealthHandler    *handlers.HealthHandler
+	ProfileHandler   *handlers.ProfileHandler
+	AdminUserHandler *handlers.AdminUserHandler
+	Limen            *limen.Limen
+}
+
 // Add all new routes here
-func provideRouter(healthHandler *handlers.HealthHandler, profileHandler *handlers.ProfileHandler, limen *limen.Limen) *chi.Mux {
+func provideRouter(params RouterParams) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(corsMiddleware)
 
-	r.Mount("/", limen.Handler())
+	r.Mount("/", params.Limen.Handler())
 
 	// All public routes
-	r.Get("/health", healthHandler.IsDatabaseHealthy)
+	r.Get("/health", params.HealthHandler.IsDatabaseHealthy)
 
 	// All protected routes
 	r.Group(func(r chi.Router) {
-		r.Use(auth.RequireAuth(limen))
-		r.Get("/profile", profileHandler.GetCurrentProfile)
+		r.Use(auth.RequireAuth(params.Limen))
+
+		r.Get("/profile", params.ProfileHandler.GetCurrentProfile)
 	})
 
 	// All onboarded routes
 	r.Group(func(r chi.Router) {
-		r.Use(auth.RequireAuth(limen))
+		r.Use(auth.RequireAuth(params.Limen))
 		r.Use(auth.RequireOnboarded)
 	})
 
 	// All admin routes
 	r.Group(func(r chi.Router) {
-		r.Use(auth.RequireAuth(limen))
+		r.Use(auth.RequireAuth(params.Limen))
 		r.Use(auth.RequireRole("admin"))
+
+		r.Get("/admin/users", params.AdminUserHandler.GetUsers)
 	})
 
 	return r
