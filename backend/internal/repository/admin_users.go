@@ -19,3 +19,10 @@ func (r *AdminUserRepository) GetUsers(
 	params db.GetUsersAdminParams) ([]db.GetUsersAdminRow, error) {
 	return r.store.GetUsersAdmin(ctx, params)
 }
+
+func (r *AdminUserRepository) CountUsers(
+	ctx context.Context,
+	params db.CountUsersAdminParams,
+) (int64, error) {
+	return r.store.CountUsersAdmin(ctx, params)
+}

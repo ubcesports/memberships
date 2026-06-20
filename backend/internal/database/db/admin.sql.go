@@ -11,6 +11,63 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countUsersAdmin = `-- name: CountUsersAdmin :one
+SELECT COUNT(*)
+FROM users u
+WHERE (
+    $1::text IS NULL
+    OR u.full_name ILIKE '%' || $1::text || '%'
+)
+AND (
+    $2::text IS NULL
+    OR u.student_id ILIKE '%' || $2::text || '%'
+)
+AND (
+    $3::text IS NULL
+    OR u.email ILIKE '%' || $3::text || '%'
+)
+AND (
+    $4::role_type IS NULL
+    OR u.role = $4::role_type
+)
+AND (
+    $5::boolean IS NULL
+    OR u.is_student = $5::boolean
+)
+AND (
+    $6::group_type IS NULL
+    OR EXISTS (
+        SELECT 1
+        FROM user_groups filter_group
+        WHERE filter_group.user_id = u.id
+          AND filter_group."group" = $6::group_type
+    )
+)
+`
+
+type CountUsersAdminParams struct {
+	FullName  pgtype.Text
+	StudentID pgtype.Text
+	Email     pgtype.Text
+	Role      NullRoleType
+	IsStudent pgtype.Bool
+	Group     NullGroupType
+}
+
+func (q *Queries) CountUsersAdmin(ctx context.Context, arg CountUsersAdminParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countUsersAdmin,
+		arg.FullName,
+		arg.StudentID,
+		arg.Email,
+		arg.Role,
+		arg.IsStudent,
+		arg.Group,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getUsersAdmin = `-- name: GetUsersAdmin :many
 SELECT
     u.id,

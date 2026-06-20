@@ -53,3 +53,36 @@ AND (
 ORDER BY u.created_at DESC
 LIMIT sqlc.narg('limit')
 OFFSET sqlc.narg('offset');
+
+-- name: CountUsersAdmin :one
+SELECT COUNT(*)
+FROM users u
+WHERE (
+    sqlc.narg('full_name')::text IS NULL
+    OR u.full_name ILIKE '%' || sqlc.narg('full_name')::text || '%'
+)
+AND (
+    sqlc.narg('student_id')::text IS NULL
+    OR u.student_id ILIKE '%' || sqlc.narg('student_id')::text || '%'
+)
+AND (
+    sqlc.narg('email')::text IS NULL
+    OR u.email ILIKE '%' || sqlc.narg('email')::text || '%'
+)
+AND (
+    sqlc.narg('role')::role_type IS NULL
+    OR u.role = sqlc.narg('role')::role_type
+)
+AND (
+    sqlc.narg('is_student')::boolean IS NULL
+    OR u.is_student = sqlc.narg('is_student')::boolean
+)
+AND (
+    sqlc.narg('group')::group_type IS NULL
+    OR EXISTS (
+        SELECT 1
+        FROM user_groups filter_group
+        WHERE filter_group.user_id = u.id
+          AND filter_group."group" = sqlc.narg('group')::group_type
+    )
+);

@@ -28,7 +28,7 @@ func NewAdminUserService(adminUserRepository *repository.AdminUserRepository) *A
 	return &AdminUserService{adminUserRepository: adminUserRepository}
 }
 
-func (s *AdminUserService) GetUsers(ctx context.Context, filters AdminUserFilters) ([]dto.ProfileDTO, error) {
+func (s *AdminUserService) GetUsers(ctx context.Context, filters AdminUserFilters) ([]dto.ProfileDTO, int64, error) {
 	if filters.Limit <= 0 {
 		filters.Limit = 25
 	}
@@ -43,7 +43,24 @@ func (s *AdminUserService) GetUsers(ctx context.Context, filters AdminUserFilter
 	params.Limit = pgtype.Int4{Int32: filters.Limit, Valid: true}
 	params.Offset = pgtype.Int4{Int32: filters.Offset, Valid: true}
 
-	return s.getUsers(ctx, params)
+	total, err := s.adminUserRepository.CountUsers(ctx, db.CountUsersAdminParams{
+		FullName:  params.FullName,
+		StudentID: params.StudentID,
+		Email:     params.Email,
+		Role:      params.Role,
+		IsStudent: params.IsStudent,
+		Group:     params.Group,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	users, err := s.getUsers(ctx, params)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return users, total, nil
 }
 
 func (s *AdminUserService) ExportUsers(ctx context.Context, filters AdminUserFilters) ([]dto.ProfileDTO, error) {

@@ -39,7 +39,8 @@ Args (query params):
 
 Returns:
 
-	users: user profiles (HTTP 200)
+	users: paginated user profiles (HTTP 200)
+	total: number of users matching the filters
 
 Raises:
 
@@ -55,7 +56,7 @@ func (h *AdminUserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := h.adminUserService.GetUsers(r.Context(), filters)
+	users, total, err := h.adminUserService.GetUsers(r.Context(), filters)
 	if err != nil {
 		http.Error(w, "unable to load users", http.StatusInternalServerError)
 		return
@@ -64,6 +65,7 @@ func (h *AdminUserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"users": users,
+		"total": total,
 	})
 }
 
