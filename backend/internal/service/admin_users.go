@@ -39,6 +39,18 @@ func (s *AdminUserService) GetUsers(ctx context.Context, filters AdminUserFilter
 		filters.Offset = 0
 	}
 
+	params := buildAdminUserQueryParams(filters)
+	params.Limit = pgtype.Int4{Int32: filters.Limit, Valid: true}
+	params.Offset = pgtype.Int4{Int32: filters.Offset, Valid: true}
+
+	return s.getUsers(ctx, params)
+}
+
+func (s *AdminUserService) ExportUsers(ctx context.Context, filters AdminUserFilters) ([]dto.ProfileDTO, error) {
+	return s.getUsers(ctx, buildAdminUserQueryParams(filters))
+}
+
+func buildAdminUserQueryParams(filters AdminUserFilters) db.GetUsersAdminParams {
 	isStudent := pgtype.Bool{}
 	if filters.IsStudent != nil {
 		isStudent = pgtype.Bool{
@@ -47,7 +59,7 @@ func (s *AdminUserService) GetUsers(ctx context.Context, filters AdminUserFilter
 		}
 	}
 
-	params := db.GetUsersAdminParams{
+	return db.GetUsersAdminParams{
 		FullName: pgtype.Text{
 			String: filters.FullName,
 			Valid:  filters.FullName != "",
@@ -69,10 +81,10 @@ func (s *AdminUserService) GetUsers(ctx context.Context, filters AdminUserFilter
 			GroupType: db.GroupType(filters.Group),
 			Valid:     filters.Group != "",
 		},
-		Limit:  filters.Limit,
-		Offset: filters.Offset,
 	}
+}
 
+func (s *AdminUserService) getUsers(ctx context.Context, params db.GetUsersAdminParams) ([]dto.ProfileDTO, error) {
 	rows, err := s.adminUserRepository.GetUsers(ctx, params)
 	if err != nil {
 		return nil, err

@@ -60,6 +60,7 @@ func provideRouter(params RouterParams) *chi.Mux {
 		r.Use(auth.RequireRole("admin"))
 
 		r.Get("/admin/users", params.AdminUserHandler.GetUsers)
+		r.Get("/admin/users/export", params.AdminUserHandler.ExportUsersCSV)
 	})
 
 	return r

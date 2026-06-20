@@ -75,8 +75,8 @@ type GetUsersAdminParams struct {
 	Role      NullRoleType
 	IsStudent pgtype.Bool
 	Group     NullGroupType
-	Offset    int32
-	Limit     int32
+	Offset    pgtype.Int4
+	Limit     pgtype.Int4
 }
 
 type GetUsersAdminRow struct {

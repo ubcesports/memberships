@@ -51,5 +51,5 @@ AND (
     )
 )
 ORDER BY u.created_at DESC
-LIMIT sqlc.arg('limit')
-OFFSET sqlc.arg('offset');
+LIMIT sqlc.narg('limit')
+OFFSET sqlc.narg('offset');
