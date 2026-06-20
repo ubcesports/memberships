@@ -21,6 +21,33 @@ func NewAdminUserHandler(adminUserService *service.AdminUserService) *AdminUserH
 	return &AdminUserHandler{adminUserService: adminUserService}
 }
 
+/*
+Returns a filtered and paginated list of users.
+
+API URL: GET /admin/users
+
+Args (query params):
+
+	full_name: optional case-insensitive name substring
+	student_id: optional case-insensitive student ID substring
+	email: optional case-insensitive email substring
+	role: optional role (member or admin)
+	is_student: optional boolean student status
+	group: optional group membership
+	limit: optional page size (default 25, maximum 100)
+	offset: optional number of users to skip (default 0)
+
+Returns:
+
+	users: user profiles (HTTP 200)
+
+Raises:
+
+	400: invalid filter or pagination value
+	401: user is not authenticated
+	403: user is not an admin
+	500: users could not be loaded
+*/
 func (h *AdminUserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	filters, err := parseAdminUserFilters(r, true)
 	if err != nil {
@@ -40,6 +67,31 @@ func (h *AdminUserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+/*
+Exports every user matching the supplied filters as CSV.
+
+API URL: GET /admin/users/export
+
+Args (query params):
+
+	full_name: optional case-insensitive name substring
+	student_id: optional case-insensitive student ID substring
+	email: optional case-insensitive email substring
+	role: optional role (member or admin)
+	is_student: optional boolean student status
+	group: optional group membership
+
+Returns:
+
+	users.csv: CSV file containing all matching users (HTTP 200)
+
+Raises:
+
+	400: invalid filter value
+	401: user is not authenticated
+	403: user is not an admin
+	500: users could not be exported
+*/
 func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request) {
 	filters, err := parseAdminUserFilters(r, false)
 	if err != nil {
