@@ -11,7 +11,7 @@ SELECT
     u.is_student,
     u.onboarding_completed_at,
     u.avatar_url,
-    COALESCE(g.groups, '{}'::text[]) AS groups
+    COALESCE(g.groups, '{}'::text[])::text[] AS groups
 FROM users u
 LEFT JOIN LATERAL (
     SELECT array_agg(ug."group"::text ORDER BY ug.assigned_at ASC, ug."group" ASC) AS groups
