@@ -20,29 +20,75 @@ var Module = fx.Module("server",
 	fx.Invoke(startServer),
 )
 
+type RouterParams struct {
+	fx.In
+
+	HealthHandler    *handlers.HealthHandler
+	ProfileHandler   *handlers.ProfileHandler
+	AdminUserHandler *handlers.AdminUserHandler
+	Limen            *limen.Limen
+}
+
 // Add all new routes here
-func provideRouter(healthHandler *handlers.HealthHandler, limen *limen.Limen) *chi.Mux {
+func provideRouter(params RouterParams) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(corsMiddleware)
 
-	r.Mount("/", limen.Handler())
+	r.Mount("/", params.Limen.Handler())
 
 	// All public routes
-	r.Get("/health", healthHandler.IsDatabaseHealthy)
+	r.Get("/health", params.HealthHandler.IsDatabaseHealthy)
 
 	// All protected routes
 	r.Group(func(r chi.Router) {
-		r.Use(auth.RequireAuth(limen))
+		r.Use(auth.RequireAuth(params.Limen))
+
+		r.Get("/profile", params.ProfileHandler.GetCurrentProfile)
+	})
+
+	// All onboarded routes
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RequireAuth(params.Limen))
+		r.Use(auth.RequireOnboarded)
 	})
 
 	// All admin routes
 	r.Group(func(r chi.Router) {
-		r.Use(auth.RequireAuth(limen))
+		r.Use(auth.RequireAuth(params.Limen))
 		r.Use(auth.RequireRole("admin"))
+
+		r.Get("/admin/users", params.AdminUserHandler.GetUsers)
+		r.Get("/admin/users/export", params.AdminUserHandler.ExportUsersCSV)
 	})
 
 	return r
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	allowedOrigins := make(map[string]struct{})
+	for _, origin := range auth.TrustedFrontendOrigins() {
+		allowedOrigins[origin] = struct{}{}
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if _, ok := allowedOrigins[origin]; ok {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Add("Vary", "Origin")
+		}
+
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 func startServer(lc fx.Lifecycle, r *chi.Mux) {
