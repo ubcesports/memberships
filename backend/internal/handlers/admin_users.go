@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -58,6 +59,7 @@ func (h *AdminUserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 
 	users, total, err := h.adminUserService.GetUsers(r.Context(), filters)
 	if err != nil {
+		log.Printf("unable to load users: %v", err)
 		http.Error(w, "unable to load users", http.StatusInternalServerError)
 		return
 	}
@@ -103,6 +105,7 @@ func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request
 
 	users, err := h.adminUserService.ExportUsers(r.Context(), filters)
 	if err != nil {
+		log.Printf("unable to export users: %v", err)
 		http.Error(w, "unable to export users", http.StatusInternalServerError)
 		return
 	}

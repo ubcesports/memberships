@@ -12,35 +12,45 @@ import (
 )
 
 const countUsersAdmin = `-- name: CountUsersAdmin :one
+WITH args AS (
+    SELECT
+        $1::text AS full_name,
+        $2::text AS student_id,
+        $3::text AS email,
+        $4::role_type AS role,
+        $5::boolean AS is_student,
+        $6::group_type AS "group"
+)
 SELECT COUNT(*)
 FROM users u
+CROSS JOIN args a
 WHERE (
-    $1::text IS NULL
-    OR u.full_name ILIKE '%' || $1::text || '%'
+    a.full_name IS NULL
+    OR u.full_name ILIKE '%' || a.full_name || '%'
 )
 AND (
-    $2::text IS NULL
-    OR u.student_id ILIKE '%' || $2::text || '%'
+    a.student_id IS NULL
+    OR u.student_id ILIKE '%' || a.student_id || '%'
 )
 AND (
-    $3::text IS NULL
-    OR u.email ILIKE '%' || $3::text || '%'
+    a.email IS NULL
+    OR u.email ILIKE '%' || a.email || '%'
 )
 AND (
-    $4::role_type IS NULL
-    OR u.role = $4::role_type
+    a.role IS NULL
+    OR u.role = a.role
 )
 AND (
-    $5::boolean IS NULL
-    OR u.is_student = $5::boolean
+    a.is_student IS NULL
+    OR u.is_student = a.is_student
 )
 AND (
-    $6::group_type IS NULL
+    a."group" IS NULL
     OR EXISTS (
         SELECT 1
         FROM user_groups filter_group
         WHERE filter_group.user_id = u.id
-          AND filter_group."group" = $6::group_type
+          AND filter_group."group" = a."group"
     )
 )
 `
@@ -69,6 +79,17 @@ func (q *Queries) CountUsersAdmin(ctx context.Context, arg CountUsersAdminParams
 }
 
 const getUsersAdmin = `-- name: GetUsersAdmin :many
+WITH args AS (
+    SELECT
+        $1::text AS full_name,
+        $2::text AS student_id,
+        $3::text AS email,
+        $4::role_type AS role,
+        $5::boolean AS is_student,
+        $6::group_type AS "group",
+        $7::integer AS "limit",
+        $8::integer AS "offset"
+)
 SELECT
     u.id,
     u.email,
@@ -83,6 +104,7 @@ SELECT
     u.avatar_url,
     COALESCE(g.groups, '{}'::text[])::text[] AS groups
 FROM users u
+CROSS JOIN args a
 LEFT JOIN LATERAL (
     SELECT array_agg(
         ug."group"::text
@@ -92,37 +114,37 @@ LEFT JOIN LATERAL (
     WHERE ug.user_id = u.id
 ) g ON true
 WHERE (
-    $1::text IS NULL
-    OR u.full_name ILIKE '%' || $1::text || '%'
+    a.full_name IS NULL
+    OR u.full_name ILIKE '%' || a.full_name || '%'
 )
 AND (
-    $2::text IS NULL
-    OR u.student_id ILIKE '%' || $2::text || '%'
+    a.student_id IS NULL
+    OR u.student_id ILIKE '%' || a.student_id || '%'
 )
 AND (
-    $3::text IS NULL
-    OR u.email ILIKE '%' || $3::text || '%'
+    a.email IS NULL
+    OR u.email ILIKE '%' || a.email || '%'
 )
 AND (
-    $4::role_type IS NULL
-    OR u.role = $4::role_type
+    a.role IS NULL
+    OR u.role = a.role
 )
 AND (
-    $5::boolean IS NULL
-    OR u.is_student = $5::boolean
+    a.is_student IS NULL
+    OR u.is_student = a.is_student
 )
 AND (
-    $6::group_type IS NULL
+    a."group" IS NULL
     OR EXISTS (
         SELECT 1
         FROM user_groups filter_group
         WHERE filter_group.user_id = u.id
-          AND filter_group."group" = $6::group_type
+          AND filter_group."group" = a."group"
     )
 )
 ORDER BY u.created_at DESC
-LIMIT $8
-OFFSET $7
+LIMIT (SELECT "limit" FROM args)
+OFFSET (SELECT "offset" FROM args)
 `
 
 type GetUsersAdminParams struct {
@@ -132,8 +154,8 @@ type GetUsersAdminParams struct {
 	Role      NullRoleType
 	IsStudent pgtype.Bool
 	Group     NullGroupType
-	Offset    pgtype.Int4
 	Limit     pgtype.Int4
+	Offset    pgtype.Int4
 }
 
 type GetUsersAdminRow struct {
@@ -159,8 +181,8 @@ func (q *Queries) GetUsersAdmin(ctx context.Context, arg GetUsersAdminParams) ([
 		arg.Role,
 		arg.IsStudent,
 		arg.Group,
-		arg.Offset,
 		arg.Limit,
+		arg.Offset,
 	)
 	if err != nil {
 		return nil, err
