@@ -23,5 +23,6 @@ const (
 	TransactionPending   TransactionStatusType = "pending"
 	TransactionCompleted TransactionStatusType = "completed"
 	TransactionFailed    TransactionStatusType = "failed"
+	TransactionExpired   TransactionStatusType = "expired"
 	TransactionRefunded  TransactionStatusType = "refunded"
 )

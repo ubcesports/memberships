@@ -7,5 +7,7 @@ var Module = fx.Module("repository",
 		NewHealthHandler,
 		NewProfileHandler,
 		NewAdminUserHandler,
+		NewMembershipHandler,
+		NewStripeWebhookHandler,
 	),
 )

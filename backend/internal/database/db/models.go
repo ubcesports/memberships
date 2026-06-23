@@ -105,6 +105,7 @@ const (
 	TransactionStatusTypeCompleted TransactionStatusType = "completed"
 	TransactionStatusTypeFailed    TransactionStatusType = "failed"
 	TransactionStatusTypeRefunded  TransactionStatusType = "refunded"
+	TransactionStatusTypeExpired   TransactionStatusType = "expired"
 )
 
 func (e *TransactionStatusType) Scan(src interface{}) error {
@@ -157,16 +158,16 @@ type Account struct {
 }
 
 type Membership struct {
-	ID              pgtype.UUID
-	UserID          pgtype.UUID
-	TierID          pgtype.UUID
-	TransactionID   pgtype.UUID
-	GroupAtPurchase GroupType
-	StartedAt       pgtype.Timestamptz
-	ExpiresAt       pgtype.Timestamptz
-	CancelledAt     pgtype.Timestamptz
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
+	ID                  pgtype.UUID
+	UserID              pgtype.UUID
+	TierID              pgtype.UUID
+	GroupAtPurchase     GroupType
+	StartedAt           pgtype.Timestamptz
+	ExpiresAt           pgtype.Timestamptz
+	CancelledAt         pgtype.Timestamptz
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+	IsStudentAtPurchase bool
 }
 
 type MembershipTier struct {
@@ -177,16 +178,17 @@ type MembershipTier struct {
 	UpdatedAt       pgtype.Timestamptz
 	StripeProductID pgtype.Text
 	IsActive        bool
+	Slug            string
 }
 
 type MembershipTierPrice struct {
 	ID            pgtype.UUID
 	TierID        pgtype.UUID
 	Group         GroupType
-	Price         pgtype.Numeric
-	StripePriceID pgtype.Text
+	StripePriceID string
 	CreatedAt     pgtype.Timestamptz
 	UpdatedAt     pgtype.Timestamptz
+	IsStudent     bool
 }
 
 type Session struct {
@@ -200,14 +202,21 @@ type Session struct {
 }
 
 type Transaction struct {
-	ID                    pgtype.UUID
-	UserID                pgtype.UUID
-	MembershipID          pgtype.UUID
-	StripePaymentIntentID pgtype.Text
-	PriceAmount           pgtype.Numeric
-	Status                TransactionStatusType
-	CreatedAt             pgtype.Timestamptz
-	UpdatedAt             pgtype.Timestamptz
+	ID                      pgtype.UUID
+	UserID                  pgtype.UUID
+	MembershipID            pgtype.UUID
+	StripePaymentIntentID   pgtype.Text
+	AmountMinor             int64
+	Status                  TransactionStatusType
+	CreatedAt               pgtype.Timestamptz
+	UpdatedAt               pgtype.Timestamptz
+	TierID                  pgtype.UUID
+	GroupAtPurchase         NullGroupType
+	IsStudentAtPurchase     bool
+	StripeCheckoutSessionID pgtype.Text
+	StripeChargeID          pgtype.Text
+	StripePriceID           pgtype.Text
+	Currency                pgtype.Text
 }
 
 type User struct {

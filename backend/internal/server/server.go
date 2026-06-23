@@ -23,10 +23,12 @@ var Module = fx.Module("server",
 type RouterParams struct {
 	fx.In
 
-	HealthHandler    *handlers.HealthHandler
-	ProfileHandler   *handlers.ProfileHandler
-	AdminUserHandler *handlers.AdminUserHandler
-	Limen            *limen.Limen
+	HealthHandler        *handlers.HealthHandler
+	ProfileHandler       *handlers.ProfileHandler
+	AdminUserHandler     *handlers.AdminUserHandler
+	MembershipHandler    *handlers.MembershipHandler
+	StripeWebhookHandler *handlers.StripeWebhookHandler
+	Limen                *limen.Limen
 }
 
 // Add all new routes here
@@ -40,6 +42,7 @@ func provideRouter(params RouterParams) *chi.Mux {
 
 	// All public routes
 	r.Get("/health", params.HealthHandler.IsDatabaseHealthy)
+	r.Post("/webhooks/stripe", params.StripeWebhookHandler.Handle)
 
 	// All protected routes
 	r.Group(func(r chi.Router) {
@@ -52,6 +55,10 @@ func provideRouter(params RouterParams) *chi.Mux {
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAuth(params.Limen))
 		r.Use(auth.RequireOnboarded)
+
+		r.Get("/membership/tiers", params.MembershipHandler.GetEligibleTiers)
+		r.Get("/membership/me", params.MembershipHandler.GetCurrentMembership)
+		r.Post("/membership/checkout", params.MembershipHandler.CreateCheckoutSession)
 	})
 
 	// All admin routes
