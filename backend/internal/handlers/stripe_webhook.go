@@ -27,7 +27,7 @@ func NewStripeWebhookHandler(membershipService *service.MembershipService) (*Str
 }
 
 /*
-Processes signed Stripe Checkout, payment failure, expiration, and refund events.
+Processes signed Stripe Checkout, payment failure, and expiration events.
 
 API URL: POST /webhooks/stripe
 
@@ -42,7 +42,6 @@ Handled events:
 	checkout.session.async_payment_succeeded: fulfills a delayed payment
 	checkout.session.async_payment_failed: marks the transaction as failed
 	checkout.session.expired: marks the transaction as expired
-	charge.refunded: cancels the membership after a full refund; partial refunds are ignored
 
 Returns:
 
@@ -88,13 +87,6 @@ func (h *StripeWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		err = h.service.HandleCheckoutFailed(r.Context(), session.ID)
-	case "charge.refunded":
-		var charge stripe.Charge
-		if err := json.Unmarshal(event.Data.Raw, &charge); err != nil {
-			writeAPIError(w, http.StatusBadRequest, "INVALID_WEBHOOK", "Invalid Charge")
-			return
-		}
-		err = h.service.HandleChargeRefunded(r.Context(), &charge, occurredAt)
 	}
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, "WEBHOOK_PROCESSING_FAILED", "Webhook processing failed")

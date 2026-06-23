@@ -18,41 +18,23 @@ WITH args AS (
         $2::text AS student_id,
         $3::text AS email,
         $4::role_type AS role,
-        $5::boolean AS is_student,
-        $6::group_type AS "group"
+        $5::group_type AS "group"
 )
 SELECT COUNT(*)
 FROM users u
 CROSS JOIN args a
-WHERE (
-    a.full_name IS NULL
-    OR u.full_name ILIKE '%' || a.full_name || '%'
-)
-AND (
-    a.student_id IS NULL
-    OR u.student_id ILIKE '%' || a.student_id || '%'
-)
-AND (
-    a.email IS NULL
-    OR u.email ILIKE '%' || a.email || '%'
-)
-AND (
-    a.role IS NULL
-    OR u.role = a.role
-)
-AND (
-    a.is_student IS NULL
-    OR u.is_student = a.is_student
-)
-AND (
-    a."group" IS NULL
-    OR EXISTS (
-        SELECT 1
-        FROM user_groups filter_group
-        WHERE filter_group.user_id = u.id
-          AND filter_group."group" = a."group"
-    )
-)
+WHERE (a.full_name IS NULL OR u.full_name ILIKE '%' || a.full_name || '%')
+  AND (a.student_id IS NULL OR u.student_id ILIKE '%' || a.student_id || '%')
+  AND (a.email IS NULL OR u.email ILIKE '%' || a.email || '%')
+  AND (a.role IS NULL OR u.role = a.role)
+  AND (
+      a."group" IS NULL
+      OR EXISTS (
+          SELECT 1 FROM user_groups filter_group
+          WHERE filter_group.user_id = u.id
+            AND filter_group."group" = a."group"
+      )
+  )
 `
 
 type CountUsersAdminParams struct {
@@ -60,7 +42,6 @@ type CountUsersAdminParams struct {
 	StudentID pgtype.Text
 	Email     pgtype.Text
 	Role      NullRoleType
-	IsStudent pgtype.Bool
 	Group     NullGroupType
 }
 
@@ -70,7 +51,6 @@ func (q *Queries) CountUsersAdmin(ctx context.Context, arg CountUsersAdminParams
 		arg.StudentID,
 		arg.Email,
 		arg.Role,
-		arg.IsStudent,
 		arg.Group,
 	)
 	var count int64
@@ -85,10 +65,9 @@ WITH args AS (
         $2::text AS student_id,
         $3::text AS email,
         $4::role_type AS role,
-        $5::boolean AS is_student,
-        $6::group_type AS "group",
-        $7::integer AS "limit",
-        $8::integer AS "offset"
+        $5::group_type AS "group",
+        $6::integer AS "limit",
+        $7::integer AS "offset"
 )
 SELECT
     u.id,
@@ -99,49 +78,28 @@ SELECT
     u.updated_at,
     u.full_name,
     u.email_verified_at,
-    u.is_student,
     u.onboarding_completed_at,
     u.avatar_url,
     COALESCE(g.groups, '{}'::text[])::text[] AS groups
 FROM users u
 CROSS JOIN args a
 LEFT JOIN LATERAL (
-    SELECT array_agg(
-        ug."group"::text
-        ORDER BY ug.assigned_at, ug."group"
-    ) AS groups
+    SELECT array_agg(ug."group"::text ORDER BY ug.assigned_at, ug."group") AS groups
     FROM user_groups ug
     WHERE ug.user_id = u.id
 ) g ON true
-WHERE (
-    a.full_name IS NULL
-    OR u.full_name ILIKE '%' || a.full_name || '%'
-)
-AND (
-    a.student_id IS NULL
-    OR u.student_id ILIKE '%' || a.student_id || '%'
-)
-AND (
-    a.email IS NULL
-    OR u.email ILIKE '%' || a.email || '%'
-)
-AND (
-    a.role IS NULL
-    OR u.role = a.role
-)
-AND (
-    a.is_student IS NULL
-    OR u.is_student = a.is_student
-)
-AND (
-    a."group" IS NULL
-    OR EXISTS (
-        SELECT 1
-        FROM user_groups filter_group
-        WHERE filter_group.user_id = u.id
-          AND filter_group."group" = a."group"
-    )
-)
+WHERE (a.full_name IS NULL OR u.full_name ILIKE '%' || a.full_name || '%')
+  AND (a.student_id IS NULL OR u.student_id ILIKE '%' || a.student_id || '%')
+  AND (a.email IS NULL OR u.email ILIKE '%' || a.email || '%')
+  AND (a.role IS NULL OR u.role = a.role)
+  AND (
+      a."group" IS NULL
+      OR EXISTS (
+          SELECT 1 FROM user_groups filter_group
+          WHERE filter_group.user_id = u.id
+            AND filter_group."group" = a."group"
+      )
+  )
 ORDER BY u.created_at DESC
 LIMIT (SELECT "limit" FROM args)
 OFFSET (SELECT "offset" FROM args)
@@ -152,7 +110,6 @@ type GetUsersAdminParams struct {
 	StudentID pgtype.Text
 	Email     pgtype.Text
 	Role      NullRoleType
-	IsStudent pgtype.Bool
 	Group     NullGroupType
 	Limit     pgtype.Int4
 	Offset    pgtype.Int4
@@ -167,7 +124,6 @@ type GetUsersAdminRow struct {
 	UpdatedAt             pgtype.Timestamptz
 	FullName              string
 	EmailVerifiedAt       pgtype.Timestamptz
-	IsStudent             bool
 	OnboardingCompletedAt pgtype.Timestamptz
 	AvatarUrl             pgtype.Text
 	Groups                []string
@@ -179,7 +135,6 @@ func (q *Queries) GetUsersAdmin(ctx context.Context, arg GetUsersAdminParams) ([
 		arg.StudentID,
 		arg.Email,
 		arg.Role,
-		arg.IsStudent,
 		arg.Group,
 		arg.Limit,
 		arg.Offset,
@@ -200,7 +155,6 @@ func (q *Queries) GetUsersAdmin(ctx context.Context, arg GetUsersAdminParams) ([
 			&i.UpdatedAt,
 			&i.FullName,
 			&i.EmailVerifiedAt,
-			&i.IsStudent,
 			&i.OnboardingCompletedAt,
 			&i.AvatarUrl,
 			&i.Groups,

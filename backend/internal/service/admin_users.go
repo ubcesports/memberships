@@ -14,7 +14,6 @@ type AdminUserFilters struct {
 	StudentID string
 	Email     string
 	Role      string
-	IsStudent *bool
 	Group     string
 	Limit     int32
 	Offset    int32
@@ -48,7 +47,6 @@ func (s *AdminUserService) GetUsers(ctx context.Context, filters AdminUserFilter
 		StudentID: params.StudentID,
 		Email:     params.Email,
 		Role:      params.Role,
-		IsStudent: params.IsStudent,
 		Group:     params.Group,
 	})
 	if err != nil {
@@ -68,14 +66,6 @@ func (s *AdminUserService) ExportUsers(ctx context.Context, filters AdminUserFil
 }
 
 func buildAdminUserQueryParams(filters AdminUserFilters) db.GetUsersAdminParams {
-	isStudent := pgtype.Bool{}
-	if filters.IsStudent != nil {
-		isStudent = pgtype.Bool{
-			Bool:  *filters.IsStudent,
-			Valid: true,
-		}
-	}
-
 	return db.GetUsersAdminParams{
 		FullName: pgtype.Text{
 			String: filters.FullName,
@@ -93,7 +83,6 @@ func buildAdminUserQueryParams(filters AdminUserFilters) db.GetUsersAdminParams 
 			RoleType: db.RoleType(filters.Role),
 			Valid:    filters.Role != "",
 		},
-		IsStudent: isStudent,
 		Group: db.NullGroupType{
 			GroupType: db.GroupType(filters.Group),
 			Valid:     filters.Group != "",
@@ -123,7 +112,6 @@ func (s *AdminUserService) getUsers(ctx context.Context, params db.GetUsersAdmin
 			UpdatedAt:             row.UpdatedAt.Time,
 			FullName:              row.FullName,
 			EmailVerifiedAt:       timestampPointer(row.EmailVerifiedAt),
-			IsStudent:             row.IsStudent,
 			OnboardingCompletedAt: timestampPointer(row.OnboardingCompletedAt),
 			AvatarURL:             textPointer(row.AvatarUrl),
 			Groups:                groups,

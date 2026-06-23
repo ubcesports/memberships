@@ -3,8 +3,6 @@ package service
 import (
 	"testing"
 	"time"
-
-	"github.com/stripe/stripe-go/v85"
 )
 
 func TestMembershipExpiry(t *testing.T) {
@@ -18,8 +16,8 @@ func TestMembershipExpiry(t *testing.T) {
 		year     int
 	}{
 		{name: "February", purchase: time.Date(2027, time.February, 10, 12, 0, 0, 0, location), year: 2027},
-		{name: "April 30", purchase: time.Date(2027, time.April, 30, 23, 59, 0, 0, location), year: 2027},
-		{name: "May 1", purchase: time.Date(2027, time.May, 1, 0, 0, 0, 0, location), year: 2028},
+		{name: "August 31", purchase: time.Date(2027, time.August, 31, 23, 59, 0, 0, location), year: 2027},
+		{name: "September 1", purchase: time.Date(2027, time.September, 1, 0, 0, 0, 0, location), year: 2028},
 		{name: "September", purchase: time.Date(2026, time.September, 15, 12, 0, 0, 0, location), year: 2027},
 	}
 	for _, test := range tests {
@@ -28,7 +26,7 @@ func TestMembershipExpiry(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			expected := time.Date(test.year, time.May, 1, 0, 0, 0, 0, location)
+			expected := time.Date(test.year, time.September, 1, 0, 0, 0, 0, location)
 			if !expiresAt.Equal(expected) {
 				t.Fatalf("expected %s, got %s", expected, expiresAt)
 			}
@@ -36,20 +34,21 @@ func TestMembershipExpiry(t *testing.T) {
 	}
 }
 
-func TestIsFullRefund(t *testing.T) {
+func TestCalculateUpgradeAmount(t *testing.T) {
 	tests := []struct {
 		name   string
-		charge *stripe.Charge
-		want   bool
+		target int64
+		credit int64
+		want   int64
 	}{
-		{name: "nil", charge: nil},
-		{name: "partial", charge: &stripe.Charge{Amount: 1000, AmountRefunded: 500, Refunded: false}},
-		{name: "amount without Stripe full flag", charge: &stripe.Charge{Amount: 1000, AmountRefunded: 1000, Refunded: false}},
-		{name: "full", charge: &stripe.Charge{Amount: 1000, AmountRefunded: 1000, Refunded: true}, want: true},
+		{name: "student upgrade", target: 2500, credit: 1500, want: 1000},
+		{name: "community upgrade", target: 3000, credit: 2000, want: 1000},
+		{name: "zero difference", target: 2000, credit: 2000, want: 0},
+		{name: "negative difference", target: 1500, credit: 2000, want: -500},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := isFullRefund(test.charge); got != test.want {
+			if got := calculateUpgradeAmount(test.target, test.credit); got != test.want {
 				t.Fatalf("expected %v, got %v", test.want, got)
 			}
 		})

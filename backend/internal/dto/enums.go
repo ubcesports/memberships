@@ -15,6 +15,7 @@ const (
 	GroupExecutive       GroupType = "executive"
 	GroupDirector        GroupType = "director"
 	GroupBoard           GroupType = "board"
+	GroupStudent         GroupType = "student"
 )
 
 type TransactionStatusType string

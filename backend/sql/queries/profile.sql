@@ -8,7 +8,6 @@ SELECT
     u.updated_at,
     u.full_name,
     u.email_verified_at,
-    u.is_student,
     u.onboarding_completed_at,
     u.avatar_url,
     COALESCE(g.groups, '{}'::text[])::text[] AS groups

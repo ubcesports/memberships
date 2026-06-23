@@ -42,6 +42,7 @@ func provideRouter(params RouterParams) *chi.Mux {
 
 	// All public routes
 	r.Get("/health", params.HealthHandler.IsDatabaseHealthy)
+	r.Get("/membership/tiers", params.MembershipHandler.GetPublicTiers)
 	r.Post("/webhooks/stripe", params.StripeWebhookHandler.Handle)
 
 	// All protected routes
@@ -56,7 +57,7 @@ func provideRouter(params RouterParams) *chi.Mux {
 		r.Use(auth.RequireAuth(params.Limen))
 		r.Use(auth.RequireOnboarded)
 
-		r.Get("/membership/tiers", params.MembershipHandler.GetEligibleTiers)
+		r.Get("/membership/tiers/eligible", params.MembershipHandler.GetEligibleTiers)
 		r.Get("/membership/me", params.MembershipHandler.GetCurrentMembership)
 		r.Post("/membership/checkout", params.MembershipHandler.CreateCheckoutSession)
 	})

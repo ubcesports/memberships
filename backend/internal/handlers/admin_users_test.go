@@ -9,7 +9,7 @@ import (
 func TestParseAdminUserFiltersForExportIgnoresPagination(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/admin/users/export?full_name=dip&role=member&group=competitive_team&is_student=false&limit=invalid",
+		"/admin/users/export?full_name=dip&role=member&group=competitive_team&limit=invalid",
 		nil,
 	)
 
@@ -19,9 +19,6 @@ func TestParseAdminUserFiltersForExportIgnoresPagination(t *testing.T) {
 	}
 	if filters.FullName != "dip" || filters.Role != "member" || filters.Group != "competitive_team" {
 		t.Fatalf("unexpected filters: %#v", filters)
-	}
-	if filters.IsStudent == nil || *filters.IsStudent {
-		t.Fatalf("expected is_student=false, got %#v", filters.IsStudent)
 	}
 	if filters.Limit != 0 || filters.Offset != 0 {
 		t.Fatalf("expected export pagination to be disabled, got limit=%d offset=%d", filters.Limit, filters.Offset)

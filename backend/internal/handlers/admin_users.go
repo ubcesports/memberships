@@ -33,7 +33,6 @@ Args (query params):
 	student_id: optional case-insensitive student ID substring
 	email: optional case-insensitive email substring
 	role: optional role (member or admin)
-	is_student: optional boolean student status
 	group: optional group membership
 	limit: optional page size (default 25, maximum 100)
 	offset: optional number of users to skip (default 0)
@@ -82,7 +81,6 @@ Args (query params):
 	student_id: optional case-insensitive student ID substring
 	email: optional case-insensitive email substring
 	role: optional role (member or admin)
-	is_student: optional boolean student status
 	group: optional group membership
 
 Returns:
@@ -120,7 +118,6 @@ func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request
 		"Email",
 		"Student ID",
 		"Role",
-		"Is Student",
 		"Groups",
 		"Created At",
 		"Updated At",
@@ -143,7 +140,6 @@ func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request
 			safeCSVCell(user.Email),
 			safeCSVCell(optionalString(user.StudentID)),
 			string(user.Role),
-			strconv.FormatBool(user.IsStudent),
 			strings.Join(groups, ";"),
 			user.CreatedAt.Format(time.RFC3339),
 			user.UpdatedAt.Format(time.RFC3339),
@@ -172,14 +168,6 @@ func parseAdminUserFilters(r *http.Request, includePagination bool) (service.Adm
 		Limit:     25,
 	}
 
-	if value := query.Get("is_student"); value != "" {
-		parsed, err := strconv.ParseBool(value)
-		if err != nil {
-			return service.AdminUserFilters{}, errors.New("is_student must be true or false")
-		}
-		filters.IsStudent = &parsed
-	}
-
 	if filters.Role != "" {
 		switch dto.RoleType(filters.Role) {
 		case dto.RoleMember, dto.RoleAdmin:
@@ -191,6 +179,7 @@ func parseAdminUserFilters(r *http.Request, includePagination bool) (service.Adm
 	if filters.Group != "" {
 		switch dto.GroupType(filters.Group) {
 		case dto.GroupMember,
+			dto.GroupStudent,
 			dto.GroupCompetitiveTeam,
 			dto.GroupExecutive,
 			dto.GroupDirector,

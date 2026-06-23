@@ -14,8 +14,7 @@ import (
 const attachCheckoutSession = `-- name: AttachCheckoutSession :exec
 UPDATE transactions
 SET stripe_checkout_session_id = $2, updated_at = NOW()
-WHERE id = $1
-  AND status = 'pending'
+WHERE id = $1 AND status = 'pending'
 `
 
 type AttachCheckoutSessionParams struct {
@@ -28,20 +27,33 @@ func (q *Queries) AttachCheckoutSession(ctx context.Context, arg AttachCheckoutS
 	return err
 }
 
-const cancelMembership = `-- name: CancelMembership :exec
+const cancelMembershipForUpgrade = `-- name: CancelMembershipForUpgrade :one
 UPDATE memberships
-SET cancelled_at = COALESCE(cancelled_at, $2), updated_at = NOW()
-WHERE id = $1
+SET
+    cancelled_at = $2,
+    updated_at = NOW()
+WHERE memberships.id = $1
+  AND cancelled_at IS NULL
+  AND expires_at > NOW()
+  AND EXISTS (
+      SELECT 1
+      FROM membership_tiers current_tier
+      WHERE current_tier.id = memberships.tier_id
+        AND current_tier.slug = 'regular'
+  )
+RETURNING expires_at
 `
 
-type CancelMembershipParams struct {
+type CancelMembershipForUpgradeParams struct {
 	ID          pgtype.UUID
 	CancelledAt pgtype.Timestamptz
 }
 
-func (q *Queries) CancelMembership(ctx context.Context, arg CancelMembershipParams) error {
-	_, err := q.db.Exec(ctx, cancelMembership, arg.ID, arg.CancelledAt)
-	return err
+func (q *Queries) CancelMembershipForUpgrade(ctx context.Context, arg CancelMembershipForUpgradeParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, cancelMembershipForUpgrade, arg.ID, arg.CancelledAt)
+	var expires_at pgtype.Timestamptz
+	err := row.Scan(&expires_at)
+	return expires_at, err
 }
 
 const completeTransaction = `-- name: CompleteTransaction :exec
@@ -85,21 +97,19 @@ INSERT INTO memberships (
     user_id,
     tier_id,
     group_at_purchase,
-    is_student_at_purchase,
     started_at,
     expires_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, user_id, tier_id, group_at_purchase, started_at, expires_at, cancelled_at, created_at, updated_at, is_student_at_purchase
+) VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, user_id, tier_id, group_at_purchase, started_at, expires_at, cancelled_at, created_at, updated_at
 `
 
 type CreateMembershipParams struct {
-	ID                  pgtype.UUID
-	UserID              pgtype.UUID
-	TierID              pgtype.UUID
-	GroupAtPurchase     GroupType
-	IsStudentAtPurchase bool
-	StartedAt           pgtype.Timestamptz
-	ExpiresAt           pgtype.Timestamptz
+	ID              pgtype.UUID
+	UserID          pgtype.UUID
+	TierID          pgtype.UUID
+	GroupAtPurchase GroupType
+	StartedAt       pgtype.Timestamptz
+	ExpiresAt       pgtype.Timestamptz
 }
 
 func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipParams) (Membership, error) {
@@ -108,7 +118,6 @@ func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipPara
 		arg.UserID,
 		arg.TierID,
 		arg.GroupAtPurchase,
-		arg.IsStudentAtPurchase,
 		arg.StartedAt,
 		arg.ExpiresAt,
 	)
@@ -123,7 +132,6 @@ func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipPara
 		&i.CancelledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.IsStudentAtPurchase,
 	)
 	return i, err
 }
@@ -132,38 +140,44 @@ const createPendingTransaction = `-- name: CreatePendingTransaction :one
 INSERT INTO transactions (
     id,
     user_id,
+    membership_id,
     tier_id,
     group_at_purchase,
-    is_student_at_purchase,
     stripe_price_id,
     amount_minor,
+    credit_amount_minor,
     currency,
+    kind,
     status
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
-RETURNING id, user_id, membership_id, stripe_payment_intent_id, amount_minor, status, created_at, updated_at, tier_id, group_at_purchase, is_student_at_purchase, stripe_checkout_session_id, stripe_charge_id, stripe_price_id, currency
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')
+RETURNING id, user_id, membership_id, stripe_payment_intent_id, amount_minor, status, created_at, updated_at, tier_id, group_at_purchase, stripe_checkout_session_id, stripe_charge_id, stripe_price_id, currency, kind, credit_amount_minor
 `
 
 type CreatePendingTransactionParams struct {
-	ID                  pgtype.UUID
-	UserID              pgtype.UUID
-	TierID              pgtype.UUID
-	GroupAtPurchase     NullGroupType
-	IsStudentAtPurchase bool
-	StripePriceID       pgtype.Text
-	AmountMinor         int64
-	Currency            pgtype.Text
+	ID                pgtype.UUID
+	UserID            pgtype.UUID
+	MembershipID      pgtype.UUID
+	TierID            pgtype.UUID
+	GroupAtPurchase   NullGroupType
+	StripePriceID     pgtype.Text
+	AmountMinor       int64
+	CreditAmountMinor int64
+	Currency          pgtype.Text
+	Kind              TransactionKindType
 }
 
 func (q *Queries) CreatePendingTransaction(ctx context.Context, arg CreatePendingTransactionParams) (Transaction, error) {
 	row := q.db.QueryRow(ctx, createPendingTransaction,
 		arg.ID,
 		arg.UserID,
+		arg.MembershipID,
 		arg.TierID,
 		arg.GroupAtPurchase,
-		arg.IsStudentAtPurchase,
 		arg.StripePriceID,
 		arg.AmountMinor,
+		arg.CreditAmountMinor,
 		arg.Currency,
+		arg.Kind,
 	)
 	var i Transaction
 	err := row.Scan(
@@ -177,11 +191,12 @@ func (q *Queries) CreatePendingTransaction(ctx context.Context, arg CreatePendin
 		&i.UpdatedAt,
 		&i.TierID,
 		&i.GroupAtPurchase,
-		&i.IsStudentAtPurchase,
 		&i.StripeCheckoutSessionID,
 		&i.StripeChargeID,
 		&i.StripePriceID,
 		&i.Currency,
+		&i.Kind,
+		&i.CreditAmountMinor,
 	)
 	return i, err
 }
@@ -195,7 +210,6 @@ SELECT
     mt.title AS tier_title,
     mt.description AS tier_description,
     m.group_at_purchase,
-    m.is_student_at_purchase,
     m.started_at,
     m.expires_at,
     m.cancelled_at,
@@ -211,19 +225,18 @@ LIMIT 1
 `
 
 type GetActiveMembershipByUserIDRow struct {
-	ID                  pgtype.UUID
-	UserID              pgtype.UUID
-	TierID              pgtype.UUID
-	TierSlug            string
-	TierTitle           string
-	TierDescription     pgtype.Text
-	GroupAtPurchase     GroupType
-	IsStudentAtPurchase bool
-	StartedAt           pgtype.Timestamptz
-	ExpiresAt           pgtype.Timestamptz
-	CancelledAt         pgtype.Timestamptz
-	CreatedAt           pgtype.Timestamptz
-	UpdatedAt           pgtype.Timestamptz
+	ID              pgtype.UUID
+	UserID          pgtype.UUID
+	TierID          pgtype.UUID
+	TierSlug        string
+	TierTitle       string
+	TierDescription pgtype.Text
+	GroupAtPurchase GroupType
+	StartedAt       pgtype.Timestamptz
+	ExpiresAt       pgtype.Timestamptz
+	CancelledAt     pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
 }
 
 func (q *Queries) GetActiveMembershipByUserID(ctx context.Context, userID pgtype.UUID) (GetActiveMembershipByUserIDRow, error) {
@@ -237,7 +250,6 @@ func (q *Queries) GetActiveMembershipByUserID(ctx context.Context, userID pgtype
 		&i.TierTitle,
 		&i.TierDescription,
 		&i.GroupAtPurchase,
-		&i.IsStudentAtPurchase,
 		&i.StartedAt,
 		&i.ExpiresAt,
 		&i.CancelledAt,
@@ -247,11 +259,23 @@ func (q *Queries) GetActiveMembershipByUserID(ctx context.Context, userID pgtype
 	return i, err
 }
 
-const getPendingTransactionByUserID = `-- name: GetPendingTransactionByUserID :one
-SELECT id, user_id, membership_id, stripe_payment_intent_id, amount_minor, status, created_at, updated_at, tier_id, group_at_purchase, is_student_at_purchase, stripe_checkout_session_id, stripe_charge_id, stripe_price_id, currency
+const getCompletedPaidAmountForMembership = `-- name: GetCompletedPaidAmountForMembership :one
+SELECT COALESCE(SUM(amount_minor), 0)::bigint
 FROM transactions
-WHERE user_id = $1
-  AND status = 'pending'
+WHERE membership_id = $1
+  AND status = 'completed'
+`
+
+func (q *Queries) GetCompletedPaidAmountForMembership(ctx context.Context, membershipID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, getCompletedPaidAmountForMembership, membershipID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const getPendingTransactionByUserID = `-- name: GetPendingTransactionByUserID :one
+SELECT id, user_id, membership_id, stripe_payment_intent_id, amount_minor, status, created_at, updated_at, tier_id, group_at_purchase, stripe_checkout_session_id, stripe_charge_id, stripe_price_id, currency, kind, credit_amount_minor FROM transactions
+WHERE user_id = $1 AND status = 'pending'
 LIMIT 1
 `
 
@@ -269,78 +293,18 @@ func (q *Queries) GetPendingTransactionByUserID(ctx context.Context, userID pgty
 		&i.UpdatedAt,
 		&i.TierID,
 		&i.GroupAtPurchase,
-		&i.IsStudentAtPurchase,
 		&i.StripeCheckoutSessionID,
 		&i.StripeChargeID,
 		&i.StripePriceID,
 		&i.Currency,
-	)
-	return i, err
-}
-
-const getTransactionByIDForUpdate = `-- name: GetTransactionByIDForUpdate :one
-SELECT id, user_id, membership_id, stripe_payment_intent_id, amount_minor, status, created_at, updated_at, tier_id, group_at_purchase, is_student_at_purchase, stripe_checkout_session_id, stripe_charge_id, stripe_price_id, currency
-FROM transactions
-WHERE id = $1
-FOR UPDATE
-`
-
-func (q *Queries) GetTransactionByIDForUpdate(ctx context.Context, id pgtype.UUID) (Transaction, error) {
-	row := q.db.QueryRow(ctx, getTransactionByIDForUpdate, id)
-	var i Transaction
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.MembershipID,
-		&i.StripePaymentIntentID,
-		&i.AmountMinor,
-		&i.Status,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.TierID,
-		&i.GroupAtPurchase,
-		&i.IsStudentAtPurchase,
-		&i.StripeCheckoutSessionID,
-		&i.StripeChargeID,
-		&i.StripePriceID,
-		&i.Currency,
-	)
-	return i, err
-}
-
-const getTransactionByPaymentIntentForUpdate = `-- name: GetTransactionByPaymentIntentForUpdate :one
-SELECT id, user_id, membership_id, stripe_payment_intent_id, amount_minor, status, created_at, updated_at, tier_id, group_at_purchase, is_student_at_purchase, stripe_checkout_session_id, stripe_charge_id, stripe_price_id, currency
-FROM transactions
-WHERE stripe_payment_intent_id = $1
-FOR UPDATE
-`
-
-func (q *Queries) GetTransactionByPaymentIntentForUpdate(ctx context.Context, stripePaymentIntentID pgtype.Text) (Transaction, error) {
-	row := q.db.QueryRow(ctx, getTransactionByPaymentIntentForUpdate, stripePaymentIntentID)
-	var i Transaction
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.MembershipID,
-		&i.StripePaymentIntentID,
-		&i.AmountMinor,
-		&i.Status,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.TierID,
-		&i.GroupAtPurchase,
-		&i.IsStudentAtPurchase,
-		&i.StripeCheckoutSessionID,
-		&i.StripeChargeID,
-		&i.StripePriceID,
-		&i.Currency,
+		&i.Kind,
+		&i.CreditAmountMinor,
 	)
 	return i, err
 }
 
 const getTransactionBySessionIDForUpdate = `-- name: GetTransactionBySessionIDForUpdate :one
-SELECT id, user_id, membership_id, stripe_payment_intent_id, amount_minor, status, created_at, updated_at, tier_id, group_at_purchase, is_student_at_purchase, stripe_checkout_session_id, stripe_charge_id, stripe_price_id, currency
-FROM transactions
+SELECT id, user_id, membership_id, stripe_payment_intent_id, amount_minor, status, created_at, updated_at, tier_id, group_at_purchase, stripe_checkout_session_id, stripe_charge_id, stripe_price_id, currency, kind, credit_amount_minor FROM transactions
 WHERE stripe_checkout_session_id = $1
 FOR UPDATE
 `
@@ -359,19 +323,18 @@ func (q *Queries) GetTransactionBySessionIDForUpdate(ctx context.Context, stripe
 		&i.UpdatedAt,
 		&i.TierID,
 		&i.GroupAtPurchase,
-		&i.IsStudentAtPurchase,
 		&i.StripeCheckoutSessionID,
 		&i.StripeChargeID,
 		&i.StripePriceID,
 		&i.Currency,
+		&i.Kind,
+		&i.CreditAmountMinor,
 	)
 	return i, err
 }
 
 const getUserEmail = `-- name: GetUserEmail :one
-SELECT email
-FROM users
-WHERE id = $1
+SELECT email FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserEmail(ctx context.Context, id pgtype.UUID) (string, error) {
@@ -388,26 +351,44 @@ SELECT
     mt.title,
     mt.description,
     mt.stripe_product_id,
+    mt.is_public,
+    mt.required_group,
     mtp."group",
-    mtp.is_student,
     mtp.stripe_price_id
-FROM users u
-JOIN membership_tier_prices mtp
-    ON mtp.is_student = u.is_student
-   AND (
-       mtp."group" = 'member'
-       OR EXISTS (
-           SELECT 1
-           FROM user_groups ug
-           WHERE ug.user_id = u.id
-             AND ug."group" = mtp."group"
-       )
-   )
-JOIN membership_tiers mt ON mt.id = mtp.tier_id
-WHERE u.id = $1
-  AND mt.is_active = TRUE
+FROM membership_tiers mt
+JOIN membership_tier_prices mtp ON mtp.tier_id = mt.id
+WHERE mt.is_active = TRUE
   AND mt.stripe_product_id IS NOT NULL
-ORDER BY mt.title, mtp."group"
+  AND (
+      (
+          mt.required_group IS NULL
+          AND (
+              (
+                  mtp."group" = 'student'
+                  AND EXISTS (
+                      SELECT 1 FROM user_groups ug
+                      WHERE ug.user_id = $1 AND ug."group" = 'student'
+                  )
+              )
+              OR (
+                  mtp."group" = 'member'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM user_groups ug
+                      WHERE ug.user_id = $1 AND ug."group" = 'student'
+                  )
+              )
+          )
+      )
+      OR (
+          mt.required_group IS NOT NULL
+          AND mtp."group" = mt.required_group
+          AND EXISTS (
+              SELECT 1 FROM user_groups ug
+              WHERE ug.user_id = $1 AND ug."group" = mt.required_group
+          )
+      )
+  )
+ORDER BY mt.title
 `
 
 type ListEligibleTierPriceMappingsRow struct {
@@ -416,13 +397,14 @@ type ListEligibleTierPriceMappingsRow struct {
 	Title           string
 	Description     pgtype.Text
 	StripeProductID pgtype.Text
+	IsPublic        bool
+	RequiredGroup   NullGroupType
 	Group           GroupType
-	IsStudent       bool
 	StripePriceID   string
 }
 
-func (q *Queries) ListEligibleTierPriceMappings(ctx context.Context, id pgtype.UUID) ([]ListEligibleTierPriceMappingsRow, error) {
-	rows, err := q.db.Query(ctx, listEligibleTierPriceMappings, id)
+func (q *Queries) ListEligibleTierPriceMappings(ctx context.Context, userID pgtype.UUID) ([]ListEligibleTierPriceMappingsRow, error) {
+	rows, err := q.db.Query(ctx, listEligibleTierPriceMappings, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -436,8 +418,71 @@ func (q *Queries) ListEligibleTierPriceMappings(ctx context.Context, id pgtype.U
 			&i.Title,
 			&i.Description,
 			&i.StripeProductID,
+			&i.IsPublic,
+			&i.RequiredGroup,
 			&i.Group,
-			&i.IsStudent,
+			&i.StripePriceID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicTierPriceMappings = `-- name: ListPublicTierPriceMappings :many
+SELECT
+    mt.id AS tier_id,
+    mt.slug,
+    mt.title,
+    mt.description,
+    mt.stripe_product_id,
+    mt.is_public,
+    mt.required_group,
+    mtp."group",
+    mtp.stripe_price_id
+FROM membership_tiers mt
+JOIN membership_tier_prices mtp ON mtp.tier_id = mt.id
+WHERE mt.is_active = TRUE
+  AND mt.is_public = TRUE
+  AND mt.stripe_product_id IS NOT NULL
+  AND mtp."group" IN ('member', 'student')
+ORDER BY mt.title, mtp."group"
+`
+
+type ListPublicTierPriceMappingsRow struct {
+	TierID          pgtype.UUID
+	Slug            string
+	Title           string
+	Description     pgtype.Text
+	StripeProductID pgtype.Text
+	IsPublic        bool
+	RequiredGroup   NullGroupType
+	Group           GroupType
+	StripePriceID   string
+}
+
+func (q *Queries) ListPublicTierPriceMappings(ctx context.Context) ([]ListPublicTierPriceMappingsRow, error) {
+	rows, err := q.db.Query(ctx, listPublicTierPriceMappings)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPublicTierPriceMappingsRow
+	for rows.Next() {
+		var i ListPublicTierPriceMappingsRow
+		if err := rows.Scan(
+			&i.TierID,
+			&i.Slug,
+			&i.Title,
+			&i.Description,
+			&i.StripeProductID,
+			&i.IsPublic,
+			&i.RequiredGroup,
+			&i.Group,
 			&i.StripePriceID,
 		); err != nil {
 			return nil, err
@@ -451,10 +496,7 @@ func (q *Queries) ListEligibleTierPriceMappings(ctx context.Context, id pgtype.U
 }
 
 const lockUserForCheckout = `-- name: LockUserForCheckout :one
-SELECT id
-FROM users
-WHERE id = $1
-FOR UPDATE
+SELECT id FROM users WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockUserForCheckout(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
@@ -467,8 +509,7 @@ func (q *Queries) LockUserForCheckout(ctx context.Context, id pgtype.UUID) (pgty
 const markPendingTransactionExpired = `-- name: MarkPendingTransactionExpired :execrows
 UPDATE transactions
 SET status = 'expired', updated_at = NOW()
-WHERE id = $1
-  AND status = 'pending'
+WHERE id = $1 AND status = 'pending'
 `
 
 func (q *Queries) MarkPendingTransactionExpired(ctx context.Context, id pgtype.UUID) (int64, error) {
@@ -482,8 +523,7 @@ func (q *Queries) MarkPendingTransactionExpired(ctx context.Context, id pgtype.U
 const markPendingTransactionFailed = `-- name: MarkPendingTransactionFailed :execrows
 UPDATE transactions
 SET status = 'failed', updated_at = NOW()
-WHERE id = $1
-  AND status = 'pending'
+WHERE id = $1 AND status = 'pending'
 `
 
 func (q *Queries) MarkPendingTransactionFailed(ctx context.Context, id pgtype.UUID) (int64, error) {
@@ -492,26 +532,4 @@ func (q *Queries) MarkPendingTransactionFailed(ctx context.Context, id pgtype.UU
 		return 0, err
 	}
 	return result.RowsAffected(), nil
-}
-
-const markTransactionRefunded = `-- name: MarkTransactionRefunded :exec
-UPDATE transactions
-SET
-    stripe_payment_intent_id = COALESCE(NULLIF($2::varchar, ''), stripe_payment_intent_id),
-    stripe_charge_id = COALESCE(NULLIF($3::varchar, ''), stripe_charge_id),
-    status = 'refunded',
-    updated_at = NOW()
-WHERE id = $1
-  AND status <> 'refunded'
-`
-
-type MarkTransactionRefundedParams struct {
-	ID      pgtype.UUID
-	Column2 string
-	Column3 string
-}
-
-func (q *Queries) MarkTransactionRefunded(ctx context.Context, arg MarkTransactionRefundedParams) error {
-	_, err := q.db.Exec(ctx, markTransactionRefunded, arg.ID, arg.Column2, arg.Column3)
-	return err
 }

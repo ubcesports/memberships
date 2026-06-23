@@ -22,6 +22,10 @@ type CheckoutSessionRequest struct {
 	UserID        string
 	CustomerEmail string
 	PriceID       string
+	ProductID     string
+	AmountMinor   int64
+	Currency      string
+	IsUpgrade     bool
 }
 
 type Client struct {
@@ -50,15 +54,29 @@ func (c *Client) GetPrice(ctx context.Context, priceID string) (*stripe.Price, e
 }
 
 func (c *Client) CreateCheckoutSession(ctx context.Context, request CheckoutSessionRequest) (*stripe.CheckoutSession, error) {
-	params := &stripe.CheckoutSessionCreateParams{
+	params := buildCheckoutSessionParams(request, c.successURL, c.cancelURL, time.Now())
+	params.SetIdempotencyKey(request.TransactionID)
+	return c.api.V1CheckoutSessions.Create(ctx, params)
+}
+
+func buildCheckoutSessionParams(request CheckoutSessionRequest, successURL, cancelURL string, now time.Time) *stripe.CheckoutSessionCreateParams {
+	lineItem := &stripe.CheckoutSessionCreateLineItemParams{Quantity: stripe.Int64(1)}
+	if request.IsUpgrade {
+		lineItem.PriceData = &stripe.CheckoutSessionCreateLineItemPriceDataParams{
+			Currency:   stripe.String(request.Currency),
+			Product:    stripe.String(request.ProductID),
+			UnitAmount: stripe.Int64(request.AmountMinor),
+		}
+	} else {
+		lineItem.Price = stripe.String(request.PriceID)
+	}
+	return &stripe.CheckoutSessionCreateParams{
 		Mode:              stripe.String(string(stripe.CheckoutSessionModePayment)),
-		SuccessURL:        stripe.String(c.successURL),
-		CancelURL:         stripe.String(c.cancelURL),
+		SuccessURL:        stripe.String(successURL),
+		CancelURL:         stripe.String(cancelURL),
 		ClientReferenceID: stripe.String(request.UserID),
 		CustomerEmail:     stripe.String(request.CustomerEmail),
-		LineItems: []*stripe.CheckoutSessionCreateLineItemParams{
-			{Price: stripe.String(request.PriceID), Quantity: stripe.Int64(1)},
-		},
+		LineItems:         []*stripe.CheckoutSessionCreateLineItemParams{lineItem},
 		Metadata: map[string]string{
 			"transaction_id": request.TransactionID,
 			"user_id":        request.UserID,
@@ -69,10 +87,8 @@ func (c *Client) CreateCheckoutSession(ctx context.Context, request CheckoutSess
 				"user_id":        request.UserID,
 			},
 		},
-		ExpiresAt: stripe.Int64(time.Now().Add(30 * time.Minute).Unix()),
+		ExpiresAt: stripe.Int64(now.Add(30 * time.Minute).Unix()),
 	}
-	params.SetIdempotencyKey(request.TransactionID)
-	return c.api.V1CheckoutSessions.Create(ctx, params)
 }
 
 func (c *Client) GetCheckoutSession(ctx context.Context, sessionID string) (*stripe.CheckoutSession, error) {

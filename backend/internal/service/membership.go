@@ -18,9 +18,10 @@ import (
 )
 
 var (
-	ErrMembershipActive  = errors.New("user already has an active membership")
-	ErrTierUnavailable   = errors.New("membership tier is unavailable for this user")
-	ErrPaymentProcessing = errors.New("a checkout payment is processing")
+	ErrMembershipActive     = errors.New("active membership does not allow this purchase")
+	ErrTierUnavailable      = errors.New("membership tier is unavailable for this user")
+	ErrPaymentProcessing    = errors.New("a checkout payment is processing")
+	ErrUpgradeNotChargeable = errors.New("upgrade amount must be positive")
 )
 
 type MembershipService struct {
@@ -30,14 +31,54 @@ type MembershipService struct {
 }
 
 type selectedTier struct {
-	dto     dto.MembershipTierDTO
-	tierID  pgtype.UUID
-	group   db.GroupType
-	priceID string
+	dto                 dto.MembershipTierDTO
+	tierID              pgtype.UUID
+	membershipID        pgtype.UUID
+	group               db.GroupType
+	priceID             string
+	kind                db.TransactionKindType
+	creditAmountMinor   int64
+	checkoutAmountMinor int64
 }
 
 func NewMembershipService(repository *repository.MembershipRepository, stripeGateway stripeclient.Gateway) *MembershipService {
 	return &MembershipService{repository: repository, stripe: stripeGateway, now: time.Now}
+}
+
+func (s *MembershipService) ListPublicTiers(ctx context.Context) ([]dto.PublicMembershipTierDTO, error) {
+	mappings, err := s.repository.ListPublicTierPriceMappings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byTier := make(map[string]*dto.PublicMembershipTierDTO)
+	order := make([]string, 0)
+	for _, mapping := range mappings {
+		price, err := s.validStripePrice(ctx, mapping.StripePriceID, mapping.StripeProductID.String)
+		if err != nil {
+			return nil, err
+		}
+		key := mapping.TierID.String()
+		tier := byTier[key]
+		if tier == nil {
+			tier = &dto.PublicMembershipTierDTO{
+				ID: key, Slug: mapping.Slug, Title: mapping.Title,
+				Description: textPointer(mapping.Description),
+				Prices:      make([]dto.MembershipTierPriceDTO, 0, 2),
+				ExpiresAt:   mustMembershipExpiry(s.now()),
+			}
+			byTier[key] = tier
+			order = append(order, key)
+		}
+		tier.Prices = append(tier.Prices, dto.MembershipTierPriceDTO{
+			AmountMinor: price.UnitAmount, Currency: string(price.Currency), Group: dto.GroupType(mapping.Group),
+		})
+	}
+	sort.Slice(order, func(i, j int) bool { return byTier[order[i]].Title < byTier[order[j]].Title })
+	result := make([]dto.PublicMembershipTierDTO, 0, len(order))
+	for _, key := range order {
+		result = append(result, *byTier[key])
+	}
+	return result, nil
 }
 
 func (s *MembershipService) ListEligibleTiers(ctx context.Context, userID pgtype.UUID) ([]dto.MembershipTierDTO, error) {
@@ -61,17 +102,12 @@ func (s *MembershipService) GetActiveMembership(ctx context.Context, userID pgty
 		return nil, err
 	}
 	return &dto.MembershipDTO{
-		ID:                  membership.ID.String(),
-		TierID:              membership.TierID.String(),
-		TierSlug:            membership.TierSlug,
-		TierTitle:           membership.TierTitle,
-		TierDescription:     textPointer(membership.TierDescription),
-		GroupAtPurchase:     dto.GroupType(membership.GroupAtPurchase),
-		IsStudentAtPurchase: membership.IsStudentAtPurchase,
-		StartedAt:           membership.StartedAt.Time,
-		ExpiresAt:           membership.ExpiresAt.Time,
-		CancelledAt:         timestampPointer(membership.CancelledAt),
-		Status:              "active",
+		ID: membership.ID.String(), TierID: membership.TierID.String(),
+		TierSlug: membership.TierSlug, TierTitle: membership.TierTitle,
+		TierDescription: textPointer(membership.TierDescription),
+		GroupAtPurchase: dto.GroupType(membership.GroupAtPurchase),
+		StartedAt:       membership.StartedAt.Time, ExpiresAt: membership.ExpiresAt.Time,
+		CancelledAt: timestampPointer(membership.CancelledAt), Status: "active",
 	}, nil
 }
 
@@ -80,14 +116,7 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userID pg
 	if err != nil {
 		return nil, ErrTierUnavailable
 	}
-
 	for attempt := 0; attempt < 2; attempt++ {
-		if _, err := s.repository.GetActiveMembership(ctx, userID); err == nil {
-			return nil, ErrMembershipActive
-		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return nil, err
-		}
-
 		pending, err := s.repository.GetPendingTransaction(ctx, userID)
 		if err == nil {
 			result, retry, err := s.checkoutForPendingTransaction(ctx, pending)
@@ -112,20 +141,23 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userID pg
 			}
 		}
 		if chosen == nil {
+			if _, activeErr := s.repository.GetActiveMembership(ctx, userID); activeErr == nil {
+				return nil, ErrMembershipActive
+			}
 			return nil, ErrTierUnavailable
 		}
+		if chosen.checkoutAmountMinor <= 0 {
+			return nil, ErrUpgradeNotChargeable
+		}
 
-		pending, _, err = s.repository.CreateOrGetPendingTransaction(ctx, repository.PendingTransactionInput{
-			ID:                  uuid.New(),
-			UserID:              userID,
-			TierID:              chosen.tierID,
-			GroupAtPurchase:     chosen.group,
-			IsStudentAtPurchase: chosen.dto.Price.IsStudent,
-			StripePriceID:       chosen.priceID,
-			AmountMinor:         chosen.dto.Price.AmountMinor,
-			Currency:            chosen.dto.Price.Currency,
+		pending, err = s.repository.CreateOrGetPendingTransaction(ctx, repository.PendingTransactionInput{
+			ID: uuid.New(), UserID: userID, MembershipID: chosen.membershipID,
+			TierID: chosen.tierID, GroupAtPurchase: chosen.group,
+			StripePriceID: chosen.priceID, AmountMinor: chosen.checkoutAmountMinor,
+			CreditAmountMinor: chosen.creditAmountMinor,
+			Currency:          chosen.dto.Price.Currency, Kind: chosen.kind,
 		})
-		if errors.Is(err, repository.ErrActiveMembership) {
+		if errors.Is(err, repository.ErrActiveMembership) || errors.Is(err, repository.ErrInvalidUpgrade) {
 			return nil, ErrMembershipActive
 		}
 		if err != nil {
@@ -173,11 +205,18 @@ func (s *MembershipService) checkoutForPendingTransaction(ctx context.Context, t
 	if err != nil {
 		return nil, false, err
 	}
+	price, err := s.stripe.GetPrice(ctx, transaction.StripePriceID.String)
+	if err != nil {
+		return nil, false, fmt.Errorf("retrieve target Stripe Price: %w", err)
+	}
+	if price.Product == nil {
+		return nil, false, errors.New("target Stripe Price has no Product")
+	}
 	session, err := s.stripe.CreateCheckoutSession(ctx, stripeclient.CheckoutSessionRequest{
-		TransactionID: transaction.ID.String(),
-		UserID:        transaction.UserID.String(),
-		CustomerEmail: email,
-		PriceID:       transaction.StripePriceID.String,
+		TransactionID: transaction.ID.String(), UserID: transaction.UserID.String(),
+		CustomerEmail: email, PriceID: transaction.StripePriceID.String,
+		ProductID: price.Product.ID, AmountMinor: transaction.AmountMinor,
+		Currency: transaction.Currency.String, IsUpgrade: transaction.Kind == db.TransactionKindTypeUpgrade,
 	})
 	if err != nil {
 		return nil, false, fmt.Errorf("create Stripe Checkout Session: %w", err)
@@ -207,16 +246,8 @@ func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *str
 	if err != nil {
 		return err
 	}
-	return s.repository.FulfillCheckout(
-		ctx,
-		session.ID,
-		paymentIntent.ID,
-		chargeID,
-		session.AmountTotal,
-		string(session.Currency),
-		occurredAt,
-		expiresAt,
-	)
+	return s.repository.FulfillCheckout(ctx, session.ID, paymentIntent.ID, chargeID,
+		session.AmountTotal, string(session.Currency), occurredAt, expiresAt)
 }
 
 func (s *MembershipService) HandleCheckoutFailed(ctx context.Context, sessionID string) error {
@@ -241,76 +272,77 @@ func (s *MembershipService) HandleCheckoutExpired(ctx context.Context, sessionID
 	return s.repository.ExpirePendingTransaction(ctx, transaction.ID)
 }
 
-func (s *MembershipService) HandleChargeRefunded(ctx context.Context, charge *stripe.Charge, occurredAt time.Time) error {
-	if !isFullRefund(charge) {
-		return nil
-	}
-	paymentIntentID := ""
-	transactionID := charge.Metadata["transaction_id"]
-	if charge.PaymentIntent != nil {
-		paymentIntentID = charge.PaymentIntent.ID
-		paymentIntent, err := s.stripe.GetPaymentIntent(ctx, paymentIntentID)
-		if err != nil {
-			return fmt.Errorf("retrieve refunded Stripe PaymentIntent: %w", err)
-		}
-		if transactionID == "" {
-			transactionID = paymentIntent.Metadata["transaction_id"]
-		}
-	}
-	return s.repository.ApplyFullRefund(ctx, paymentIntentID, transactionID, charge.ID, occurredAt)
-}
-
 func (s *MembershipService) selectEligibleTiers(ctx context.Context, userID pgtype.UUID) ([]selectedTier, error) {
 	mappings, err := s.repository.ListEligibleTierPriceMappings(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	chosen := make(map[string]selectedTier)
-	for _, mapping := range mappings {
-		price, err := s.stripe.GetPrice(ctx, mapping.StripePriceID)
+	active, activeErr := s.repository.GetActiveMembership(ctx, userID)
+	hasActive := activeErr == nil
+	if activeErr != nil && !errors.Is(activeErr, pgx.ErrNoRows) {
+		return nil, activeErr
+	}
+	if hasActive && active.TierSlug != "regular" {
+		return []selectedTier{}, nil
+	}
+
+	credit := int64(0)
+	if hasActive {
+		credit, err = s.repository.GetCompletedPaidAmount(ctx, active.ID)
 		if err != nil {
-			return nil, fmt.Errorf("retrieve Stripe Price %s: %w", mapping.StripePriceID, err)
-		}
-		if !price.Active || price.Type != stripe.PriceTypeOneTime || price.UnitAmount < 0 {
-			continue
-		}
-		if price.Product == nil || price.Product.ID != mapping.StripeProductID.String {
-			return nil, fmt.Errorf("Stripe Price %s does not belong to tier product %s", price.ID, mapping.StripeProductID.String)
-		}
-		key := mapping.TierID.String()
-		current, exists := chosen[key]
-		if exists && current.dto.Price.AmountMinor <= price.UnitAmount {
-			continue
-		}
-		chosen[key] = selectedTier{
-			tierID:  mapping.TierID,
-			group:   mapping.Group,
-			priceID: price.ID,
-			dto: dto.MembershipTierDTO{
-				ID:          key,
-				Slug:        mapping.Slug,
-				Title:       mapping.Title,
-				Description: textPointer(mapping.Description),
-				Price: dto.MembershipTierPriceDTO{
-					AmountMinor: price.UnitAmount,
-					Currency:    string(price.Currency),
-					Group:       dto.GroupType(mapping.Group),
-					IsStudent:   mapping.IsStudent,
-				},
-				ExpiresAt: mustMembershipExpiry(s.now()),
-			},
+			return nil, err
 		}
 	}
-	result := make([]selectedTier, 0, len(chosen))
-	for _, tier := range chosen {
-		result = append(result, tier)
+	result := make([]selectedTier, 0, len(mappings))
+	for _, mapping := range mappings {
+		if hasActive && mapping.Slug != "premium" {
+			continue
+		}
+		price, err := s.validStripePrice(ctx, mapping.StripePriceID, mapping.StripeProductID.String)
+		if err != nil {
+			return nil, err
+		}
+		amountDue := price.UnitAmount
+		kind := db.TransactionKindTypePurchase
+		membershipID := pgtype.UUID{}
+		if hasActive {
+			kind = db.TransactionKindTypeUpgrade
+			membershipID = active.ID
+			amountDue = calculateUpgradeAmount(price.UnitAmount, credit)
+		}
+		result = append(result, selectedTier{
+			tierID: mapping.TierID, membershipID: membershipID, group: mapping.Group,
+			priceID: price.ID,
+			kind:    kind, creditAmountMinor: credit, checkoutAmountMinor: amountDue,
+			dto: dto.MembershipTierDTO{
+				ID: mapping.TierID.String(), Slug: mapping.Slug, Title: mapping.Title,
+				Description: textPointer(mapping.Description),
+				Price:       dto.MembershipTierPriceDTO{AmountMinor: price.UnitAmount, Currency: string(price.Currency), Group: dto.GroupType(mapping.Group)},
+				IsUpgrade:   hasActive, CreditAmountMinor: credit, AmountDueMinor: amountDue,
+				ExpiresAt: mustMembershipExpiry(s.now()),
+			},
+		})
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].dto.Title < result[j].dto.Title })
 	return result, nil
 }
 
-func isFullRefund(charge *stripe.Charge) bool {
-	return charge != nil && charge.Refunded
+func calculateUpgradeAmount(targetAmount, creditAmount int64) int64 {
+	return targetAmount - creditAmount
+}
+
+func (s *MembershipService) validStripePrice(ctx context.Context, priceID, productID string) (*stripe.Price, error) {
+	price, err := s.stripe.GetPrice(ctx, priceID)
+	if err != nil {
+		return nil, fmt.Errorf("retrieve Stripe Price %s: %w", priceID, err)
+	}
+	if !price.Active || price.Type != stripe.PriceTypeOneTime || price.UnitAmount < 0 {
+		return nil, fmt.Errorf("Stripe Price %s is not an active one-time price", priceID)
+	}
+	if price.Product == nil || price.Product.ID != productID {
+		return nil, fmt.Errorf("Stripe Price %s does not belong to tier product %s", priceID, productID)
+	}
+	return price, nil
 }
 
 func membershipExpiry(purchasedAt time.Time) (time.Time, error) {
@@ -320,11 +352,10 @@ func membershipExpiry(purchasedAt time.Time) (time.Time, error) {
 	}
 	local := purchasedAt.In(location)
 	year := local.Year()
-	mayFirst := time.Date(year, time.May, 1, 0, 0, 0, 0, location)
-	if !local.Before(mayFirst) {
+	if !local.Before(time.Date(year, time.September, 1, 0, 0, 0, 0, location)) {
 		year++
 	}
-	return time.Date(year, time.May, 1, 0, 0, 0, 0, location), nil
+	return time.Date(year, time.September, 1, 0, 0, 0, 0, location), nil
 }
 
 func mustMembershipExpiry(value time.Time) time.Time {

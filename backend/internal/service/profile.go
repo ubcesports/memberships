@@ -36,7 +36,6 @@ func buildProfile(row db.GetProfileByUserIDRow) *dto.ProfileDTO {
 		UpdatedAt:             row.UpdatedAt.Time,
 		FullName:              row.FullName,
 		EmailVerifiedAt:       timestampPointer(row.EmailVerifiedAt),
-		IsStudent:             row.IsStudent,
 		OnboardingCompletedAt: timestampPointer(row.OnboardingCompletedAt),
 		AvatarURL:             textPointer(row.AvatarUrl),
 		Groups:                make([]dto.GroupType, 0, len(row.Groups)),

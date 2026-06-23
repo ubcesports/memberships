@@ -9,7 +9,7 @@ import (
 
 func TestStripeWebhookRejectsInvalidSignature(t *testing.T) {
 	handler := &StripeWebhookHandler{webhookSecret: "whsec_test"}
-	request := httptest.NewRequest(http.MethodPost, "/webhooks/stripe", strings.NewReader(`{"type":"charge.refunded"}`))
+	request := httptest.NewRequest(http.MethodPost, "/webhooks/stripe", strings.NewReader(`{"type":"checkout.session.completed"}`))
 	request.Header.Set("Stripe-Signature", "invalid")
 	recorder := httptest.NewRecorder()
 

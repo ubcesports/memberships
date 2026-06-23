@@ -25,7 +25,6 @@ func TestProfileServiceGetProfileByUserIDAggregatesGroups(t *testing.T) {
 		UpdatedAt:             pgtype.Timestamptz{Time: now, Valid: true},
 		FullName:              "Sudi Mango",
 		EmailVerifiedAt:       emailVerifiedAt,
-		IsStudent:             true,
 		OnboardingCompletedAt: onboardingCompletedAt,
 		AvatarUrl:             avatarURL,
 		Groups:                []string{"member", "board"},
@@ -55,7 +54,6 @@ func TestProfileServiceGetProfileByUserIDReturnsEmptyGroupsSlice(t *testing.T) {
 		CreatedAt: pgtype.Timestamptz{Time: now.Add(-72 * time.Hour), Valid: true},
 		UpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		FullName:  "Sudi Mango",
-		IsStudent: false,
 		Groups:    []string{},
 	})
 

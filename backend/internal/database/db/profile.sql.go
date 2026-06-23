@@ -21,7 +21,6 @@ SELECT
     u.updated_at,
     u.full_name,
     u.email_verified_at,
-    u.is_student,
     u.onboarding_completed_at,
     u.avatar_url,
     COALESCE(g.groups, '{}'::text[])::text[] AS groups
@@ -43,7 +42,6 @@ type GetProfileByUserIDRow struct {
 	UpdatedAt             pgtype.Timestamptz
 	FullName              string
 	EmailVerifiedAt       pgtype.Timestamptz
-	IsStudent             bool
 	OnboardingCompletedAt pgtype.Timestamptz
 	AvatarUrl             pgtype.Text
 	Groups                []string
@@ -61,7 +59,6 @@ func (q *Queries) GetProfileByUserID(ctx context.Context, id pgtype.UUID) (GetPr
 		&i.UpdatedAt,
 		&i.FullName,
 		&i.EmailVerifiedAt,
-		&i.IsStudent,
 		&i.OnboardingCompletedAt,
 		&i.AvatarUrl,
 		&i.Groups,
