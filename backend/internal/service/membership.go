@@ -107,7 +107,7 @@ func (s *MembershipService) GetActiveMembership(ctx context.Context, userID pgty
 		TierDescription: textPointer(membership.TierDescription),
 		GroupAtPurchase: dto.GroupType(membership.GroupAtPurchase),
 		StartedAt:       membership.StartedAt.Time, ExpiresAt: membership.ExpiresAt.Time,
-		CancelledAt: timestampPointer(membership.CancelledAt), Status: "active",
+		CancelledAt: timestampPointer(membership.CancelledAt),
 	}, nil
 }
 
@@ -146,7 +146,7 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userID pg
 			}
 			return nil, ErrTierUnavailable
 		}
-		if chosen.checkoutAmountMinor <= 0 {
+		if isNonChargeableUpgrade(chosen.kind, chosen.checkoutAmountMinor) {
 			return nil, ErrUpgradeNotChargeable
 		}
 
@@ -228,25 +228,31 @@ func (s *MembershipService) checkoutForPendingTransaction(ctx context.Context, t
 }
 
 func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *stripe.CheckoutSession, occurredAt time.Time) error {
-	if session.PaymentStatus != stripe.CheckoutSessionPaymentStatusPaid {
+	if !checkoutSessionReadyForFulfillment(session.PaymentStatus) {
 		return nil
 	}
-	if session.PaymentIntent == nil || session.PaymentIntent.ID == "" {
-		return errors.New("paid Checkout Session is missing its PaymentIntent")
-	}
-	paymentIntent, err := s.stripe.GetPaymentIntent(ctx, session.PaymentIntent.ID)
-	if err != nil {
-		return fmt.Errorf("retrieve Stripe PaymentIntent: %w", err)
-	}
+	paymentIntentID := ""
 	chargeID := ""
-	if paymentIntent.LatestCharge != nil {
-		chargeID = paymentIntent.LatestCharge.ID
+	if session.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid {
+		if paidCheckoutMissingPaymentIntent(session) {
+			return errors.New("paid Checkout Session is missing its PaymentIntent")
+		}
+		if session.PaymentIntent != nil && session.PaymentIntent.ID != "" {
+			paymentIntent, err := s.stripe.GetPaymentIntent(ctx, session.PaymentIntent.ID)
+			if err != nil {
+				return fmt.Errorf("retrieve Stripe PaymentIntent: %w", err)
+			}
+			paymentIntentID = paymentIntent.ID
+			if paymentIntent.LatestCharge != nil {
+				chargeID = paymentIntent.LatestCharge.ID
+			}
+		}
 	}
 	expiresAt, err := membershipExpiry(occurredAt)
 	if err != nil {
 		return err
 	}
-	return s.repository.FulfillCheckout(ctx, session.ID, paymentIntent.ID, chargeID,
+	return s.repository.FulfillCheckout(ctx, session.ID, paymentIntentID, chargeID,
 		session.AmountTotal, string(session.Currency), occurredAt, expiresAt)
 }
 
@@ -329,6 +335,21 @@ func (s *MembershipService) selectEligibleTiers(ctx context.Context, userID pgty
 
 func calculateUpgradeAmount(targetAmount, creditAmount int64) int64 {
 	return targetAmount - creditAmount
+}
+
+func isNonChargeableUpgrade(kind db.TransactionKindType, amount int64) bool {
+	return kind == db.TransactionKindTypeUpgrade && amount <= 0
+}
+
+func checkoutSessionReadyForFulfillment(status stripe.CheckoutSessionPaymentStatus) bool {
+	return status == stripe.CheckoutSessionPaymentStatusPaid ||
+		status == stripe.CheckoutSessionPaymentStatusNoPaymentRequired
+}
+
+func paidCheckoutMissingPaymentIntent(session *stripe.CheckoutSession) bool {
+	return session.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid &&
+		session.AmountTotal > 0 &&
+		(session.PaymentIntent == nil || session.PaymentIntent.ID == "")
 }
 
 func (s *MembershipService) validStripePrice(ctx context.Context, priceID, productID string) (*stripe.Price, error) {

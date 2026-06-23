@@ -3,6 +3,9 @@ package service
 import (
 	"testing"
 	"time"
+
+	"github.com/stripe/stripe-go/v85"
+	"github.com/ubcesports/memberships/internal/database/db"
 )
 
 func TestMembershipExpiry(t *testing.T) {
@@ -49,6 +52,79 @@ func TestCalculateUpgradeAmount(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			if got := calculateUpgradeAmount(test.target, test.credit); got != test.want {
+				t.Fatalf("expected %v, got %v", test.want, got)
+			}
+		})
+	}
+}
+
+func TestIsNonChargeableUpgrade(t *testing.T) {
+	tests := []struct {
+		name   string
+		kind   db.TransactionKindType
+		amount int64
+		want   bool
+	}{
+		{name: "free purchase", kind: db.TransactionKindTypePurchase, amount: 0, want: false},
+		{name: "paid purchase", kind: db.TransactionKindTypePurchase, amount: 1000, want: false},
+		{name: "free upgrade", kind: db.TransactionKindTypeUpgrade, amount: 0, want: true},
+		{name: "negative upgrade", kind: db.TransactionKindTypeUpgrade, amount: -500, want: true},
+		{name: "paid upgrade", kind: db.TransactionKindTypeUpgrade, amount: 1000, want: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := isNonChargeableUpgrade(test.kind, test.amount); got != test.want {
+				t.Fatalf("expected %v, got %v", test.want, got)
+			}
+		})
+	}
+}
+
+func TestCheckoutSessionReadyForFulfillment(t *testing.T) {
+	tests := []struct {
+		status stripe.CheckoutSessionPaymentStatus
+		want   bool
+	}{
+		{status: stripe.CheckoutSessionPaymentStatusPaid, want: true},
+		{status: stripe.CheckoutSessionPaymentStatusNoPaymentRequired, want: true},
+		{status: stripe.CheckoutSessionPaymentStatusUnpaid, want: false},
+	}
+	for _, test := range tests {
+		if got := checkoutSessionReadyForFulfillment(test.status); got != test.want {
+			t.Errorf("status %q: expected %v, got %v", test.status, test.want, got)
+		}
+	}
+}
+
+func TestPaidCheckoutMissingPaymentIntent(t *testing.T) {
+	tests := []struct {
+		name    string
+		session stripe.CheckoutSession
+		want    bool
+	}{
+		{
+			name:    "free paid checkout has no PaymentIntent",
+			session: stripe.CheckoutSession{PaymentStatus: stripe.CheckoutSessionPaymentStatusPaid, AmountTotal: 0},
+			want:    false,
+		},
+		{
+			name:    "chargeable paid checkout requires PaymentIntent",
+			session: stripe.CheckoutSession{PaymentStatus: stripe.CheckoutSessionPaymentStatusPaid, AmountTotal: 1000},
+			want:    true,
+		},
+		{
+			name: "chargeable paid checkout has PaymentIntent",
+			session: stripe.CheckoutSession{
+				PaymentStatus: stripe.CheckoutSessionPaymentStatusPaid,
+				AmountTotal:   1000,
+				PaymentIntent: &stripe.PaymentIntent{ID: "pi_test"},
+			},
+			want: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := paidCheckoutMissingPaymentIntent(&test.session); got != test.want {
 				t.Fatalf("expected %v, got %v", test.want, got)
 			}
 		})

@@ -39,7 +39,6 @@ type MembershipDTO struct {
 	StartedAt       time.Time  `json:"started_at"`
 	ExpiresAt       time.Time  `json:"expires_at"`
 	CancelledAt     *time.Time `json:"cancelled_at"`
-	Status          string     `json:"status"`
 }
 
 type CreateCheckoutSessionDTO struct {
