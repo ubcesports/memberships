@@ -9,6 +9,8 @@ import (
 	"github.com/stripe/stripe-go/v85"
 )
 
+const CheckoutSessionLifetime = time.Hour
+
 type Gateway interface {
 	GetPrice(context.Context, string) (*stripe.Price, error)
 	CreateCheckoutSession(context.Context, CheckoutSessionRequest) (*stripe.CheckoutSession, error)
@@ -87,7 +89,7 @@ func buildCheckoutSessionParams(request CheckoutSessionRequest, successURL, canc
 				"user_id":        request.UserID,
 			},
 		},
-		ExpiresAt: stripe.Int64(now.Add(30 * time.Minute).Unix()),
+		ExpiresAt: stripe.Int64(now.Add(CheckoutSessionLifetime).Unix()),
 	}
 }
 

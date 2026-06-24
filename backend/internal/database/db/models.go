@@ -221,8 +221,6 @@ type MembershipTier struct {
 	StripeProductID pgtype.Text
 	IsActive        bool
 	Slug            string
-	IsPublic        bool
-	RequiredGroup   NullGroupType
 }
 
 type MembershipTierPrice struct {

@@ -3,17 +3,7 @@
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 ALTER TABLE membership_tiers
-    ADD COLUMN slug VARCHAR;
-
-UPDATE membership_tiers
-SET slug = CASE LOWER(title)
-    WHEN 'regular' THEN 'regular'
-    WHEN 'premium' THEN 'premium'
-    ELSE LOWER(REGEXP_REPLACE(title, '[^a-zA-Z0-9]+', '-', 'g')) || '-' || LEFT(id::text, 8)
-END;
-
-ALTER TABLE membership_tiers
-    ALTER COLUMN slug SET NOT NULL,
+    ADD COLUMN slug VARCHAR NOT NULL,
     ADD CONSTRAINT membership_tiers_slug_key UNIQUE (slug);
 
 ALTER TABLE membership_tier_prices
@@ -55,13 +45,6 @@ ALTER TABLE transactions
     ADD COLUMN currency VARCHAR(3),
     ADD CONSTRAINT transactions_amount_nonnegative CHECK (amount_minor >= 0);
 
-UPDATE transactions t
-SET
-    tier_id = m.tier_id,
-    group_at_purchase = m.group_at_purchase
-FROM memberships m
-WHERE m.id = t.membership_id;
-
 CREATE UNIQUE INDEX transactions_one_pending_per_user
     ON transactions (user_id)
     WHERE status = 'pending';
@@ -87,8 +70,6 @@ ALTER TABLE transactions
 
 ALTER TABLE transactions
     RENAME COLUMN amount_minor TO price_amount;
-
-DELETE FROM transactions WHERE membership_id IS NULL;
 
 ALTER TABLE transactions
     ALTER COLUMN price_amount TYPE NUMERIC(10,2) USING (price_amount::NUMERIC / 100),

@@ -351,8 +351,6 @@ SELECT
     mt.title,
     mt.description,
     mt.stripe_product_id,
-    mt.is_public,
-    mt.required_group,
     mtp."group",
     mtp.stripe_price_id
 FROM membership_tiers mt
@@ -360,35 +358,14 @@ JOIN membership_tier_prices mtp ON mtp.tier_id = mt.id
 WHERE mt.is_active = TRUE
   AND mt.stripe_product_id IS NOT NULL
   AND (
-      (
-          mt.required_group IS NULL
-          AND (
-              (
-                  mtp."group" = 'student'
-                  AND EXISTS (
-                      SELECT 1 FROM user_groups ug
-                      WHERE ug.user_id = $1 AND ug."group" = 'student'
-                  )
-              )
-              OR (
-                  mtp."group" = 'member'
-                  AND NOT EXISTS (
-                      SELECT 1 FROM user_groups ug
-                      WHERE ug.user_id = $1 AND ug."group" = 'student'
-                  )
-              )
-          )
-      )
-      OR (
-          mt.required_group IS NOT NULL
-          AND mtp."group" = mt.required_group
-          AND EXISTS (
-              SELECT 1 FROM user_groups ug
-              WHERE ug.user_id = $1 AND ug."group" = mt.required_group
-          )
+      mtp."group" = 'member'
+      OR EXISTS (
+          SELECT 1 FROM user_groups ug
+          WHERE ug.user_id = $1
+            AND ug."group" = mtp."group"
       )
   )
-ORDER BY mt.title
+ORDER BY mt.title, mtp."group"
 `
 
 type ListEligibleTierPriceMappingsRow struct {
@@ -397,8 +374,6 @@ type ListEligibleTierPriceMappingsRow struct {
 	Title           string
 	Description     pgtype.Text
 	StripeProductID pgtype.Text
-	IsPublic        bool
-	RequiredGroup   NullGroupType
 	Group           GroupType
 	StripePriceID   string
 }
@@ -418,8 +393,6 @@ func (q *Queries) ListEligibleTierPriceMappings(ctx context.Context, userID pgty
 			&i.Title,
 			&i.Description,
 			&i.StripeProductID,
-			&i.IsPublic,
-			&i.RequiredGroup,
 			&i.Group,
 			&i.StripePriceID,
 		); err != nil {
@@ -440,14 +413,11 @@ SELECT
     mt.title,
     mt.description,
     mt.stripe_product_id,
-    mt.is_public,
-    mt.required_group,
     mtp."group",
     mtp.stripe_price_id
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp ON mtp.tier_id = mt.id
 WHERE mt.is_active = TRUE
-  AND mt.is_public = TRUE
   AND mt.stripe_product_id IS NOT NULL
   AND mtp."group" IN ('member', 'student')
 ORDER BY mt.title, mtp."group"
@@ -459,8 +429,6 @@ type ListPublicTierPriceMappingsRow struct {
 	Title           string
 	Description     pgtype.Text
 	StripeProductID pgtype.Text
-	IsPublic        bool
-	RequiredGroup   NullGroupType
 	Group           GroupType
 	StripePriceID   string
 }
@@ -480,8 +448,6 @@ func (q *Queries) ListPublicTierPriceMappings(ctx context.Context) ([]ListPublic
 			&i.Title,
 			&i.Description,
 			&i.StripeProductID,
-			&i.IsPublic,
-			&i.RequiredGroup,
 			&i.Group,
 			&i.StripePriceID,
 		); err != nil {

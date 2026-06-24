@@ -18,10 +18,10 @@ import (
 )
 
 var (
-	ErrMembershipActive     = errors.New("active membership does not allow this purchase")
-	ErrTierUnavailable      = errors.New("membership tier is unavailable for this user")
-	ErrPaymentProcessing    = errors.New("a checkout payment is processing")
-	ErrUpgradeNotChargeable = errors.New("upgrade amount must be positive")
+	ErrMembershipActive    = errors.New("active membership does not allow this purchase")
+	ErrTierUnavailable     = errors.New("membership tier is unavailable for this user")
+	ErrPaymentProcessing   = errors.New("a checkout payment is processing")
+	ErrUpgradeWindowClosed = errors.New("membership expires too soon to upgrade")
 )
 
 type MembershipService struct {
@@ -141,22 +141,25 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userID pg
 			}
 		}
 		if chosen == nil {
-			if _, activeErr := s.repository.GetActiveMembership(ctx, userID); activeErr == nil {
+			if active, activeErr := s.repository.GetActiveMembership(ctx, userID); activeErr == nil {
+				if active.TierSlug == "regular" && !upgradeWindowOpen(active.ExpiresAt.Time, s.now()) {
+					return nil, ErrUpgradeWindowClosed
+				}
 				return nil, ErrMembershipActive
 			}
 			return nil, ErrTierUnavailable
 		}
-		if isNonChargeableUpgrade(chosen.kind, chosen.checkoutAmountMinor) {
-			return nil, ErrUpgradeNotChargeable
-		}
-
 		pending, err = s.repository.CreateOrGetPendingTransaction(ctx, repository.PendingTransactionInput{
 			ID: uuid.New(), UserID: userID, MembershipID: chosen.membershipID,
 			TierID: chosen.tierID, GroupAtPurchase: chosen.group,
 			StripePriceID: chosen.priceID, AmountMinor: chosen.checkoutAmountMinor,
 			CreditAmountMinor: chosen.creditAmountMinor,
 			Currency:          chosen.dto.Price.Currency, Kind: chosen.kind,
+			UpgradeWindow: stripeclient.CheckoutSessionLifetime,
 		})
+		if errors.Is(err, repository.ErrUpgradeWindowClosed) {
+			return nil, ErrUpgradeWindowClosed
+		}
 		if errors.Is(err, repository.ErrActiveMembership) || errors.Is(err, repository.ErrInvalidUpgrade) {
 			return nil, ErrMembershipActive
 		}
@@ -291,15 +294,18 @@ func (s *MembershipService) selectEligibleTiers(ctx context.Context, userID pgty
 	if hasActive && active.TierSlug != "regular" {
 		return []selectedTier{}, nil
 	}
+	if hasActive && !upgradeWindowOpen(active.ExpiresAt.Time, s.now()) {
+		return []selectedTier{}, nil
+	}
 
-	credit := int64(0)
+	availableCredit := int64(0)
 	if hasActive {
-		credit, err = s.repository.GetCompletedPaidAmount(ctx, active.ID)
+		availableCredit, err = s.repository.GetCompletedPaidAmount(ctx, active.ID)
 		if err != nil {
 			return nil, err
 		}
 	}
-	result := make([]selectedTier, 0, len(mappings))
+	bestByTier := make(map[string]selectedTier, len(mappings))
 	for _, mapping := range mappings {
 		if hasActive && mapping.Slug != "premium" {
 			continue
@@ -309,36 +315,71 @@ func (s *MembershipService) selectEligibleTiers(ctx context.Context, userID pgty
 			return nil, err
 		}
 		amountDue := price.UnitAmount
+		appliedCredit := int64(0)
 		kind := db.TransactionKindTypePurchase
 		membershipID := pgtype.UUID{}
 		if hasActive {
 			kind = db.TransactionKindTypeUpgrade
 			membershipID = active.ID
-			amountDue = calculateUpgradeAmount(price.UnitAmount, credit)
+			appliedCredit, amountDue = calculateUpgradeAmounts(price.UnitAmount, availableCredit)
 		}
-		result = append(result, selectedTier{
+		candidate := selectedTier{
 			tierID: mapping.TierID, membershipID: membershipID, group: mapping.Group,
 			priceID: price.ID,
-			kind:    kind, creditAmountMinor: credit, checkoutAmountMinor: amountDue,
+			kind:    kind, creditAmountMinor: appliedCredit, checkoutAmountMinor: amountDue,
 			dto: dto.MembershipTierDTO{
 				ID: mapping.TierID.String(), Slug: mapping.Slug, Title: mapping.Title,
 				Description: textPointer(mapping.Description),
 				Price:       dto.MembershipTierPriceDTO{AmountMinor: price.UnitAmount, Currency: string(price.Currency), Group: dto.GroupType(mapping.Group)},
-				IsUpgrade:   hasActive, CreditAmountMinor: credit, AmountDueMinor: amountDue,
+				IsUpgrade:   hasActive, CreditAmountMinor: appliedCredit, AmountDueMinor: amountDue,
 				ExpiresAt: mustMembershipExpiry(s.now()),
 			},
-		})
+		}
+		key := mapping.TierID.String()
+		current, exists := bestByTier[key]
+		if !exists || preferSelectedTier(candidate, current) {
+			bestByTier[key] = candidate
+		}
+	}
+	result := make([]selectedTier, 0, len(bestByTier))
+	for _, tier := range bestByTier {
+		result = append(result, tier)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].dto.Title < result[j].dto.Title })
 	return result, nil
 }
 
-func calculateUpgradeAmount(targetAmount, creditAmount int64) int64 {
-	return targetAmount - creditAmount
+func calculateUpgradeAmounts(targetAmount, availableCredit int64) (appliedCredit, amountDue int64) {
+	appliedCredit = min(availableCredit, targetAmount)
+	return appliedCredit, targetAmount - appliedCredit
 }
 
-func isNonChargeableUpgrade(kind db.TransactionKindType, amount int64) bool {
-	return kind == db.TransactionKindTypeUpgrade && amount <= 0
+func upgradeWindowOpen(expiresAt, now time.Time) bool {
+	return expiresAt.After(now.Add(stripeclient.CheckoutSessionLifetime))
+}
+
+func groupPriority(group db.GroupType) int {
+	switch group {
+	case db.GroupTypeMember:
+		return 0
+	case db.GroupTypeCompetitiveTeam:
+		return 1
+	case db.GroupTypeExecutive:
+		return 2
+	case db.GroupTypeDirector:
+		return 3
+	case db.GroupTypeBoard:
+		return 4
+	case db.GroupTypeStudent:
+		return 5
+	default:
+		return 6
+	}
+}
+
+func preferSelectedTier(candidate, current selectedTier) bool {
+	return candidate.dto.Price.AmountMinor < current.dto.Price.AmountMinor ||
+		(candidate.dto.Price.AmountMinor == current.dto.Price.AmountMinor && groupPriority(candidate.group) < groupPriority(current.group))
 }
 
 func checkoutSessionReadyForFulfillment(status stripe.CheckoutSessionPaymentStatus) bool {

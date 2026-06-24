@@ -20,13 +20,13 @@ func NewMembershipHandler(membershipService *service.MembershipService) *Members
 }
 
 /*
-Returns the public Regular and Premium catalog with Member and Student prices.
+Returns the public Regular and Premium catalog with the ordinary Member price.
 
 API URL: GET /membership/tiers
 
 Returns:
 
-	tiers: public tiers with both configured prices and the membership expiry date (HTTP 200)
+	tiers: public tiers with the Member price and membership expiry date (HTTP 200)
 
 Raises:
 
@@ -98,7 +98,7 @@ func (h *MembershipHandler) GetCurrentMembership(w http.ResponseWriter, r *http.
 }
 
 /*
-Expires any previous open Checkout Session and creates a new 30-minute purchase or Premium-upgrade Checkout Session.
+Expires any previous open Checkout Session and creates a new 60-minute purchase or Premium-upgrade Checkout Session.
 
 API URL: POST /membership/checkout
 
@@ -116,7 +116,7 @@ Raises:
 	401: user is not authenticated
 	403: user has not completed onboarding
 	409: active membership rules block the purchase or a payment is already processing
-	422: tier is unavailable or the calculated upgrade amount is not positive
+	422: tier is unavailable or the upgrade window is closed
 	500: previous Checkout could not be expired or a new Checkout could not be created
 */
 func (h *MembershipHandler) CreateCheckoutSession(w http.ResponseWriter, r *http.Request) {
@@ -138,8 +138,8 @@ func (h *MembershipHandler) CreateCheckoutSession(w http.ResponseWriter, r *http
 		writeAPIError(w, http.StatusConflict, "ACTIVE_MEMBERSHIP", "An active membership already exists")
 	case errors.Is(err, service.ErrTierUnavailable):
 		writeAPIError(w, http.StatusUnprocessableEntity, "TIER_UNAVAILABLE", "The selected membership tier is unavailable")
-	case errors.Is(err, service.ErrUpgradeNotChargeable):
-		writeAPIError(w, http.StatusUnprocessableEntity, "UPGRADE_NOT_CHARGEABLE", "The upgrade requires an administrator")
+	case errors.Is(err, service.ErrUpgradeWindowClosed):
+		writeAPIError(w, http.StatusUnprocessableEntity, "UPGRADE_WINDOW_CLOSED", "Memberships cannot be upgraded during their final hour")
 	case errors.Is(err, service.ErrPaymentProcessing):
 		writeAPIError(w, http.StatusConflict, "PAYMENT_PROCESSING", "A membership payment is already processing")
 	case err != nil:

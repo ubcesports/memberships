@@ -6,6 +6,7 @@ import (
 
 	"github.com/stripe/stripe-go/v85"
 	"github.com/ubcesports/memberships/internal/database/db"
+	"github.com/ubcesports/memberships/internal/dto"
 )
 
 func TestMembershipExpiry(t *testing.T) {
@@ -37,43 +38,79 @@ func TestMembershipExpiry(t *testing.T) {
 	}
 }
 
-func TestCalculateUpgradeAmount(t *testing.T) {
+func TestCalculateUpgradeAmounts(t *testing.T) {
 	tests := []struct {
-		name   string
-		target int64
-		credit int64
-		want   int64
+		name       string
+		target     int64
+		available  int64
+		wantCredit int64
+		wantAmount int64
 	}{
-		{name: "student upgrade", target: 2500, credit: 1500, want: 1000},
-		{name: "community upgrade", target: 3000, credit: 2000, want: 1000},
-		{name: "zero difference", target: 2000, credit: 2000, want: 0},
-		{name: "negative difference", target: 1500, credit: 2000, want: -500},
+		{name: "student upgrade", target: 2500, available: 1500, wantCredit: 1500, wantAmount: 1000},
+		{name: "community upgrade", target: 3000, available: 2000, wantCredit: 2000, wantAmount: 1000},
+		{name: "exact credit", target: 2000, available: 2000, wantCredit: 2000, wantAmount: 0},
+		{name: "credit capped at target", target: 1500, available: 2000, wantCredit: 1500, wantAmount: 0},
+		{name: "free group price", target: 0, available: 1500, wantCredit: 0, wantAmount: 0},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := calculateUpgradeAmount(test.target, test.credit); got != test.want {
+			credit, amount := calculateUpgradeAmounts(test.target, test.available)
+			if credit != test.wantCredit || amount != test.wantAmount {
+				t.Fatalf("expected credit %v and amount %v, got credit %v and amount %v", test.wantCredit, test.wantAmount, credit, amount)
+			}
+		})
+	}
+}
+
+func TestUpgradeWindowOpen(t *testing.T) {
+	now := time.Date(2027, time.August, 31, 20, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name      string
+		expiresAt time.Time
+		want      bool
+	}{
+		{name: "more than one hour remains", expiresAt: now.Add(time.Hour + time.Second), want: true},
+		{name: "exactly one hour remains", expiresAt: now.Add(time.Hour), want: false},
+		{name: "less than one hour remains", expiresAt: now.Add(30 * time.Minute), want: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := upgradeWindowOpen(test.expiresAt, now); got != test.want {
 				t.Fatalf("expected %v, got %v", test.want, got)
 			}
 		})
 	}
 }
 
-func TestIsNonChargeableUpgrade(t *testing.T) {
+func TestPreferSelectedTier(t *testing.T) {
 	tests := []struct {
-		name   string
-		kind   db.TransactionKindType
-		amount int64
-		want   bool
+		name      string
+		candidate selectedTier
+		current   selectedTier
+		want      bool
 	}{
-		{name: "free purchase", kind: db.TransactionKindTypePurchase, amount: 0, want: false},
-		{name: "paid purchase", kind: db.TransactionKindTypePurchase, amount: 1000, want: false},
-		{name: "free upgrade", kind: db.TransactionKindTypeUpgrade, amount: 0, want: true},
-		{name: "negative upgrade", kind: db.TransactionKindTypeUpgrade, amount: -500, want: true},
-		{name: "paid upgrade", kind: db.TransactionKindTypeUpgrade, amount: 1000, want: false},
+		{
+			name:      "lower eligible price wins",
+			candidate: selectedTier{dto: dto.MembershipTierDTO{Price: dto.MembershipTierPriceDTO{AmountMinor: 0}}, group: db.GroupTypeCompetitiveTeam},
+			current:   selectedTier{dto: dto.MembershipTierDTO{Price: dto.MembershipTierPriceDTO{AmountMinor: 2000}}, group: db.GroupTypeMember},
+			want:      true,
+		},
+		{
+			name:      "higher eligible price loses",
+			candidate: selectedTier{dto: dto.MembershipTierDTO{Price: dto.MembershipTierPriceDTO{AmountMinor: 2000}}, group: db.GroupTypeMember},
+			current:   selectedTier{dto: dto.MembershipTierDTO{Price: dto.MembershipTierPriceDTO{AmountMinor: 1000}}, group: db.GroupTypeExecutive},
+			want:      false,
+		},
+		{
+			name:      "enum order breaks ties",
+			candidate: selectedTier{dto: dto.MembershipTierDTO{Price: dto.MembershipTierPriceDTO{AmountMinor: 1500}}, group: db.GroupTypeExecutive},
+			current:   selectedTier{dto: dto.MembershipTierDTO{Price: dto.MembershipTierPriceDTO{AmountMinor: 1500}}, group: db.GroupTypeStudent},
+			want:      true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := isNonChargeableUpgrade(test.kind, test.amount); got != test.want {
+			if got := preferSelectedTier(test.candidate, test.current); got != test.want {
 				t.Fatalf("expected %v, got %v", test.want, got)
 			}
 		})

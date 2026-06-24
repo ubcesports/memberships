@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -55,11 +56,13 @@ Raises:
 func (h *StripeWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 64<<10))
 	if err != nil {
+		log.Printf("Stripe webhook request body failed: %v", err)
 		writeAPIError(w, http.StatusBadRequest, "INVALID_WEBHOOK", "Unable to read webhook")
 		return
 	}
 	event, err := webhook.ConstructEvent(payload, r.Header.Get("Stripe-Signature"), h.webhookSecret)
 	if err != nil {
+		log.Printf("Stripe webhook signature verification failed: %v", err)
 		writeAPIError(w, http.StatusBadRequest, "INVALID_WEBHOOK_SIGNATURE", "Invalid webhook signature")
 		return
 	}
@@ -69,6 +72,7 @@ func (h *StripeWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	case "checkout.session.completed", "checkout.session.async_payment_succeeded":
 		var session stripe.CheckoutSession
 		if err := json.Unmarshal(event.Data.Raw, &session); err != nil {
+			log.Printf("Stripe webhook event %s (%s) decoding failed: %v", event.ID, event.Type, err)
 			writeAPIError(w, http.StatusBadRequest, "INVALID_WEBHOOK", "Invalid Checkout Session")
 			return
 		}
@@ -76,6 +80,7 @@ func (h *StripeWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	case "checkout.session.expired":
 		var session stripe.CheckoutSession
 		if err := json.Unmarshal(event.Data.Raw, &session); err != nil {
+			log.Printf("Stripe webhook event %s (%s) decoding failed: %v", event.ID, event.Type, err)
 			writeAPIError(w, http.StatusBadRequest, "INVALID_WEBHOOK", "Invalid Checkout Session")
 			return
 		}
@@ -83,12 +88,14 @@ func (h *StripeWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	case "checkout.session.async_payment_failed":
 		var session stripe.CheckoutSession
 		if err := json.Unmarshal(event.Data.Raw, &session); err != nil {
+			log.Printf("Stripe webhook event %s (%s) decoding failed: %v", event.ID, event.Type, err)
 			writeAPIError(w, http.StatusBadRequest, "INVALID_WEBHOOK", "Invalid Checkout Session")
 			return
 		}
 		err = h.service.HandleCheckoutFailed(r.Context(), session.ID)
 	}
 	if err != nil {
+		log.Printf("Stripe webhook event %s (%s) processing failed: %v", event.ID, event.Type, err)
 		writeAPIError(w, http.StatusInternalServerError, "WEBHOOK_PROCESSING_FAILED", "Webhook processing failed")
 		return
 	}

@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	ErrActiveMembership = errors.New("user already has an active membership")
-	ErrInvalidUpgrade   = errors.New("membership is no longer eligible for upgrade")
+	ErrActiveMembership    = errors.New("user already has an active membership")
+	ErrInvalidUpgrade      = errors.New("membership is no longer eligible for upgrade")
+	ErrUpgradeWindowClosed = errors.New("membership expires too soon to upgrade")
 )
 
 type MembershipRepository struct {
@@ -33,6 +34,7 @@ type PendingTransactionInput struct {
 	CreditAmountMinor int64
 	Currency          string
 	Kind              db.TransactionKindType
+	UpgradeWindow     time.Duration
 }
 
 func NewMembershipRepository(pool *pgxpool.Pool, store *db.Queries) *MembershipRepository {
@@ -87,6 +89,9 @@ func (r *MembershipRepository) CreateOrGetPendingTransaction(ctx context.Context
 	case db.TransactionKindTypeUpgrade:
 		if activeErr != nil || active.TierSlug != "regular" || !input.MembershipID.Valid || active.ID != input.MembershipID {
 			return db.Transaction{}, ErrInvalidUpgrade
+		}
+		if !active.ExpiresAt.Time.After(time.Now().Add(input.UpgradeWindow)) {
+			return db.Transaction{}, ErrUpgradeWindowClosed
 		}
 	default:
 		return db.Transaction{}, errors.New("invalid transaction kind")
