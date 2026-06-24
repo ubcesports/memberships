@@ -96,6 +96,32 @@ func TestCalculateUpgradeAmounts(t *testing.T) {
 	}
 }
 
+func TestTransactionKindForTier(t *testing.T) {
+	tests := []struct {
+		name       string
+		activeSlug string
+		targetSlug string
+		wantKind   db.TransactionKindType
+		want       bool
+	}{
+		{name: "new Regular purchase", targetSlug: "regular", wantKind: db.TransactionKindTypePurchase, want: true},
+		{name: "Regular to Premium upgrade", activeSlug: "regular", targetSlug: "premium", wantKind: db.TransactionKindTypeUpgrade, want: true},
+		{name: "Regular cannot buy Day", activeSlug: "regular", targetSlug: "day", wantKind: db.TransactionKindTypeUpgrade, want: false},
+		{name: "Day to Regular replacement", activeSlug: "day", targetSlug: "regular", wantKind: db.TransactionKindTypeReplacement, want: true},
+		{name: "Day to Premium replacement", activeSlug: "day", targetSlug: "premium", wantKind: db.TransactionKindTypeReplacement, want: true},
+		{name: "Day cannot buy Day", activeSlug: "day", targetSlug: "day", wantKind: db.TransactionKindTypeReplacement, want: false},
+		{name: "Premium blocks purchases", activeSlug: "premium", targetSlug: "day", want: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			kind, allowed := transactionKindForTier(test.activeSlug, test.targetSlug)
+			if kind != test.wantKind || allowed != test.want {
+				t.Fatalf("expected kind %q and allowed %v, got kind %q and allowed %v", test.wantKind, test.want, kind, allowed)
+			}
+		})
+	}
+}
+
 func TestUpgradeWindowOpen(t *testing.T) {
 	now := time.Date(2027, time.August, 31, 20, 0, 0, 0, time.UTC)
 	tests := []struct {

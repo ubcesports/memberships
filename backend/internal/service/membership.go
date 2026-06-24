@@ -155,12 +155,13 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userID pg
 			StripePriceID: chosen.priceID, AmountMinor: chosen.checkoutAmountMinor,
 			CreditAmountMinor: chosen.creditAmountMinor,
 			Currency:          chosen.dto.Price.Currency, Kind: chosen.kind,
-			UpgradeWindow: stripeclient.CheckoutSessionLifetime,
+			TargetTierSlug: chosen.dto.Slug,
+			UpgradeWindow:  stripeclient.CheckoutSessionLifetime,
 		})
 		if errors.Is(err, repository.ErrUpgradeWindowClosed) {
 			return nil, ErrUpgradeWindowClosed
 		}
-		if errors.Is(err, repository.ErrActiveMembership) || errors.Is(err, repository.ErrInvalidUpgrade) {
+		if errors.Is(err, repository.ErrActiveMembership) || errors.Is(err, repository.ErrInvalidUpgrade) || errors.Is(err, repository.ErrInvalidReplacement) {
 			return nil, ErrMembershipActive
 		}
 		if err != nil {
@@ -298,15 +299,17 @@ func (s *MembershipService) selectEligibleTiers(ctx context.Context, userID pgty
 	if activeErr != nil && !errors.Is(activeErr, pgx.ErrNoRows) {
 		return nil, activeErr
 	}
-	if hasActive && active.TierSlug != "regular" {
+	isUpgrade := hasActive && active.TierSlug == "regular"
+	isReplacement := hasActive && active.TierSlug == "day"
+	if hasActive && !isUpgrade && !isReplacement {
 		return []selectedTier{}, nil
 	}
-	if hasActive && !upgradeWindowOpen(active.ExpiresAt.Time, s.now()) {
+	if isUpgrade && !upgradeWindowOpen(active.ExpiresAt.Time, s.now()) {
 		return []selectedTier{}, nil
 	}
 
 	availableCredit := int64(0)
-	if hasActive {
+	if isUpgrade {
 		availableCredit, err = s.repository.GetCompletedPaidAmount(ctx, active.ID)
 		if err != nil {
 			return nil, err
@@ -314,7 +317,12 @@ func (s *MembershipService) selectEligibleTiers(ctx context.Context, userID pgty
 	}
 	bestByTier := make(map[string]selectedTier, len(mappings))
 	for _, mapping := range mappings {
-		if hasActive && mapping.Slug != "premium" {
+		activeSlug := ""
+		if hasActive {
+			activeSlug = active.TierSlug
+		}
+		kind, allowed := transactionKindForTier(activeSlug, mapping.Slug)
+		if !allowed {
 			continue
 		}
 		price, err := s.validStripePrice(ctx, mapping.StripePriceID, mapping.StripeProductID.String)
@@ -323,11 +331,11 @@ func (s *MembershipService) selectEligibleTiers(ctx context.Context, userID pgty
 		}
 		amountDue := price.UnitAmount
 		appliedCredit := int64(0)
-		kind := db.TransactionKindTypePurchase
 		membershipID := pgtype.UUID{}
 		if hasActive {
-			kind = db.TransactionKindTypeUpgrade
 			membershipID = active.ID
+		}
+		if kind == db.TransactionKindTypeUpgrade {
 			appliedCredit, amountDue = calculateUpgradeAmounts(price.UnitAmount, availableCredit)
 		}
 		candidate := selectedTier{
@@ -338,7 +346,7 @@ func (s *MembershipService) selectEligibleTiers(ctx context.Context, userID pgty
 				ID: mapping.TierID.String(), Slug: mapping.Slug, Title: mapping.Title,
 				Description: textPointer(mapping.Description),
 				Price:       dto.MembershipTierPriceDTO{AmountMinor: price.UnitAmount, Currency: string(price.Currency), Group: dto.GroupType(mapping.Group)},
-				IsUpgrade:   hasActive, CreditAmountMinor: appliedCredit, AmountDueMinor: amountDue,
+				IsUpgrade:   kind == db.TransactionKindTypeUpgrade, CreditAmountMinor: appliedCredit, AmountDueMinor: amountDue,
 				ExpiresAt: mustMembershipExpiry(mapping.Slug, s.now()),
 			},
 		}
@@ -359,6 +367,19 @@ func (s *MembershipService) selectEligibleTiers(ctx context.Context, userID pgty
 func calculateUpgradeAmounts(targetAmount, availableCredit int64) (appliedCredit, amountDue int64) {
 	appliedCredit = min(availableCredit, targetAmount)
 	return appliedCredit, targetAmount - appliedCredit
+}
+
+func transactionKindForTier(activeSlug, targetSlug string) (db.TransactionKindType, bool) {
+	switch activeSlug {
+	case "":
+		return db.TransactionKindTypePurchase, true
+	case "regular":
+		return db.TransactionKindTypeUpgrade, targetSlug == "premium"
+	case "day":
+		return db.TransactionKindTypeReplacement, targetSlug == "regular" || targetSlug == "premium"
+	default:
+		return "", false
+	}
 }
 
 func upgradeWindowOpen(expiresAt, now time.Time) bool {

@@ -15,6 +15,7 @@ import (
 var (
 	ErrActiveMembership    = errors.New("user already has an active membership")
 	ErrInvalidUpgrade      = errors.New("membership is no longer eligible for upgrade")
+	ErrInvalidReplacement  = errors.New("day pass is no longer eligible for replacement")
 	ErrUpgradeWindowClosed = errors.New("membership expires too soon to upgrade")
 )
 
@@ -34,6 +35,7 @@ type PendingTransactionInput struct {
 	CreditAmountMinor int64
 	Currency          string
 	Kind              db.TransactionKindType
+	TargetTierSlug    string
 	UpgradeWindow     time.Duration
 }
 
@@ -96,6 +98,13 @@ func (r *MembershipRepository) CreateOrGetPendingTransaction(ctx context.Context
 		}
 		if !active.ExpiresAt.Time.After(time.Now().Add(input.UpgradeWindow)) {
 			return db.Transaction{}, ErrUpgradeWindowClosed
+		}
+	case db.TransactionKindTypeReplacement:
+		if activeErr != nil || active.TierSlug != "day" || !input.MembershipID.Valid || active.ID != input.MembershipID {
+			return db.Transaction{}, ErrInvalidReplacement
+		}
+		if input.TargetTierSlug != "regular" && input.TargetTierSlug != "premium" {
+			return db.Transaction{}, ErrInvalidReplacement
 		}
 	default:
 		return db.Transaction{}, errors.New("invalid transaction kind")
@@ -172,7 +181,8 @@ func (r *MembershipRepository) FulfillCheckout(ctx context.Context, sessionID, p
 	}
 
 	membershipID := transaction.MembershipID
-	if transaction.Kind == db.TransactionKindTypeUpgrade {
+	switch transaction.Kind {
+	case db.TransactionKindTypeUpgrade:
 		if !membershipID.Valid {
 			return ErrInvalidUpgrade
 		}
@@ -197,7 +207,22 @@ func (r *MembershipRepository) FulfillCheckout(ctx context.Context, sessionID, p
 		}); err != nil {
 			return err
 		}
-	} else {
+	case db.TransactionKindTypeReplacement:
+		if !membershipID.Valid {
+			return ErrInvalidReplacement
+		}
+		cancelled, err := queries.CancelDayMembershipForReplacement(ctx, db.CancelDayMembershipForReplacementParams{
+			ID:          membershipID,
+			CancelledAt: pgtype.Timestamptz{Time: startedAt, Valid: true},
+			UserID:      transaction.UserID,
+		})
+		if err != nil {
+			return err
+		}
+		if cancelled == 0 {
+			return ErrInvalidReplacement
+		}
+
 		newMembershipID := uuid.New()
 		membershipID = uuidToPG(newMembershipID)
 		if _, err := queries.CreateMembership(ctx, db.CreateMembershipParams{
@@ -208,6 +233,19 @@ func (r *MembershipRepository) FulfillCheckout(ctx context.Context, sessionID, p
 		}); err != nil {
 			return err
 		}
+	case db.TransactionKindTypePurchase:
+		newMembershipID := uuid.New()
+		membershipID = uuidToPG(newMembershipID)
+		if _, err := queries.CreateMembership(ctx, db.CreateMembershipParams{
+			ID: membershipID, UserID: transaction.UserID, TierID: transaction.TierID,
+			GroupAtPurchase: transaction.GroupAtPurchase.GroupType,
+			StartedAt:       pgtype.Timestamptz{Time: startedAt, Valid: true},
+			ExpiresAt:       pgtype.Timestamptz{Time: expiresAt, Valid: true},
+		}); err != nil {
+			return err
+		}
+	default:
+		return errors.New("invalid transaction kind")
 	}
 
 	if err := queries.CompleteTransaction(ctx, db.CompleteTransactionParams{

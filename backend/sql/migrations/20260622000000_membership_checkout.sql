@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 ALTER TYPE group_type ADD VALUE IF NOT EXISTS 'student';
 ALTER TYPE transaction_status_type ADD VALUE IF NOT EXISTS 'expired';
-CREATE TYPE transaction_kind_type AS ENUM ('purchase', 'upgrade');
+CREATE TYPE transaction_kind_type AS ENUM ('purchase', 'upgrade', 'replacement');
 
 ALTER TABLE users
     DROP COLUMN is_student;

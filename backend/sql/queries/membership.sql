@@ -145,6 +145,21 @@ WHERE memberships.id = $1
   )
 RETURNING expires_at;
 
+-- name: CancelDayMembershipForReplacement :execrows
+UPDATE memberships
+SET
+    cancelled_at = LEAST($2, expires_at),
+    updated_at = NOW()
+WHERE memberships.id = $1
+  AND memberships.user_id = $3
+  AND cancelled_at IS NULL
+  AND EXISTS (
+      SELECT 1
+      FROM membership_tiers current_tier
+      WHERE current_tier.id = memberships.tier_id
+        AND current_tier.slug = 'day'
+  );
+
 -- name: CompleteTransaction :exec
 UPDATE transactions
 SET

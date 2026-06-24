@@ -102,8 +102,9 @@ func (ns NullRoleType) Value() (driver.Value, error) {
 type TransactionKindType string
 
 const (
-	TransactionKindTypePurchase TransactionKindType = "purchase"
-	TransactionKindTypeUpgrade  TransactionKindType = "upgrade"
+	TransactionKindTypePurchase    TransactionKindType = "purchase"
+	TransactionKindTypeUpgrade     TransactionKindType = "upgrade"
+	TransactionKindTypeReplacement TransactionKindType = "replacement"
 )
 
 func (e *TransactionKindType) Scan(src interface{}) error {

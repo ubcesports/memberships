@@ -27,6 +27,36 @@ func (q *Queries) AttachCheckoutSession(ctx context.Context, arg AttachCheckoutS
 	return err
 }
 
+const cancelDayMembershipForReplacement = `-- name: CancelDayMembershipForReplacement :execrows
+UPDATE memberships
+SET
+    cancelled_at = LEAST($2, expires_at),
+    updated_at = NOW()
+WHERE memberships.id = $1
+  AND memberships.user_id = $3
+  AND cancelled_at IS NULL
+  AND EXISTS (
+      SELECT 1
+      FROM membership_tiers current_tier
+      WHERE current_tier.id = memberships.tier_id
+        AND current_tier.slug = 'day'
+  )
+`
+
+type CancelDayMembershipForReplacementParams struct {
+	ID          pgtype.UUID
+	CancelledAt pgtype.Timestamptz
+	UserID      pgtype.UUID
+}
+
+func (q *Queries) CancelDayMembershipForReplacement(ctx context.Context, arg CancelDayMembershipForReplacementParams) (int64, error) {
+	result, err := q.db.Exec(ctx, cancelDayMembershipForReplacement, arg.ID, arg.CancelledAt, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const cancelMembershipForUpgrade = `-- name: CancelMembershipForUpgrade :one
 UPDATE memberships
 SET
