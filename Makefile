@@ -3,7 +3,7 @@ ifneq (,$(wildcard backend/.env))
     export
 endif
 
-.PHONY: be fe dev build-be build-fe sqlc migration-new migration-up migration-down DB_CHECK
+.PHONY: be fe dev build-be build-fe sqlc seed migration-new migration-up migration-down DB_CHECK
 
 # nextjs commands
 
@@ -38,6 +38,17 @@ DB_CHECK:
 ifndef DATABASE_URL
 	$(error Error: DATABASE_URL is not set. Make sure your .env file exists and contains it)
 endif
+
+# (usage: make seed file=membership_tiers.sql)
+seed: DB_CHECK
+ifndef file
+	$(error Error: Please provide a seed filename. Example: make seed file=membership_tiers.sql)
+endif
+	@test -f "backend/sql/seeds/$(file)" || { \
+		echo "Error: backend/sql/seeds/$(file) does not exist"; \
+		exit 1; \
+	}
+	@cd backend && psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f "sql/seeds/$(file)"
 
 # (usage: make migration-new name=add_billing)
 migration-new:
