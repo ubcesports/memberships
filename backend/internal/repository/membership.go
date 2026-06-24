@@ -65,6 +65,10 @@ func (r *MembershipRepository) GetPendingTransactionBySession(ctx context.Contex
 	return r.store.GetTransactionBySessionIDForUpdate(ctx, pgtype.Text{String: sessionID, Valid: true})
 }
 
+func (r *MembershipRepository) GetTransactionTierSlugBySession(ctx context.Context, sessionID string) (string, error) {
+	return r.store.GetTransactionTierSlugBySessionID(ctx, pgtype.Text{String: sessionID, Valid: true})
+}
+
 func (r *MembershipRepository) GetUserEmail(ctx context.Context, userID pgtype.UUID) (string, error) {
 	return r.store.GetUserEmail(ctx, userID)
 }

@@ -26,13 +26,47 @@ func TestMembershipExpiry(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			expiresAt, err := membershipExpiry(test.purchase)
+			expiresAt, err := membershipExpiry("regular", test.purchase)
 			if err != nil {
 				t.Fatal(err)
 			}
 			expected := time.Date(test.year, time.September, 1, 0, 0, 0, 0, location)
 			if !expiresAt.Equal(expected) {
 				t.Fatalf("expected %s, got %s", expected, expiresAt)
+			}
+		})
+	}
+}
+
+func TestDayPassExpiry(t *testing.T) {
+	location, err := time.LoadLocation("America/Vancouver")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name     string
+		purchase time.Time
+		expected time.Time
+	}{
+		{
+			name:     "morning purchase",
+			purchase: time.Date(2026, time.June, 23, 9, 30, 0, 0, location),
+			expected: time.Date(2026, time.June, 24, 0, 0, 0, 0, location),
+		},
+		{
+			name:     "late night purchase",
+			purchase: time.Date(2026, time.December, 31, 23, 59, 0, 0, location),
+			expected: time.Date(2027, time.January, 1, 0, 0, 0, 0, location),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			expiresAt, err := membershipExpiry("day", test.purchase)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !expiresAt.Equal(test.expected) {
+				t.Fatalf("expected %s, got %s", test.expected, expiresAt)
 			}
 		})
 	}

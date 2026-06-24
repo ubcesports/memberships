@@ -81,6 +81,12 @@ SELECT * FROM transactions
 WHERE stripe_checkout_session_id = $1
 FOR UPDATE;
 
+-- name: GetTransactionTierSlugBySessionID :one
+SELECT mt.slug
+FROM transactions t
+JOIN membership_tiers mt ON mt.id = t.tier_id
+WHERE t.stripe_checkout_session_id = $1;
+
 -- name: CreatePendingTransaction :one
 INSERT INTO transactions (
     id,

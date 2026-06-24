@@ -20,7 +20,7 @@ func NewMembershipHandler(membershipService *service.MembershipService) *Members
 }
 
 /*
-Returns the public Regular and Premium catalog with the ordinary Member price.
+Returns the public Day Pass, Regular, and Premium catalog with the ordinary Member price.
 
 API URL: GET /membership/tiers
 

@@ -64,7 +64,7 @@ func (s *MembershipService) ListPublicTiers(ctx context.Context) ([]dto.PublicMe
 				ID: key, Slug: mapping.Slug, Title: mapping.Title,
 				Description: textPointer(mapping.Description),
 				Prices:      make([]dto.MembershipTierPriceDTO, 0, 2),
-				ExpiresAt:   mustMembershipExpiry(s.now()),
+				ExpiresAt:   mustMembershipExpiry(mapping.Slug, s.now()),
 			}
 			byTier[key] = tier
 			order = append(order, key)
@@ -251,7 +251,14 @@ func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *str
 			}
 		}
 	}
-	expiresAt, err := membershipExpiry(occurredAt)
+	tierSlug, err := s.repository.GetTransactionTierSlugBySession(ctx, session.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	expiresAt, err := membershipExpiry(tierSlug, occurredAt)
 	if err != nil {
 		return err
 	}
@@ -332,7 +339,7 @@ func (s *MembershipService) selectEligibleTiers(ctx context.Context, userID pgty
 				Description: textPointer(mapping.Description),
 				Price:       dto.MembershipTierPriceDTO{AmountMinor: price.UnitAmount, Currency: string(price.Currency), Group: dto.GroupType(mapping.Group)},
 				IsUpgrade:   hasActive, CreditAmountMinor: appliedCredit, AmountDueMinor: amountDue,
-				ExpiresAt: mustMembershipExpiry(s.now()),
+				ExpiresAt: mustMembershipExpiry(mapping.Slug, s.now()),
 			},
 		}
 		key := mapping.TierID.String()
@@ -407,12 +414,15 @@ func (s *MembershipService) validStripePrice(ctx context.Context, priceID, produ
 	return price, nil
 }
 
-func membershipExpiry(purchasedAt time.Time) (time.Time, error) {
+func membershipExpiry(tierSlug string, purchasedAt time.Time) (time.Time, error) {
 	location, err := time.LoadLocation("America/Vancouver")
 	if err != nil {
 		return time.Time{}, err
 	}
 	local := purchasedAt.In(location)
+	if tierSlug == "day" {
+		return time.Date(local.Year(), local.Month(), local.Day()+1, 0, 0, 0, 0, location), nil
+	}
 	year := local.Year()
 	if !local.Before(time.Date(year, time.September, 1, 0, 0, 0, 0, location)) {
 		year++
@@ -420,8 +430,8 @@ func membershipExpiry(purchasedAt time.Time) (time.Time, error) {
 	return time.Date(year, time.September, 1, 0, 0, 0, 0, location), nil
 }
 
-func mustMembershipExpiry(value time.Time) time.Time {
-	expiresAt, err := membershipExpiry(value)
+func mustMembershipExpiry(tierSlug string, value time.Time) time.Time {
+	expiresAt, err := membershipExpiry(tierSlug, value)
 	if err != nil {
 		panic(err)
 	}

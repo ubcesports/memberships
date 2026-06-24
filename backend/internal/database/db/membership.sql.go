@@ -333,6 +333,20 @@ func (q *Queries) GetTransactionBySessionIDForUpdate(ctx context.Context, stripe
 	return i, err
 }
 
+const getTransactionTierSlugBySessionID = `-- name: GetTransactionTierSlugBySessionID :one
+SELECT mt.slug
+FROM transactions t
+JOIN membership_tiers mt ON mt.id = t.tier_id
+WHERE t.stripe_checkout_session_id = $1
+`
+
+func (q *Queries) GetTransactionTierSlugBySessionID(ctx context.Context, stripeCheckoutSessionID pgtype.Text) (string, error) {
+	row := q.db.QueryRow(ctx, getTransactionTierSlugBySessionID, stripeCheckoutSessionID)
+	var slug string
+	err := row.Scan(&slug)
+	return slug, err
+}
+
 const getUserEmail = `-- name: GetUserEmail :one
 SELECT email FROM users WHERE id = $1
 `
