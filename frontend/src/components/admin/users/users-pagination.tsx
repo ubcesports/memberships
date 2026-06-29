@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
-import { PAGE_SIZE_OPTIONS } from "@/lib/admin-users.types";
+import { PAGE_SIZE_OPTIONS } from "@/lib/admin/admin-users.types";
 
 const FIELD_CLASS_NAME =
   "h-10 border border-brand-border bg-brand-surface px-3 text-sm text-brand-text";

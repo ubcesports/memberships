@@ -10,16 +10,16 @@ import { UsersPagination } from "@/components/admin/users/users-pagination";
 import { UsersTable } from "@/components/admin/users/users-table";
 import { UsersToolbar } from "@/components/admin/users/users-toolbar";
 import { BasePage } from "@/components/layout/base-page";
-import { downloadCSVBlob, exportAdminUsersCSV } from "@/lib/admin-users.api";
-import { useAdminUsers } from "@/lib/admin-users.hook";
+import { downloadCSVBlob, exportAdminUsersCSV } from "@/lib/admin/admin-users.api";
+import { useAdminUsers } from "@/lib/admin/admin-users.hook";
 import type {
   AdminUserFilters,
   AppliedSearch,
   GroupType,
   RoleType,
   SearchMode,
-} from "@/lib/admin-users.types";
-import { DEFAULT_PAGE_SIZE } from "@/lib/admin-users.types";
+} from "@/lib/admin/admin-users.types";
+import { DEFAULT_PAGE_SIZE } from "@/lib/admin/admin-users.types";
 import { useProfile } from "@/lib/profile.hook";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 

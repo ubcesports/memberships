@@ -2,7 +2,7 @@ import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import { StatusBadge } from "@/components/status-badge";
 import { SurfacePanel } from "@/components/surface-panel";
-import type { AdminUser } from "@/lib/admin-users.types";
+import type { AdminUser } from "@/lib/admin/admin-users.types";
 import { formatTime } from "@/lib/utils/formatting";
 import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
 
