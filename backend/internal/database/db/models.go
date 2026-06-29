@@ -203,11 +203,12 @@ type Transaction struct {
 	UserID                pgtype.UUID
 	MembershipID          pgtype.UUID
 	StripePaymentIntentID pgtype.Text
-	PriceAmount           pgtype.Numeric
 	Status                TransactionStatusType
 	CreatedAt             pgtype.Timestamptz
 	UpdatedAt             pgtype.Timestamptz
 	GroupAtPurchase       NullGroupType
+	StudentAtPurchase     pgtype.Bool
+	AmountPaidCents       pgtype.Int8
 }
 
 type User struct {

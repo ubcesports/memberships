@@ -11,6 +11,57 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getCurrentMembershipWithTransaction = `-- name: GetCurrentMembershipWithTransaction :one
+SELECT
+    m.id,
+    m.tier_id,
+    m.started_at,
+    m.expires_at,
+    m.cancelled_at,
+    t.id AS transaction_id,
+    t.amount_paid_cents,
+    t.status,
+    t.group_at_purchase
+FROM memberships m
+JOIN transactions t
+    ON t.membership_id = m.id
+WHERE m.user_id = $1
+    AND m.cancelled_at IS NULL
+    AND m.started_at <= NOW()
+    AND m.expires_at > NOW()
+ORDER BY m.started_at DESC
+LIMIT 1
+`
+
+type GetCurrentMembershipWithTransactionRow struct {
+	ID              pgtype.UUID
+	TierID          pgtype.UUID
+	StartedAt       pgtype.Timestamptz
+	ExpiresAt       pgtype.Timestamptz
+	CancelledAt     pgtype.Timestamptz
+	TransactionID   pgtype.UUID
+	AmountPaidCents pgtype.Int8
+	Status          TransactionStatusType
+	GroupAtPurchase NullGroupType
+}
+
+func (q *Queries) GetCurrentMembershipWithTransaction(ctx context.Context, userID pgtype.UUID) (GetCurrentMembershipWithTransactionRow, error) {
+	row := q.db.QueryRow(ctx, getCurrentMembershipWithTransaction, userID)
+	var i GetCurrentMembershipWithTransactionRow
+	err := row.Scan(
+		&i.ID,
+		&i.TierID,
+		&i.StartedAt,
+		&i.ExpiresAt,
+		&i.CancelledAt,
+		&i.TransactionID,
+		&i.AmountPaidCents,
+		&i.Status,
+		&i.GroupAtPurchase,
+	)
+	return i, err
+}
+
 const getPublicTiersAndPrices = `-- name: GetPublicTiersAndPrices :many
 SELECT
     mt.id,

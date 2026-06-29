@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/repository"
 	"github.com/ubcesports/memberships/internal/stripeclient"
@@ -65,4 +67,30 @@ func (s *MembershipService) GetPublicTiersAndPrices(ctx context.Context) ([]dto.
 	}
 
 	return returnTiers, nil
+}
+
+func (s *MembershipService) GetCurrentMembershipWithTransaction(ctx context.Context, userId string) (*dto.MembershipDTO, error) {
+	membership, err := s.membershipRepo.GetCurrentMembershipWithTransaction(ctx, userId)
+	if err != nil {
+		// If user has no current membership, return nil
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return &dto.MembershipDTO{
+		ID:          membership.ID.String(),
+		TierId:      membership.TierID.String(),
+		StartedAt:   membership.StartedAt.Time,
+		ExpiresAt:   membership.ExpiresAt.Time,
+		CancelledAt: &membership.CancelledAt.Time,
+		Transaction: dto.TransactionDTO{
+			ID:              membership.TransactionID.String(),
+			AmountPaid:      fmt.Sprintf("%.2f", float64(membership.AmountPaidCents.Int64)/100),
+			Status:          dto.TransactionStatusType(membership.Status),
+			GroupAtPurchase: dto.GroupType(membership.GroupAtPurchase.GroupType),
+		},
+	}, nil
 }
