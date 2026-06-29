@@ -23,10 +23,11 @@ var Module = fx.Module("server",
 type RouterParams struct {
 	fx.In
 
-	HealthHandler    *handlers.HealthHandler
-	ProfileHandler   *handlers.ProfileHandler
-	AdminUserHandler *handlers.AdminUserHandler
-	Limen            *limen.Limen
+	HealthHandler     *handlers.HealthHandler
+	ProfileHandler    *handlers.ProfileHandler
+	AdminUserHandler  *handlers.AdminUserHandler
+	MembershipHandler *handlers.MembershipHandler
+	Limen             *limen.Limen
 }
 
 // Add all new routes here
@@ -40,6 +41,7 @@ func provideRouter(params RouterParams) *chi.Mux {
 
 	// All public routes
 	r.Get("/health", params.HealthHandler.IsDatabaseHealthy)
+	r.Get("/membership/tiers", params.MembershipHandler.GetPublicTiersWithPrices)
 
 	// All protected routes
 	r.Group(func(r chi.Router) {

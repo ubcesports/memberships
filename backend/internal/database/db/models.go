@@ -157,16 +157,14 @@ type Account struct {
 }
 
 type Membership struct {
-	ID              pgtype.UUID
-	UserID          pgtype.UUID
-	TierID          pgtype.UUID
-	TransactionID   pgtype.UUID
-	GroupAtPurchase GroupType
-	StartedAt       pgtype.Timestamptz
-	ExpiresAt       pgtype.Timestamptz
-	CancelledAt     pgtype.Timestamptz
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
+	ID          pgtype.UUID
+	UserID      pgtype.UUID
+	TierID      pgtype.UUID
+	StartedAt   pgtype.Timestamptz
+	ExpiresAt   pgtype.Timestamptz
+	CancelledAt pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
 }
 
 type MembershipTier struct {
@@ -177,16 +175,17 @@ type MembershipTier struct {
 	UpdatedAt       pgtype.Timestamptz
 	StripeProductID pgtype.Text
 	IsActive        bool
+	Slug            pgtype.Text
+	Group           NullGroupType
 }
 
 type MembershipTierPrice struct {
-	ID            pgtype.UUID
-	TierID        pgtype.UUID
-	Group         GroupType
-	Price         pgtype.Numeric
-	StripePriceID pgtype.Text
-	CreatedAt     pgtype.Timestamptz
-	UpdatedAt     pgtype.Timestamptz
+	ID                pgtype.UUID
+	TierID            pgtype.UUID
+	StripePriceID     pgtype.Text
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+	IsStudentRequired pgtype.Bool
 }
 
 type Session struct {
@@ -208,6 +207,7 @@ type Transaction struct {
 	Status                TransactionStatusType
 	CreatedAt             pgtype.Timestamptz
 	UpdatedAt             pgtype.Timestamptz
+	GroupAtPurchase       NullGroupType
 }
 
 type User struct {
