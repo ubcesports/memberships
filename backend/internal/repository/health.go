@@ -6,7 +6,7 @@ import (
 	"github.com/ubcesports/memberships/internal/database/db"
 )
 
-type HealthRepository struct{
+type HealthRepository struct {
 	store *db.Queries
 }
 

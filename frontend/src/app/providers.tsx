@@ -21,7 +21,5 @@ export function AppProviders({ children }: AppProvidersProps) {
       }),
   );
 
-  return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }

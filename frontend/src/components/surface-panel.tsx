@@ -7,16 +7,9 @@ export type SurfacePanelProps = {
 
 const BASE_CLASS_NAME = "border border-brand-border bg-white/[0.03]";
 
-export function SurfacePanel({
-  children,
-  className,
-  ...props
-}: SurfacePanelProps) {
+export function SurfacePanel({ children, className, ...props }: SurfacePanelProps) {
   return (
-    <div
-      {...props}
-      className={className ? `${BASE_CLASS_NAME} ${className}` : BASE_CLASS_NAME}
-    >
+    <div {...props} className={className ? `${BASE_CLASS_NAME} ${className}` : BASE_CLASS_NAME}>
       {children}
     </div>
   );

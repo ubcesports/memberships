@@ -37,9 +37,7 @@ const query = queryOptions({
     return {
       name: user.full_name,
       email: user.email,
-      emailVerifiedAt: user.email_verified_at
-        ? new Date(user.email_verified_at)
-        : undefined,
+      emailVerifiedAt: user.email_verified_at ? new Date(user.email_verified_at) : undefined,
       groups: user.groups ?? [],
       avatarUrl: user.avatar_url ?? undefined,
       onboardingCompletedAt: user.onboarding_completed_at
@@ -54,5 +52,4 @@ const query = queryOptions({
   },
 });
 
-export const useProfile = (options?: Partial<typeof query>) =>
-  useQuery({ ...query, ...options });
+export const useProfile = (options?: Partial<typeof query>) => useQuery({ ...query, ...options });
