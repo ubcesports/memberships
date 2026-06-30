@@ -56,6 +56,7 @@ func provideRouter(params RouterParams) *chi.Mux {
 		r.Use(auth.RequireOnboarded)
 
 		r.Get("/membership/me", params.MembershipHandler.GetCurrentMembershipWithTransaction)
+		r.Get("/membership/tiers/eligible", params.MembershipHandler.GetEligibleTiersWithPrices)
 	})
 
 	// All admin routes

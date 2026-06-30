@@ -6,7 +6,17 @@ type MembershipTierDTO struct {
 	ID          string                   `json:"id"`
 	Title       string                   `json:"title"`
 	Description string                   `json:"description"`
+	Slug        string                   `json:"slug"`
 	Prices      []MembershipTierPriceDTO `json:"prices"`
+}
+
+type EligibleMembershipTierDTO struct {
+	ID           string                   `json:"id"`
+	Title        string                   `json:"title"`
+	Description  string                   `json:"description"`
+	Slug         string                   `json:"slug"`
+	PurchaseType PurchaseType             `json:"purchase_type"`
+	Prices       []MembershipTierPriceDTO `json:"prices"`
 }
 
 type MembershipTierPriceDTO struct {

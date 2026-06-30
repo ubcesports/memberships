@@ -30,3 +30,23 @@ func (r *MembershipRepository) GetCurrentMembershipWithTransaction(ctx context.C
 
 	return r.store.GetCurrentMembershipWithTransaction(ctx, pgUserId)
 }
+
+func (r *MembershipRepository) GetEligibleTiersWithPrices(ctx context.Context, userId string) ([]db.GetEligibleTiersWithPricesRow, error) {
+	var pgUserId pgtype.UUID
+
+	if err := pgUserId.Scan(userId); err != nil {
+		return []db.GetEligibleTiersWithPricesRow{}, err
+	}
+
+	return r.store.GetEligibleTiersWithPrices(ctx, pgUserId)
+}
+
+func (r *MembershipRepository) GetTierByTierId(ctx context.Context, tierId string) (db.GetTierByTierIdRow, error) {
+	var pgTierId pgtype.UUID
+
+	if err := pgTierId.Scan(tierId); err != nil {
+		return db.GetTierByTierIdRow{}, err
+	}
+
+	return r.store.GetTierByTierId(ctx, pgTierId)
+}

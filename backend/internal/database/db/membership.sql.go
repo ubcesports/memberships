@@ -62,11 +62,76 @@ func (q *Queries) GetCurrentMembershipWithTransaction(ctx context.Context, userI
 	return i, err
 }
 
+const getEligibleTiersWithPrices = `-- name: GetEligibleTiersWithPrices :many
+SELECT
+    mt.id,
+    mt.title,
+    mt.description,
+    mt.stripe_product_id,
+    mt.slug,
+    mtp.stripe_price_id
+FROM membership_tiers mt
+JOIN membership_tier_prices mtp
+    ON mtp.tier_id = mt.id
+JOIN users u
+    on u.id = $1
+WHERE mt.is_active = TRUE
+    AND (
+        mt."group" = 'member'
+        OR EXISTS (
+            SELECT 1
+            FROM user_groups ug
+            WHERE ug.user_id = u.id AND ug."group" = mt."group"
+        )
+    )
+    AND (
+        mtp.is_student_required IS NULL
+        OR mtp.is_student_required = u.is_student
+    )
+`
+
+type GetEligibleTiersWithPricesRow struct {
+	ID              pgtype.UUID
+	Title           string
+	Description     pgtype.Text
+	StripeProductID pgtype.Text
+	Slug            pgtype.Text
+	StripePriceID   pgtype.Text
+}
+
+func (q *Queries) GetEligibleTiersWithPrices(ctx context.Context, id pgtype.UUID) ([]GetEligibleTiersWithPricesRow, error) {
+	rows, err := q.db.Query(ctx, getEligibleTiersWithPrices, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetEligibleTiersWithPricesRow
+	for rows.Next() {
+		var i GetEligibleTiersWithPricesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Description,
+			&i.StripeProductID,
+			&i.Slug,
+			&i.StripePriceID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getPublicTiersAndPrices = `-- name: GetPublicTiersAndPrices :many
 SELECT
     mt.id,
     mt.title,
     mt.description,
+    mt.slug,
     mt.stripe_product_id,
     mtp.stripe_price_id,
     mtp.is_student_required
@@ -80,6 +145,7 @@ type GetPublicTiersAndPricesRow struct {
 	ID                pgtype.UUID
 	Title             string
 	Description       pgtype.Text
+	Slug              pgtype.Text
 	StripeProductID   pgtype.Text
 	StripePriceID     pgtype.Text
 	IsStudentRequired pgtype.Bool
@@ -98,6 +164,7 @@ func (q *Queries) GetPublicTiersAndPrices(ctx context.Context) ([]GetPublicTiers
 			&i.ID,
 			&i.Title,
 			&i.Description,
+			&i.Slug,
 			&i.StripeProductID,
 			&i.StripePriceID,
 			&i.IsStudentRequired,
@@ -110,4 +177,44 @@ func (q *Queries) GetPublicTiersAndPrices(ctx context.Context) ([]GetPublicTiers
 		return nil, err
 	}
 	return items, nil
+}
+
+const getTierByTierId = `-- name: GetTierByTierId :one
+SELECT
+    mt.id,
+    mt.title,
+    mt.description,
+    mt.slug,
+    mt.stripe_product_id,
+    mtp.stripe_price_id,
+    mtp.is_student_required
+FROM membership_tiers mt
+JOIN membership_tier_prices mtp
+    ON mtp.tier_id = mt.id
+WHERE mt.id = $1
+`
+
+type GetTierByTierIdRow struct {
+	ID                pgtype.UUID
+	Title             string
+	Description       pgtype.Text
+	Slug              pgtype.Text
+	StripeProductID   pgtype.Text
+	StripePriceID     pgtype.Text
+	IsStudentRequired pgtype.Bool
+}
+
+func (q *Queries) GetTierByTierId(ctx context.Context, id pgtype.UUID) (GetTierByTierIdRow, error) {
+	row := q.db.QueryRow(ctx, getTierByTierId, id)
+	var i GetTierByTierIdRow
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Description,
+		&i.Slug,
+		&i.StripeProductID,
+		&i.StripePriceID,
+		&i.IsStudentRequired,
+	)
+	return i, err
 }

@@ -25,3 +25,10 @@ const (
 	TransactionFailed    TransactionStatusType = "failed"
 	TransactionRefunded  TransactionStatusType = "refunded"
 )
+
+type PurchaseType string
+
+const (
+	PurchaseNew     PurchaseType = "new"
+	PurchaseUpgrade PurchaseType = "upgrade"
+)

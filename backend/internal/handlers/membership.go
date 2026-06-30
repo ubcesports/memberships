@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -21,14 +22,31 @@ func (h *MembershipHandler) GetPublicTiersWithPrices(w http.ResponseWriter, r *h
 	tiers, err := h.membershipService.GetPublicTiersAndPrices(r.Context())
 	if err != nil {
 		log.Printf("failed to get public tiers and prices: %v", err)
-		util.WriteApiResponse(w, 500, "ErrorGetPublicTiersWithPrices", "Error retrieving public tiers and prices. Please try again.")
+		util.WriteApiResponse(w, 500, "ErrorGetPublicTiersWithPrices", fmt.Sprintf("Error retrieving public tiers and prices. Error message: %v", err))
 		return
 	}
 	util.WriteJson(w, 200, tiers)
 }
 
 func (h *MembershipHandler) GetEligibleTiersWithPrices(w http.ResponseWriter, r *http.Request) {
-	return
+	userId, ok := currentUserID(r)
+	if !ok {
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
+		return
+	}
+
+	tiers, err := h.membershipService.GetEligibleTiersWithPrices(r.Context(), userId)
+	if err != nil {
+		log.Printf("failed to get eligible tiers and prices: %v", err)
+		util.WriteApiResponse(w, 500, "ErrorGetEligibleTiersWithPrices", fmt.Sprintf("Error retrieving eligible tiers and prices. Error message: %v", err))
+		return
+	}
+
+	if tiers != nil {
+		util.WriteJson(w, 200, *tiers)
+	} else {
+		util.WriteJson(w, 200, nil)
+	}
 }
 
 func (h *MembershipHandler) GetCurrentMembershipWithTransaction(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +59,7 @@ func (h *MembershipHandler) GetCurrentMembershipWithTransaction(w http.ResponseW
 	membership, err := h.membershipService.GetCurrentMembershipWithTransaction(r.Context(), userId)
 	if err != nil {
 		log.Printf("failed to get current membership: %v", err)
-		util.WriteApiResponse(w, 500, "ErrorGetCurrentMembershipWithTransaction", "Error retrieving current user's membership. Please try again.")
+		util.WriteApiResponse(w, 500, "ErrorGetCurrentMembershipWithTransaction", fmt.Sprintf("Error retrieving current user's membership. Error message: %v", err))
 		return
 	}
 	util.WriteJson(w, 200, membership)
