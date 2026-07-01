@@ -7,6 +7,7 @@ import (
 	"github.com/ubcesports/memberships/internal/database/db"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/repository"
+	"github.com/ubcesports/memberships/internal/util"
 )
 
 type AdminUserFilters struct {
@@ -117,15 +118,15 @@ func (s *AdminUserService) getUsers(ctx context.Context, params db.GetUsersAdmin
 		users = append(users, dto.ProfileDTO{
 			ID:                    row.ID.String(),
 			Email:                 row.Email,
-			StudentID:             textPointer(row.StudentID),
+			StudentID:             util.TextPointer(row.StudentID),
 			Role:                  dto.RoleType(row.Role),
 			CreatedAt:             row.CreatedAt.Time,
 			UpdatedAt:             row.UpdatedAt.Time,
 			FullName:              row.FullName,
-			EmailVerifiedAt:       timestampPointer(row.EmailVerifiedAt),
+			EmailVerifiedAt:       util.TimestampPointer(row.EmailVerifiedAt),
 			IsStudent:             row.IsStudent,
-			OnboardingCompletedAt: timestampPointer(row.OnboardingCompletedAt),
-			AvatarURL:             textPointer(row.AvatarUrl),
+			OnboardingCompletedAt: util.TimestampPointer(row.OnboardingCompletedAt),
+			AvatarURL:             util.TextPointer(row.AvatarUrl),
 			Groups:                groups,
 		})
 	}
