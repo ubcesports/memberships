@@ -20,6 +20,24 @@ func NewProfileHandler(profileService *service.ProfileService) *ProfileHandler {
 	return &ProfileHandler{profileService: profileService}
 }
 
+/*
+Get the currently authenticated user's profile.
+
+API URL: GET /profile
+
+Args:
+
+	None
+
+Returns:
+
+	response body containing the current user's profile under the "user" key (HTTP 200).
+
+Raises:
+
+	401: unauthorized user
+	500: unable to load profile
+*/
 func (h *ProfileHandler) GetCurrentProfile(w http.ResponseWriter, r *http.Request) {
 	// Get current user id
 	userId, ok := currentUserID(r)
@@ -37,10 +55,48 @@ func (h *ProfileHandler) GetCurrentProfile(w http.ResponseWriter, r *http.Reques
 	util.WriteJson(w, http.StatusOK, map[string]dto.ProfileDTO{"user": *profile})
 }
 
+/*
+Check whether the currently authenticated user is onboarded.
+Only returns HTTP 200, as middleware auto-handles non-onboarded users.
+
+API URL: GET /onboard/check
+
+Args:
+
+	None
+
+Returns:
+
+	None (HTTP 200)
+
+Raises:
+
+	None
+*/
 func (h *ProfileHandler) GetIsUserOnboarded(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+/*
+Onboard the currently authenticated user.
+
+API URL: PATCH /onboard
+
+Args:
+
+	request body: dto.OnboardUserRequest
+
+Returns:
+
+	response body with success code and message (HTTP 200)
+
+Raises:
+
+	400: invalid request body or validation error
+	401: unauthorized user
+	409: conflict, when the user is already onboarded
+	500: internal error, when onboarding fails unexpectedly
+*/
 func (h *ProfileHandler) OnboardUser(w http.ResponseWriter, r *http.Request) {
 	// Get current user id
 	userId, ok := currentUserID(r)
@@ -49,8 +105,6 @@ func (h *ProfileHandler) OnboardUser(w http.ResponseWriter, r *http.Request) {
 		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 		return
 	}
-
-	log.Printf("onboard user request started: user_id=%s", userId)
 
 	// Ensure request body is valid
 	var onboardUserRequest dto.OnboardUserRequest
@@ -79,9 +133,12 @@ func (h *ProfileHandler) OnboardUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("onboard user request completed: user_id=%s", userId)
 	util.WriteApiResponse(w, http.StatusOK, "OK", "User onboarded successfully!")
 }
+
+/*
+	Private functions
+*/
 
 func currentUserID(r *http.Request) (string, bool) {
 	session := auth.SessionFromContext(r.Context())

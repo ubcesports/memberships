@@ -14,12 +14,13 @@ import (
 	"github.com/ubcesports/memberships/internal/util"
 )
 
+// Errors
 var (
 	ErrValidation = errors.New("Validation error")
 	ErrConflict   = errors.New("Conflict")
 )
 
-var studentIDRegex = regexp.MustCompile(`^\d{8}$`)
+var studentIDRegex = regexp.MustCompile(`^\d{8}$`) // Regex to ensure student id is an 8 digit number, which all ubc student ids are
 
 type ProfileService struct {
 	profileRepository *repository.ProfileRepository
@@ -40,11 +41,13 @@ func (s *ProfileService) GetProfileByUserID(ctx context.Context, userID string) 
 func (s *ProfileService) OnboardUser(ctx context.Context, userId string, onboardUserRequest dto.OnboardUserRequest) error {
 	var studentID string
 
+	// Get user profile
 	user, err := s.GetProfileByUserID(ctx, userId)
 	if err != nil {
 		return err
 	}
 
+	// Only allow non-onboarded users to onboard
 	if user.OnboardingCompletedAt != nil {
 		return fmt.Errorf("%w: current user is already onboarded!", ErrConflict)
 	}
@@ -77,6 +80,10 @@ func (s *ProfileService) OnboardUser(ctx context.Context, userId string, onboard
 		studentID,
 	)
 }
+
+/*
+	Private functions
+*/
 
 func buildProfile(row db.GetProfileByUserIDRow) *dto.ProfileDTO {
 	profile := &dto.ProfileDTO{
