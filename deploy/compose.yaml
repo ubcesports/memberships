@@ -15,6 +15,23 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    profiles: [migrate]
+    image: ${BACKEND_IMAGE}
+    restart: "no"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        'exec /usr/local/bin/goose -dir /app/sql/migrations postgres "$$DATABASE_URL" up',
+      ]
+
   backend:
     image: ${BACKEND_IMAGE}
     restart: unless-stopped

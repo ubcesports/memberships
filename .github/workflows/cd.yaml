@@ -128,6 +128,8 @@ jobs:
             compose.yaml.template > compose.yaml
 
           docker compose pull
+          docker compose run --rm migrate
+          docker compose down
           docker compose up -d --remove-orphans
           docker image prune -f
           EOF
