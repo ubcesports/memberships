@@ -33,6 +33,23 @@ WHERE m.user_id = $1
 ORDER BY m.started_at DESC
 LIMIT 1;
 
+-- name: GetAllMembershipsWithTransactions :many
+SELECT
+    m.id,
+    m.tier_id,
+    m.started_at,
+    m.expires_at,
+    m.cancelled_at,
+    t.id AS transaction_id,
+    t.amount_paid_cents,
+    t.status,
+    t.group_at_purchase
+FROM memberships m
+JOIN transactions t
+    ON t.membership_id = m.id
+WHERE m.user_id = $1
+ORDER BY m.started_at DESC;
+
 -- name: GetEligibleTiersWithPrices :many
 SELECT
     mt.id,

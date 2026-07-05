@@ -31,6 +31,16 @@ func (r *MembershipRepository) GetCurrentMembershipWithTransaction(ctx context.C
 	return r.store.GetCurrentMembershipWithTransaction(ctx, pgUserId)
 }
 
+func (r *MembershipRepository) GetAllMembershipsWithTransactions(ctx context.Context, userId string) ([]db.GetAllMembershipsWithTransactionsRow, error) {
+	var pgUserId pgtype.UUID
+
+	if err := pgUserId.Scan(userId); err != nil {
+		return []db.GetAllMembershipsWithTransactionsRow{}, err
+	}
+
+	return r.store.GetAllMembershipsWithTransactions(ctx, pgUserId)
+}
+
 func (r *MembershipRepository) GetEligibleTiersWithPrices(ctx context.Context, userId string) ([]db.GetEligibleTiersWithPricesRow, error) {
 	var pgUserId pgtype.UUID
 

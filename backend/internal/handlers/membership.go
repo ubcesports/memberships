@@ -65,12 +65,20 @@ func (h *MembershipHandler) GetCurrentMembershipWithTransaction(w http.ResponseW
 	util.WriteJson(w, 200, membership)
 }
 
-func (h *MembershipHandler) GetTierByTierId(w http.ResponseWriter, r *http.Request) {
-	return
-}
-
 func (h *MembershipHandler) GetAllMembershipsWithTransactions(w http.ResponseWriter, r *http.Request) {
-	return
+	userId, ok := currentUserID(r)
+	if !ok {
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
+		return
+	}
+
+	memberships, err := h.membershipService.GetAllMembershipsWithTransactions(r.Context(), userId)
+	if err != nil {
+		log.Printf("failed to get all memberships: %v", err)
+		util.WriteApiResponse(w, 500, "ErrorGetAllMembershipsWithTransactions", fmt.Sprintf("Error retrieving current user's memberships. Error message: %v", err))
+		return
+	}
+	util.WriteJson(w, 200, memberships)
 }
 
 func (h *MembershipHandler) CreateMembershipCheckoutSession(w http.ResponseWriter, r *http.Request) {

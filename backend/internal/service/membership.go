@@ -103,6 +103,38 @@ func (s *MembershipService) GetCurrentMembershipWithTransaction(ctx context.Cont
 	}, nil
 }
 
+func (s *MembershipService) GetAllMembershipsWithTransactions(ctx context.Context, userId string) (*[]dto.MembershipDTO, error) {
+	memberships, err := s.membershipRepo.GetAllMembershipsWithTransactions(ctx, userId)
+	if err != nil {
+		// If user has no current membership, return nil
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	returnMemberships := make([]dto.MembershipDTO, 0, len(memberships))
+	for _, membership := range memberships {
+		membershipDto := dto.MembershipDTO{
+			ID:          membership.ID.String(),
+			TierId:      membership.TierID.String(),
+			StartedAt:   membership.StartedAt.Time,
+			ExpiresAt:   membership.ExpiresAt.Time,
+			CancelledAt: &membership.CancelledAt.Time,
+			Transaction: dto.TransactionDTO{
+				ID:              membership.TransactionID.String(),
+				AmountPaid:      fmt.Sprintf("%.2f", float64(membership.AmountPaidCents.Int64)/100),
+				Status:          dto.TransactionStatusType(membership.Status),
+				GroupAtPurchase: dto.GroupType(membership.GroupAtPurchase.GroupType),
+			},
+		}
+		returnMemberships = append(returnMemberships, membershipDto)
+	}
+
+	return &returnMemberships, nil
+}
+
 func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, userId string) (*[]dto.EligibleMembershipTierDTO, error) {
 	tiers, err := s.membershipRepo.GetEligibleTiersWithPrices(ctx, userId)
 	if err != nil {

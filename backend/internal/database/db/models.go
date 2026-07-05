@@ -56,6 +56,48 @@ func (ns NullGroupType) Value() (driver.Value, error) {
 	return string(ns.GroupType), nil
 }
 
+type PurchaseType string
+
+const (
+	PurchaseTypeNew     PurchaseType = "new"
+	PurchaseTypeUpgrade PurchaseType = "upgrade"
+)
+
+func (e *PurchaseType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PurchaseType(s)
+	case string:
+		*e = PurchaseType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PurchaseType: %T", src)
+	}
+	return nil
+}
+
+type NullPurchaseType struct {
+	PurchaseType PurchaseType
+	Valid        bool // Valid is true if PurchaseType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPurchaseType) Scan(value interface{}) error {
+	if value == nil {
+		ns.PurchaseType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PurchaseType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPurchaseType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PurchaseType), nil
+}
+
 type RoleType string
 
 const (
@@ -209,6 +251,7 @@ type Transaction struct {
 	GroupAtPurchase       NullGroupType
 	StudentAtPurchase     pgtype.Bool
 	AmountPaidCents       pgtype.Int8
+	PurchaseType          NullPurchaseType
 }
 
 type User struct {

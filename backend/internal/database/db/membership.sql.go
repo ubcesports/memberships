@@ -11,6 +11,66 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getAllMembershipsWithTransactions = `-- name: GetAllMembershipsWithTransactions :many
+SELECT
+    m.id,
+    m.tier_id,
+    m.started_at,
+    m.expires_at,
+    m.cancelled_at,
+    t.id AS transaction_id,
+    t.amount_paid_cents,
+    t.status,
+    t.group_at_purchase
+FROM memberships m
+JOIN transactions t
+    ON t.membership_id = m.id
+WHERE m.user_id = $1
+ORDER BY m.started_at DESC
+`
+
+type GetAllMembershipsWithTransactionsRow struct {
+	ID              pgtype.UUID
+	TierID          pgtype.UUID
+	StartedAt       pgtype.Timestamptz
+	ExpiresAt       pgtype.Timestamptz
+	CancelledAt     pgtype.Timestamptz
+	TransactionID   pgtype.UUID
+	AmountPaidCents pgtype.Int8
+	Status          TransactionStatusType
+	GroupAtPurchase NullGroupType
+}
+
+func (q *Queries) GetAllMembershipsWithTransactions(ctx context.Context, userID pgtype.UUID) ([]GetAllMembershipsWithTransactionsRow, error) {
+	rows, err := q.db.Query(ctx, getAllMembershipsWithTransactions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllMembershipsWithTransactionsRow
+	for rows.Next() {
+		var i GetAllMembershipsWithTransactionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TierID,
+			&i.StartedAt,
+			&i.ExpiresAt,
+			&i.CancelledAt,
+			&i.TransactionID,
+			&i.AmountPaidCents,
+			&i.Status,
+			&i.GroupAtPurchase,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCurrentMembershipWithTransaction = `-- name: GetCurrentMembershipWithTransaction :one
 SELECT
     m.id,

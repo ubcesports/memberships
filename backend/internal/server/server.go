@@ -55,7 +55,8 @@ func provideRouter(params RouterParams) *chi.Mux {
 		r.Use(auth.RequireAuth(params.Limen))
 		r.Use(auth.RequireOnboarded)
 
-		r.Get("/membership/me", params.MembershipHandler.GetCurrentMembershipWithTransaction)
+		r.Get("/membership/me/current", params.MembershipHandler.GetCurrentMembershipWithTransaction)
+		r.Get("/membership/me/all", params.MembershipHandler.GetAllMembershipsWithTransactions)
 		r.Get("/membership/tiers/eligible", params.MembershipHandler.GetEligibleTiersWithPrices)
 	})
 
