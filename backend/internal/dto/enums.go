@@ -24,6 +24,7 @@ const (
 	TransactionCompleted TransactionStatusType = "completed"
 	TransactionFailed    TransactionStatusType = "failed"
 	TransactionRefunded  TransactionStatusType = "refunded"
+	TransactionExpired   TransactionStatusType = "expired"
 )
 
 type PurchaseType string

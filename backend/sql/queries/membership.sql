@@ -90,3 +90,49 @@ FROM membership_tiers mt
 JOIN membership_tier_prices mtp
     ON mtp.tier_id = mt.id
 WHERE mt.id = $1;
+
+-- name: GetPendingTransactionForUpdate :one
+SELECT
+    id,
+    stripe_checkout_session_id
+FROM transactions
+WHERE user_id = $1 AND status = 'pending'
+FOR UPDATE;
+
+-- name: ExpirePendingTransactionById :exec
+UPDATE transactions
+SET
+    status = 'expired',
+    updated_at = NOW()
+WHERE id = $1 AND status = 'pending';
+
+-- name: CreatePendingTransaction :one
+INSERT INTO transactions (
+    user_id,
+    group_at_purchase,
+    student_at_purchase,
+    purchase_type,
+    status
+)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    'pending'
+)
+RETURNING id;
+
+-- name: PutStripeCheckoutSessionId :exec
+UPDATE transactions
+SET
+    stripe_checkout_session_id = $2,
+    updated_at = NOW()
+WHERE id = $1;
+
+-- name: UpdateTransactionStatusById :exec
+UPDATE transactions
+SET
+    status = $2,
+    updated_at = NOW()
+WHERE id = $1;

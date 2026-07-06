@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ubcesports/memberships/internal/auth"
 	"github.com/ubcesports/memberships/internal/service"
 )
@@ -30,13 +29,7 @@ func (h *ProfileHandler) GetCurrentProfile(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var id pgtype.UUID
-	if err := id.Scan(userID); err != nil {
-		http.Error(w, "Invalid session user ID", http.StatusInternalServerError)
-		return
-	}
-
-	profile, err := h.profileService.GetProfileByUserID(r.Context(), id)
+	profile, err := h.profileService.GetProfileByUserID(r.Context(), userID)
 	if err != nil {
 		http.Error(w, "Unable to load profile", http.StatusInternalServerError)
 		return

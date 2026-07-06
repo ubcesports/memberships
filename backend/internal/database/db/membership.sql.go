@@ -11,6 +11,56 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createPendingTransaction = `-- name: CreatePendingTransaction :one
+INSERT INTO transactions (
+    user_id,
+    group_at_purchase,
+    student_at_purchase,
+    purchase_type,
+    status
+)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    'pending'
+)
+RETURNING id
+`
+
+type CreatePendingTransactionParams struct {
+	UserID            pgtype.UUID
+	GroupAtPurchase   NullGroupType
+	StudentAtPurchase pgtype.Bool
+	PurchaseType      NullPurchaseType
+}
+
+func (q *Queries) CreatePendingTransaction(ctx context.Context, arg CreatePendingTransactionParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, createPendingTransaction,
+		arg.UserID,
+		arg.GroupAtPurchase,
+		arg.StudentAtPurchase,
+		arg.PurchaseType,
+	)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const expirePendingTransactionById = `-- name: ExpirePendingTransactionById :exec
+UPDATE transactions
+SET
+    status = 'expired',
+    updated_at = NOW()
+WHERE id = $1 AND status = 'pending'
+`
+
+func (q *Queries) ExpirePendingTransactionById(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, expirePendingTransactionById, id)
+	return err
+}
+
 const getAllMembershipsWithTransactions = `-- name: GetAllMembershipsWithTransactions :many
 SELECT
     m.id,
@@ -186,6 +236,27 @@ func (q *Queries) GetEligibleTiersWithPrices(ctx context.Context, id pgtype.UUID
 	return items, nil
 }
 
+const getPendingTransactionForUpdate = `-- name: GetPendingTransactionForUpdate :one
+SELECT
+    id,
+    stripe_checkout_session_id
+FROM transactions
+WHERE user_id = $1 AND status = 'pending'
+FOR UPDATE
+`
+
+type GetPendingTransactionForUpdateRow struct {
+	ID                      pgtype.UUID
+	StripeCheckoutSessionID pgtype.Text
+}
+
+func (q *Queries) GetPendingTransactionForUpdate(ctx context.Context, userID pgtype.UUID) (GetPendingTransactionForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getPendingTransactionForUpdate, userID)
+	var i GetPendingTransactionForUpdateRow
+	err := row.Scan(&i.ID, &i.StripeCheckoutSessionID)
+	return i, err
+}
+
 const getPublicTiersAndPrices = `-- name: GetPublicTiersAndPrices :many
 SELECT
     mt.id,
@@ -277,4 +348,40 @@ func (q *Queries) GetTierByTierId(ctx context.Context, id pgtype.UUID) (GetTierB
 		&i.IsStudentRequired,
 	)
 	return i, err
+}
+
+const putStripeCheckoutSessionId = `-- name: PutStripeCheckoutSessionId :exec
+UPDATE transactions
+SET
+    stripe_checkout_session_id = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type PutStripeCheckoutSessionIdParams struct {
+	ID                      pgtype.UUID
+	StripeCheckoutSessionID pgtype.Text
+}
+
+func (q *Queries) PutStripeCheckoutSessionId(ctx context.Context, arg PutStripeCheckoutSessionIdParams) error {
+	_, err := q.db.Exec(ctx, putStripeCheckoutSessionId, arg.ID, arg.StripeCheckoutSessionID)
+	return err
+}
+
+const updateTransactionStatusById = `-- name: UpdateTransactionStatusById :exec
+UPDATE transactions
+SET
+    status = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateTransactionStatusByIdParams struct {
+	ID     pgtype.UUID
+	Status TransactionStatusType
+}
+
+func (q *Queries) UpdateTransactionStatusById(ctx context.Context, arg UpdateTransactionStatusByIdParams) error {
+	_, err := q.db.Exec(ctx, updateTransactionStatusById, arg.ID, arg.Status)
+	return err
 }

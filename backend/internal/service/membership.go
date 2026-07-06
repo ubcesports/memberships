@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"math"
@@ -10,11 +9,17 @@ import (
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/stripe/stripe-go/v86"
 	"github.com/ubcesports/memberships/internal/database/db"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/repository"
 	"github.com/ubcesports/memberships/internal/stripeclient"
+)
+
+var (
+	ErrMembershipAlreadyExists = errors.New("An active un-upgradeable membership already exists! Can't create new checkout session.")
+	ErrTierNotEligible         = errors.New("Requested membership tier not eligible for current user. Please try another value.")
+	ErrTierNotFound            = errors.New("Tier with given tier id not found.")
 )
 
 type MembershipService struct {
@@ -54,7 +59,8 @@ func (s *MembershipService) GetPublicTiersAndPrices(ctx context.Context) ([]dto.
 		}
 
 		priceDto := dto.MembershipTierPriceDTO{
-			Price:             fmt.Sprintf("%.2f", float64(price.UnitAmount)/100), // Turn unit amount which is in cents, into readable format with 2 numbers after the decimal
+			Price:             float64(price.UnitAmount) / 100, // Turn unit amount which is in cents, into readable format with 2 numbers after the decimal
+			PriceId:           tier.StripePriceID.String,
 			IsStudentRequired: isStudentRequired,
 		}
 
@@ -69,6 +75,7 @@ func (s *MembershipService) GetPublicTiersAndPrices(ctx context.Context) ([]dto.
 				Title:       tier.Title,
 				Description: tier.Description.String,
 				Slug:        tier.Slug.String,
+				ProductId:   tier.StripeProductID.String,
 				Prices:      []dto.MembershipTierPriceDTO{priceDto},
 			})
 		}
@@ -145,11 +152,7 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 	tierIndexById := make(map[string]int)
 
 	// Get user info
-	var pgUserId pgtype.UUID
-	if err := pgUserId.Scan(userId); err != nil {
-		return nil, err
-	}
-	user, err := s.profileService.GetProfileByUserID(ctx, pgUserId)
+	user, err := s.profileService.GetProfileByUserID(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -187,6 +190,7 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 			Description:  tier.Description.String,
 			Slug:         tier.Slug.String,
 			PurchaseType: purchaseType,
+			ProductId:    tier.StripeProductID.String,
 			Prices:       []dto.MembershipTierPriceDTO{priceDto},
 		})
 	}
@@ -267,8 +271,9 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 
 			// Set up price dto
 			priceDto := dto.MembershipTierPriceDTO{
-				Price:             fmt.Sprintf("%.2f", float64(price.UnitAmount)/100), // Turn unit amount which is in cents, into readable format with 2 numbers after the decimal
-				IsStudentRequired: nil,                                                // Leave nil as this is not really required in this context.
+				Price:             float64(price.UnitAmount) / 100, // Turn unit amount which is in cents, into readable format with 2 numbers after the decimal
+				PriceId:           tier.StripePriceID.String,
+				IsStudentRequired: nil, // Leave nil as this is not really required in this context.
 			}
 
 			addPriceToTier(tier, purchaseType, priceDto)
@@ -297,7 +302,8 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 
 			// Set up price dto
 			priceDto := dto.MembershipTierPriceDTO{
-				Price:             fmt.Sprintf("%.2f", float64(priceToPay)/100),
+				Price:             float64(priceToPay) / 100,
+				PriceId:           tier.StripePriceID.String,
 				IsStudentRequired: nil, // Leave nil as this is not really required in this context.
 			}
 
@@ -308,11 +314,154 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 	return &returnTiers, nil
 }
 
+func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId string, req dto.CheckoutSessionRequest) (*dto.CheckoutSessionResponse, error) {
+	reqTier, err := s.getTierByTierId(ctx, req.TierId)
+	if err != nil {
+		return nil, err
+	}
+
+	// 1. Check if an active membership already exists. If if does, return an error.
+	membership, err := s.GetCurrentMembershipWithTransaction(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+	if membership != nil {
+		currTier, err := s.getTierByTierId(ctx, membership.TierId)
+		if err != nil {
+			return nil, err
+		}
+
+		// Users can create an "upgrade" checkout session if they have a regular membership and want to buy premium
+		// Only return ErrMembershipAlreadyExists if they don't have regular membership or they are trying to purchase
+		// another membership having regular membership
+		if !(currTier.Slug == "regular" && reqTier.Slug == "premium") {
+			return nil, ErrMembershipAlreadyExists
+		}
+	}
+
+	// 2. Check if the requested tier is eligible for the user. If not, return an error.
+	eligibleTiers, err := s.GetEligibleTiersWithPrices(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	var selectedTier *dto.EligibleMembershipTierDTO
+	if eligibleTiers != nil {
+		for i := range *eligibleTiers {
+			tier := &(*eligibleTiers)[i]
+			if req.TierId == tier.ID {
+				selectedTier = tier
+				break
+			}
+		}
+	}
+
+	if selectedTier == nil {
+		return nil, ErrTierNotEligible
+	}
+
+	// 3. If there is a pending transaction, then expire it and its stripe checkout session
+	err = s.membershipRepo.WithTx(ctx, func(mr *repository.MembershipRepository) error {
+		pending, err := mr.GetPendingTransactionForUpdate(ctx, userId)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		if !pending.StripeCheckoutSessionID.Valid || pending.StripeCheckoutSessionID.String == "" {
+			return mr.ExpirePendingTransactionById(ctx, pending.ID.String())
+		}
+
+		_, err = s.stripeClient.ExpireCheckoutSession(ctx, pending.StripeCheckoutSessionID.String)
+		if err != nil {
+			session, getErr := s.stripeClient.GetCheckoutSession(ctx, pending.StripeCheckoutSessionID.String)
+			if getErr != nil {
+				return err
+			}
+			if session.Status != stripe.CheckoutSessionStatusExpired {
+				return err
+			}
+		}
+
+		return mr.ExpirePendingTransactionById(ctx, pending.ID.String())
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. Create new pending transaction and checkout session
+
+	// Get user profile to create checkout session with their email
+	profile, err := s.profileService.GetProfileByUserID(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create new pending transaction
+	transactionId, err := s.membershipRepo.CreatePendingTransaction(ctx, repository.CreatePendingTransactionParams{
+		UserId:            userId,
+		GroupAtPurchase:   getGroupAtPurchase(profile.Groups),
+		StudentAtPurchase: profile.IsStudent,
+		PurchaseType:      selectedTier.PurchaseType,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	session, err := s.stripeClient.CreateCheckoutSession(ctx, stripeclient.CheckoutSessionRequest{
+		TransactionID: transactionId,
+		UserID:        userId,
+		CustomerEmail: profile.Email,
+		PriceID:       selectedTier.Prices[0].PriceId,
+		ProductID:     selectedTier.ProductId,
+		AmountInCents: int64(math.Round(selectedTier.Prices[0].Price * 100)),
+		Currency:      "cad", // Always in canadian dollars
+		IsUpgrade:     selectedTier.PurchaseType == dto.PurchaseUpgrade,
+	})
+	if err != nil {
+		markFailedErr := s.membershipRepo.UpdateTransactionStatusById(ctx, transactionId, dto.TransactionFailed)
+		if markFailedErr != nil {
+			return nil, fmt.Errorf("create checkout session failed: %w; also failed to mark transaction failed: %v", err, markFailedErr)
+		}
+		return nil, err
+	}
+
+	err = s.membershipRepo.PutStripeCheckoutSessionId(ctx, transactionId, session.ID)
+	if err != nil {
+		_, expireErr := s.stripeClient.ExpireCheckoutSession(ctx, session.ID)
+		markFailedErr := s.membershipRepo.UpdateTransactionStatusById(ctx, transactionId, dto.TransactionFailed)
+		if expireErr != nil || markFailedErr != nil {
+			return nil, fmt.Errorf("save checkout session id failed: %w; expire checkout session failed: %v; mark transaction failed failed: %v", err, expireErr, markFailedErr)
+		}
+		return nil, err
+	}
+
+	return &dto.CheckoutSessionResponse{Url: session.URL}, nil
+}
+
+func getGroupAtPurchase(groups []dto.GroupType) dto.GroupType {
+	if slices.Contains(groups, dto.GroupBoard) {
+		return dto.GroupBoard
+	}
+	if slices.Contains(groups, dto.GroupDirector) {
+		return dto.GroupDirector
+	}
+	if slices.Contains(groups, dto.GroupExecutive) {
+		return dto.GroupExecutive
+	}
+	if slices.Contains(groups, dto.GroupCompetitiveTeam) {
+		return dto.GroupCompetitiveTeam
+	}
+	return dto.GroupMember
+}
+
 func (s *MembershipService) getTierByTierId(ctx context.Context, tierId string) (*dto.MembershipTierDTO, error) {
 	tier, err := s.membershipRepo.GetTierByTierId(ctx, tierId)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrTierNotFound
 		}
 
 		return nil, err
@@ -323,6 +472,7 @@ func (s *MembershipService) getTierByTierId(ctx context.Context, tierId string) 
 		Title:       tier.Title,
 		Description: tier.Description.String,
 		Slug:        tier.Slug.String,
+		ProductId:   tier.StripeProductID.String,
 		Prices:      []dto.MembershipTierPriceDTO{},
 	}, nil
 }

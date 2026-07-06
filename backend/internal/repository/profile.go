@@ -3,8 +3,8 @@ package repository
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ubcesports/memberships/internal/database/db"
+	"github.com/ubcesports/memberships/internal/util"
 )
 
 type ProfileRepository struct {
@@ -15,6 +15,12 @@ func NewProfileRepository(store *db.Queries) *ProfileRepository {
 	return &ProfileRepository{store: store}
 }
 
-func (r *ProfileRepository) GetProfileByUserID(ctx context.Context, userID pgtype.UUID) (db.GetProfileByUserIDRow, error) {
-	return r.store.GetProfileByUserID(ctx, userID)
+func (r *ProfileRepository) GetProfileByUserID(ctx context.Context, userId string) (db.GetProfileByUserIDRow, error) {
+	// Validate user id
+	pgUserId, err := util.GetValidatedUUID(userId)
+	if err != nil {
+		return db.GetProfileByUserIDRow{}, err
+	}
+
+	return r.store.GetProfileByUserID(ctx, pgUserId)
 }

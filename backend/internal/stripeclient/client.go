@@ -21,7 +21,7 @@ type CheckoutSessionRequest struct {
 	CustomerEmail string
 	PriceID       string
 	ProductID     string
-	AmountInCents int64 // Amount of money needed to be paid in cents. Needed to determine new price in case user is upgrading their membership. Leave to 0 if it's not an upgrade
+	AmountInCents int64 // Amount of money needed to be paid in cents. Needed to determine new price in case user is upgrading their membership.
 	Currency      string
 	IsUpgrade     bool // true if user is upgrading from regular membership -> premium membership
 }

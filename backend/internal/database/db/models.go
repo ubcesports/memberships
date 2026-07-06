@@ -147,6 +147,7 @@ const (
 	TransactionStatusTypeCompleted TransactionStatusType = "completed"
 	TransactionStatusTypeFailed    TransactionStatusType = "failed"
 	TransactionStatusTypeRefunded  TransactionStatusType = "refunded"
+	TransactionStatusTypeExpired   TransactionStatusType = "expired"
 )
 
 func (e *TransactionStatusType) Scan(src interface{}) error {
@@ -241,17 +242,18 @@ type Session struct {
 }
 
 type Transaction struct {
-	ID                    pgtype.UUID
-	UserID                pgtype.UUID
-	MembershipID          pgtype.UUID
-	StripePaymentIntentID pgtype.Text
-	Status                TransactionStatusType
-	CreatedAt             pgtype.Timestamptz
-	UpdatedAt             pgtype.Timestamptz
-	GroupAtPurchase       NullGroupType
-	StudentAtPurchase     pgtype.Bool
-	AmountPaidCents       pgtype.Int8
-	PurchaseType          NullPurchaseType
+	ID                      pgtype.UUID
+	UserID                  pgtype.UUID
+	MembershipID            pgtype.UUID
+	StripePaymentIntentID   pgtype.Text
+	Status                  TransactionStatusType
+	CreatedAt               pgtype.Timestamptz
+	UpdatedAt               pgtype.Timestamptz
+	GroupAtPurchase         NullGroupType
+	StudentAtPurchase       pgtype.Bool
+	AmountPaidCents         pgtype.Int8
+	PurchaseType            NullPurchaseType
+	StripeCheckoutSessionID pgtype.Text
 }
 
 type User struct {

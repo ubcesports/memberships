@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/ubcesports/memberships/internal/auth"
+	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/service"
 	"github.com/ubcesports/memberships/internal/util"
 )
@@ -82,7 +85,32 @@ func (h *MembershipHandler) GetAllMembershipsWithTransactions(w http.ResponseWri
 }
 
 func (h *MembershipHandler) CreateMembershipCheckoutSession(w http.ResponseWriter, r *http.Request) {
-	return
+	userId, ok := currentUserID(r)
+	if !ok {
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
+		return
+	}
+
+	var checkoutSessionRequest dto.CheckoutSessionRequest
+	if err := json.NewDecoder(r.Body).Decode(checkoutSessionRequest); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again.")
+		return
+	}
+
+	checkoutSessionResponse, err := h.membershipService.CreateCheckoutSession(r.Context(), userId, checkoutSessionRequest)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrMembershipAlreadyExists):
+			util.WriteApiResponse(w, http.StatusConflict, "CONFLICT", err.Error())
+
+		default:
+			util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+		}
+
+		return
+	}
+
+	util.WriteJson(w, http.StatusOK, *checkoutSessionResponse)
 }
 
 func currentUserID(r *http.Request) (string, bool) {

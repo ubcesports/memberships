@@ -18,7 +18,7 @@ func NewProfileService(profileRepository *repository.ProfileRepository) *Profile
 	return &ProfileService{profileRepository: profileRepository}
 }
 
-func (s *ProfileService) GetProfileByUserID(ctx context.Context, userID pgtype.UUID) (*dto.ProfileDTO, error) {
+func (s *ProfileService) GetProfileByUserID(ctx context.Context, userID string) (*dto.ProfileDTO, error) {
 	row, err := s.profileRepository.GetProfileByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
