@@ -92,7 +92,7 @@ func (h *MembershipHandler) CreateMembershipCheckoutSession(w http.ResponseWrite
 	}
 
 	var checkoutSessionRequest dto.CheckoutSessionRequest
-	if err := json.NewDecoder(r.Body).Decode(checkoutSessionRequest); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&checkoutSessionRequest); err != nil {
 		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again.")
 		return
 	}
@@ -102,6 +102,15 @@ func (h *MembershipHandler) CreateMembershipCheckoutSession(w http.ResponseWrite
 		switch {
 		case errors.Is(err, service.ErrMembershipAlreadyExists):
 			util.WriteApiResponse(w, http.StatusConflict, "CONFLICT", err.Error())
+			return
+
+		case errors.Is(err, service.ErrTierNotEligible):
+			util.WriteApiResponse(w, http.StatusForbidden, "TIER_NOT_AVAILABLE", err.Error())
+			return
+
+		case errors.Is(err, service.ErrTierNotFound):
+			util.WriteApiResponse(w, http.StatusNotFound, "NOT_FOUND", err.Error())
+			return
 
 		default:
 			util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -12,9 +13,24 @@ import (
 
 type CreatePendingTransactionParams struct {
 	UserId            string
+	TierId            string
 	GroupAtPurchase   dto.GroupType
 	StudentAtPurchase bool
 	PurchaseType      dto.PurchaseType
+}
+
+type CreateMembershipParams struct {
+	UserId    string
+	TierId    string
+	StartedAt time.Time
+	ExpiresAt time.Time
+}
+
+type CompleteTransactionParams struct {
+	TransactionId         string
+	MembershipId          string
+	StripePaymentIntentId string
+	AmountPaidCents       int64
 }
 
 type MembershipRepository struct {
@@ -119,14 +135,29 @@ func (r *MembershipRepository) UpdateTransactionStatusById(ctx context.Context, 
 	})
 }
 
+func (r *MembershipRepository) UpdatePendingTransactionStatusByCheckoutId(ctx context.Context, checkoutId string, status dto.TransactionStatusType) error {
+	return r.store.UpdatePendingTransactionStatusByCheckoutId(ctx, db.UpdatePendingTransactionStatusByCheckoutIdParams{
+		StripeCheckoutSessionID: pgtype.Text{
+			String: checkoutId,
+			Valid:  true,
+		},
+		Status: db.TransactionStatusType(status),
+	})
+}
+
 func (r *MembershipRepository) CreatePendingTransaction(ctx context.Context, params CreatePendingTransactionParams) (string, error) {
 	var userID pgtype.UUID
 	if err := userID.Scan(params.UserId); err != nil {
 		return "", err
 	}
+	var tierID pgtype.UUID
+	if err := tierID.Scan(params.TierId); err != nil {
+		return "", err
+	}
 
 	dbParams := db.CreatePendingTransactionParams{
 		UserID: userID,
+		TierID: tierID,
 		GroupAtPurchase: db.NullGroupType{
 			GroupType: db.GroupType(params.GroupAtPurchase),
 			Valid:     true,
@@ -147,6 +178,81 @@ func (r *MembershipRepository) CreatePendingTransaction(ctx context.Context, par
 	}
 
 	return uuid.UUID(id.Bytes).String(), nil
+}
+
+func (r *MembershipRepository) GetTransactionByCheckoutSessionIdForUpdate(ctx context.Context, checkoutId string) (db.GetTransactionByCheckoutSessionIdForUpdateRow, error) {
+	return r.store.GetTransactionByCheckoutSessionIdForUpdate(ctx, pgtype.Text{
+		String: checkoutId,
+		Valid:  true,
+	})
+}
+
+func (r *MembershipRepository) CreateMembership(ctx context.Context, params CreateMembershipParams) (string, error) {
+	var userID pgtype.UUID
+	if err := userID.Scan(params.UserId); err != nil {
+		return "", err
+	}
+	var tierID pgtype.UUID
+	if err := tierID.Scan(params.TierId); err != nil {
+		return "", err
+	}
+
+	id, err := r.store.CreateMembership(ctx, db.CreateMembershipParams{
+		UserID: userID,
+		TierID: tierID,
+		StartedAt: pgtype.Timestamptz{
+			Time:  params.StartedAt,
+			Valid: true,
+		},
+		ExpiresAt: pgtype.Timestamptz{
+			Time:  params.ExpiresAt,
+			Valid: true,
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return uuid.UUID(id.Bytes).String(), nil
+}
+
+func (r *MembershipRepository) CompleteTransaction(ctx context.Context, params CompleteTransactionParams) error {
+	var transactionID pgtype.UUID
+	if err := transactionID.Scan(params.TransactionId); err != nil {
+		return err
+	}
+	var membershipID pgtype.UUID
+	if err := membershipID.Scan(params.MembershipId); err != nil {
+		return err
+	}
+
+	return r.store.CompleteTransaction(ctx, db.CompleteTransactionParams{
+		ID:           transactionID,
+		MembershipID: membershipID,
+		StripePaymentIntentID: pgtype.Text{
+			String: params.StripePaymentIntentId,
+			Valid:  params.StripePaymentIntentId != "",
+		},
+		AmountPaidCents: pgtype.Int8{
+			Int64: params.AmountPaidCents,
+			Valid: true,
+		},
+	})
+}
+
+func (r *MembershipRepository) CancelActiveMembershipsByUserId(ctx context.Context, userId string, occurredAt time.Time) error {
+	var userID pgtype.UUID
+	if err := userID.Scan(userId); err != nil {
+		return err
+	}
+
+	return r.store.CancelActiveMembershipsByUserId(ctx, db.CancelActiveMembershipsByUserIdParams{
+		UserID: userID,
+		CancelledAt: pgtype.Timestamptz{
+			Time:  occurredAt,
+			Valid: true,
+		},
+	})
 }
 
 func (r *MembershipRepository) WithTx(ctx context.Context, fn func(*MembershipRepository) error) error {

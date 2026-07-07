@@ -7,6 +7,7 @@ import (
 	"math"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/stripe/stripe-go/v86"
@@ -332,9 +333,10 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 		}
 
 		// Users can create an "upgrade" checkout session if they have a regular membership and want to buy premium
-		// Only return ErrMembershipAlreadyExists if they don't have regular membership or they are trying to purchase
-		// another membership having regular membership
-		if !(currTier.Slug == "regular" && reqTier.Slug == "premium") {
+		// OR they have a day pass and want to buy regular/premium
+		// Return ErrMembershipAlreadyExists if they don't meet the above criteria
+		if !((currTier.Slug == "regular" && reqTier.Slug == "premium") ||
+			(currTier.Slug == "day" && (reqTier.Slug == "regular" || reqTier.Slug == "premium"))) {
 			return nil, ErrMembershipAlreadyExists
 		}
 	}
@@ -402,6 +404,7 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 	// Create new pending transaction
 	transactionId, err := s.membershipRepo.CreatePendingTransaction(ctx, repository.CreatePendingTransactionParams{
 		UserId:            userId,
+		TierId:            selectedTier.ID,
 		GroupAtPurchase:   getGroupAtPurchase(profile.Groups),
 		StudentAtPurchase: profile.IsStudent,
 		PurchaseType:      selectedTier.PurchaseType,
@@ -439,6 +442,93 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 	}
 
 	return &dto.CheckoutSessionResponse{Url: session.URL}, nil
+}
+
+func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *stripe.CheckoutSession, occurredAt time.Time) error {
+	return s.membershipRepo.WithTx(ctx, func(mr *repository.MembershipRepository) error {
+		// 1. Lock the transaction for this checkout session so duplicate webhooks cannot fulfill it twice.
+		transaction, err := mr.GetTransactionByCheckoutSessionIdForUpdate(ctx, session.ID)
+		if err != nil {
+			return err
+		}
+
+		// 2. Make the handler idempotent: Stripe can retry or duplicate webhook delivery.
+		if transaction.Status == db.TransactionStatusTypeCompleted {
+			return nil
+		}
+		if transaction.Status != db.TransactionStatusTypePending {
+			return nil
+		}
+
+		// 3. Confirm Stripe says this checkout is paid before fulfilling the membership.
+		if session.PaymentStatus != stripe.CheckoutSessionPaymentStatusPaid {
+			return fmt.Errorf("checkout session %s is not paid", session.ID)
+		}
+
+		// 4. Cross-check Stripe metadata against the locked DB transaction.
+		if session.Metadata["transaction_id"] != transaction.ID.String() {
+			return fmt.Errorf("checkout session %s transaction metadata mismatch", session.ID)
+		}
+		if session.Metadata["user_id"] != transaction.UserID.String() {
+			return fmt.Errorf("checkout session %s user metadata mismatch", session.ID)
+		}
+
+		// 5. Cancel any old active membership before creating the new fulfilled membership.
+		if err := mr.CancelActiveMembershipsByUserId(ctx, transaction.UserID.String(), occurredAt); err != nil {
+			return err
+		}
+
+		// 6. Create the fulfilled membership. Memberships expire after April 30 in Vancouver time.
+		expiresAt, err := membershipExpiresAt(occurredAt)
+		if err != nil {
+			return err
+		}
+		membershipId, err := mr.CreateMembership(ctx, repository.CreateMembershipParams{
+			UserId:    transaction.UserID.String(),
+			TierId:    transaction.TierID.String(),
+			StartedAt: occurredAt,
+			ExpiresAt: expiresAt,
+		})
+		if err != nil {
+			return err
+		}
+
+		// 7. Record payment details and mark the transaction completed.
+		var paymentIntentId string
+		if session.PaymentIntent != nil {
+			paymentIntentId = session.PaymentIntent.ID
+		}
+		return mr.CompleteTransaction(ctx, repository.CompleteTransactionParams{
+			TransactionId:         transaction.ID.String(),
+			MembershipId:          membershipId,
+			StripePaymentIntentId: paymentIntentId,
+			AmountPaidCents:       session.AmountTotal,
+		})
+	})
+}
+
+func membershipExpiresAt(purchasedAt time.Time) (time.Time, error) {
+	location, err := time.LoadLocation("America/Vancouver")
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	localPurchasedAt := purchasedAt.In(location)
+	expiryYear := localPurchasedAt.Year()
+	expiryThisYear := time.Date(expiryYear, time.May, 1, 0, 0, 0, 0, location)
+	if !localPurchasedAt.Before(expiryThisYear) {
+		expiryYear++
+	}
+
+	return time.Date(expiryYear, time.May, 1, 0, 0, 0, 0, location), nil
+}
+
+func (s *MembershipService) HandleCheckoutExpired(ctx context.Context, sessionId string) error {
+	return s.membershipRepo.UpdatePendingTransactionStatusByCheckoutId(ctx, sessionId, dto.TransactionExpired)
+}
+
+func (s *MembershipService) HandleCheckoutFailed(ctx context.Context, sessionId string) error {
+	return s.membershipRepo.UpdatePendingTransactionStatusByCheckoutId(ctx, sessionId, dto.TransactionFailed)
 }
 
 func getGroupAtPurchase(groups []dto.GroupType) dto.GroupType {

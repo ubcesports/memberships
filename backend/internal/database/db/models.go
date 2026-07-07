@@ -254,6 +254,7 @@ type Transaction struct {
 	AmountPaidCents         pgtype.Int8
 	PurchaseType            NullPurchaseType
 	StripeCheckoutSessionID pgtype.Text
+	TierID                  pgtype.UUID
 }
 
 type User struct {

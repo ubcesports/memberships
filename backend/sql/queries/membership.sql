@@ -109,6 +109,7 @@ WHERE id = $1 AND status = 'pending';
 -- name: CreatePendingTransaction :one
 INSERT INTO transactions (
     user_id,
+    tier_id,
     group_at_purchase,
     student_at_purchase,
     purchase_type,
@@ -119,6 +120,7 @@ VALUES (
     $2,
     $3,
     $4,
+    $5,
     'pending'
 )
 RETURNING id;
@@ -136,3 +138,55 @@ SET
     status = $2,
     updated_at = NOW()
 WHERE id = $1;
+
+-- name: UpdatePendingTransactionStatusByCheckoutId :exec
+UPDATE transactions
+SET
+    status = $2,
+    updated_at = NOW()
+WHERE stripe_checkout_session_id = $1 AND status = 'pending';
+
+-- name: GetTransactionByCheckoutSessionIdForUpdate :one
+SELECT
+    id,
+    user_id,
+    membership_id,
+    tier_id,
+    status,
+    purchase_type,
+    stripe_checkout_session_id
+FROM transactions
+WHERE stripe_checkout_session_id = $1
+FOR UPDATE;
+
+-- name: CreateMembership :one
+INSERT INTO memberships (
+    user_id,
+    tier_id,
+    started_at,
+    expires_at
+)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4
+)
+RETURNING id;
+
+-- name: CompleteTransaction :exec
+UPDATE transactions
+SET
+    membership_id = $2,
+    stripe_payment_intent_id = $3,
+    amount_paid_cents = $4,
+    status = 'completed',
+    updated_at = NOW()
+WHERE id = $1 AND status = 'pending';
+
+-- name: CancelActiveMembershipsByUserId :exec
+UPDATE memberships
+SET
+    cancelled_at = $2,
+    updated_at = $2
+WHERE user_id = $1 AND cancelled_at IS NULL;
