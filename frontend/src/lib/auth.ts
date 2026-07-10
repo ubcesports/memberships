@@ -1,9 +1,21 @@
+import axios from "axios";
 import { API_BASE } from "@/lib/client";
 
-export function redirectToSignIn(returnTo: string) {
-  const url = new URL(`${API_BASE}/auth/oauth/jasperlabs/authorize`);
-  url.searchParams.set("redirect_uri", returnTo);
-  url.searchParams.set("error_redirect_uri", returnTo);
+type OAuthAuthorizeResponse = {
+  url: string;
+};
 
-  window.location.assign(url.toString());
+export async function redirectToSignIn(returnTo: string) {
+  const response = await axios.get<OAuthAuthorizeResponse>(
+    `${API_BASE}/auth/oauth/jasperlabs/authorize`,
+    {
+      params: {
+        redirect_uri: returnTo,
+        error_redirect_uri: returnTo,
+      },
+      withCredentials: true,
+    },
+  );
+
+  window.location.assign(response.data.url);
 }

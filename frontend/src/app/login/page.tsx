@@ -1,6 +1,7 @@
 "use client";
 
-import { LogIn } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { Loader2, LogIn } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
 import { BasePage } from "@/components/layout/base-page";
 import { redirectToSignIn } from "@/lib/auth";
@@ -8,6 +9,16 @@ import { redirectToSignIn } from "@/lib/auth";
 const POST_AUTH_PATH = "/onboard/check";
 
 export default function LoginPage() {
+  const {
+    mutate: continueWithJasperLabs,
+    error,
+    isPending,
+  } = useMutation({
+    mutationFn: async () => {
+      await redirectToSignIn(`${window.location.origin}${POST_AUTH_PATH}`);
+    },
+  });
+
   return (
     <BasePage>
       <div className="flex flex-1 items-center justify-center py-12">
@@ -23,11 +34,19 @@ export default function LoginPage() {
           <div className="px-5 py-5 sm:px-6">
             <ActionButton
               className="h-12 w-full border-brand-primary bg-brand-primary text-base hover:border-brand-primary-hover hover:bg-brand-primary-hover"
-              onClick={() => redirectToSignIn(`${window.location.origin}${POST_AUTH_PATH}`)}
+              onClick={() => continueWithJasperLabs()}
+              loading={isPending}
               icon={<LogIn aria-hidden="true" className="size-5" />}
+              loadingIcon={<Loader2 aria-hidden="true" className="size-5 animate-spin" />}
             >
-              Continue with JasperLabs
+              {isPending ? "Redirecting" : "Continue with JasperLabs"}
             </ActionButton>
+
+            {error && (
+              <p className="mt-4 text-sm leading-6 text-brand-text-muted">
+                Unable to start JasperLabs sign in. Try again.
+              </p>
+            )}
           </div>
         </section>
       </div>
