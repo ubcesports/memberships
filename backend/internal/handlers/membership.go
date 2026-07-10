@@ -21,6 +21,27 @@ func NewMembershipHandler(membershipService *service.MembershipService) *Members
 	return &MembershipHandler{membershipService: membershipService}
 }
 
+/*
+Returns all public membership tiers and prices.
+
+-> Day pass with student/non-student prices
+-> Regular pass with student/non-student prices
+-> Premium pass with student/non-student prices
+
+API URL: GET /membership/tiers
+
+Args:
+
+	None
+
+Returns:
+
+	[]dto.MembershipTierDTO (HTTP 200)
+
+Raises:
+
+	500: public membership tiers and prices could not be retrieved
+*/
 func (h *MembershipHandler) GetPublicTiersWithPrices(w http.ResponseWriter, r *http.Request) {
 	tiers, err := h.membershipService.GetPublicTiersAndPrices(r.Context())
 	if err != nil {
@@ -31,6 +52,44 @@ func (h *MembershipHandler) GetPublicTiersWithPrices(w http.ResponseWriter, r *h
 	util.WriteJson(w, 200, tiers)
 }
 
+/*
+Returns membership tiers and prices the current user is eligible to buy.
+
+For exec/director/board members:
+
+	Executive Pass
+
+For competitive team players:
+
+	Competitive Team Pass
+
+For regular UBC students:
+
+	Day pass with student price
+	Regular pass with student price
+	Premium pass with student price
+
+For regular non-students:
+
+	Day pass with non-student price
+	Regular pass with non-student price
+	Premium pass with non-student price
+
+API URL: GET /membership/tiers/eligible
+
+Args:
+
+	auth.Session user id
+
+Returns:
+
+	[]dto.EligibleMembershipTierDTO (HTTP 200)
+
+Raises:
+
+	401: user is not authenticated
+	500: eligible membership tiers and prices could not be retrieved
+*/
 func (h *MembershipHandler) GetEligibleTiersWithPrices(w http.ResponseWriter, r *http.Request) {
 	userId, ok := currentUserID(r)
 	if !ok {
@@ -52,6 +111,24 @@ func (h *MembershipHandler) GetEligibleTiersWithPrices(w http.ResponseWriter, r 
 	}
 }
 
+/*
+Returns the current user's active membership and transaction.
+
+API URL: GET /membership/me/current
+
+Args:
+
+	auth.Session user id
+
+Returns:
+
+	dto.MembershipDTO (HTTP 200)
+
+Raises:
+
+	401: user is not authenticated
+	500: current membership could not be retrieved
+*/
 func (h *MembershipHandler) GetCurrentMembershipWithTransaction(w http.ResponseWriter, r *http.Request) {
 	userId, ok := currentUserID(r)
 	if !ok {
@@ -68,6 +145,24 @@ func (h *MembershipHandler) GetCurrentMembershipWithTransaction(w http.ResponseW
 	util.WriteJson(w, 200, membership)
 }
 
+/*
+Returns all past and present memberships and transactions for the current user.
+
+API URL: GET /membership/me/all
+
+Args:
+
+	auth.Session user id
+
+Returns:
+
+	[]dto.MembershipDTO (HTTP 200)
+
+Raises:
+
+	401: user is not authenticated
+	500: memberships could not be retrieved
+*/
 func (h *MembershipHandler) GetAllMembershipsWithTransactions(w http.ResponseWriter, r *http.Request) {
 	userId, ok := currentUserID(r)
 	if !ok {
@@ -84,6 +179,29 @@ func (h *MembershipHandler) GetAllMembershipsWithTransactions(w http.ResponseWri
 	util.WriteJson(w, 200, memberships)
 }
 
+/*
+Creates a signed Stripe Checkout Session for a membership purchase.
+
+API URL: POST /membership/checkout
+
+Args:
+
+	auth.Session user id
+	dto.CheckoutSessionRequest
+
+Returns:
+
+	dto.CheckoutSessionResponse (HTTP 200)
+
+Raises:
+
+	400: request body is unreadable or malformed
+	401: user is not authenticated
+	403: requested tier is not eligible for the user
+	404: requested tier does not exist
+	409: user already has a membership that blocks this purchase
+	500: checkout session could not be created
+*/
 func (h *MembershipHandler) CreateMembershipCheckoutSession(w http.ResponseWriter, r *http.Request) {
 	userId, ok := currentUserID(r)
 	if !ok {
@@ -110,6 +228,10 @@ func (h *MembershipHandler) CreateMembershipCheckoutSession(w http.ResponseWrite
 
 		case errors.Is(err, service.ErrTierNotFound):
 			util.WriteApiResponse(w, http.StatusNotFound, "NOT_FOUND", err.Error())
+			return
+
+		case errors.Is(err, service.ErrMembershipPurchaseClosed):
+			util.WriteApiResponse(w, http.StatusForbidden, "MEMBERSHIP_PURCHASE_CLOSED", err.Error())
 			return
 
 		default:

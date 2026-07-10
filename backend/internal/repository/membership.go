@@ -255,6 +255,14 @@ func (r *MembershipRepository) CancelActiveMembershipsByUserId(ctx context.Conte
 	})
 }
 
+// executes fn within a database transaction.
+//
+// The callback receives a MembershipRepository whose operations are executed
+// using the same transaction. If fn returns an error, the transaction is
+// rolled back. Otherwise, the transaction is committed.
+//
+// This helper should be used when multiple repository operations must succeed
+// or fail atomically.
 func (r *MembershipRepository) WithTx(ctx context.Context, fn func(*MembershipRepository) error) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {

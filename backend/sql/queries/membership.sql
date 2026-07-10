@@ -57,7 +57,8 @@ SELECT
     mt.description,
     mt.stripe_product_id,
     mt.slug,
-    mtp.stripe_price_id
+    mtp.stripe_price_id,
+    mtp.is_student_required
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp
     ON mtp.tier_id = mt.id

@@ -264,7 +264,8 @@ SELECT
     mt.description,
     mt.stripe_product_id,
     mt.slug,
-    mtp.stripe_price_id
+    mtp.stripe_price_id,
+    mtp.is_student_required
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp
     ON mtp.tier_id = mt.id
@@ -286,12 +287,13 @@ WHERE mt.is_active = TRUE
 `
 
 type GetEligibleTiersWithPricesRow struct {
-	ID              pgtype.UUID
-	Title           string
-	Description     pgtype.Text
-	StripeProductID pgtype.Text
-	Slug            pgtype.Text
-	StripePriceID   pgtype.Text
+	ID                pgtype.UUID
+	Title             string
+	Description       pgtype.Text
+	StripeProductID   pgtype.Text
+	Slug              pgtype.Text
+	StripePriceID     pgtype.Text
+	IsStudentRequired pgtype.Bool
 }
 
 func (q *Queries) GetEligibleTiersWithPrices(ctx context.Context, id pgtype.UUID) ([]GetEligibleTiersWithPricesRow, error) {
@@ -310,6 +312,7 @@ func (q *Queries) GetEligibleTiersWithPrices(ctx context.Context, id pgtype.UUID
 			&i.StripeProductID,
 			&i.Slug,
 			&i.StripePriceID,
+			&i.IsStudentRequired,
 		); err != nil {
 			return nil, err
 		}

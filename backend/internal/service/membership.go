@@ -17,12 +17,6 @@ import (
 	"github.com/ubcesports/memberships/internal/stripeclient"
 )
 
-var (
-	ErrMembershipAlreadyExists = errors.New("An active un-upgradeable membership already exists! Can't create new checkout session.")
-	ErrTierNotEligible         = errors.New("Requested membership tier not eligible for current user. Please try another value.")
-	ErrTierNotFound            = errors.New("Tier with given tier id not found.")
-)
-
 type MembershipService struct {
 	membershipRepo *repository.MembershipRepository
 	stripeClient   *stripeclient.Client
@@ -32,6 +26,21 @@ type MembershipService struct {
 func NewMembershipService(membershipRepo *repository.MembershipRepository, stripeClient *stripeclient.Client, profileService *ProfileService) *MembershipService {
 	return &MembershipService{membershipRepo: membershipRepo, stripeClient: stripeClient, profileService: profileService}
 }
+
+/*
+	Consts
+*/
+
+var (
+	ErrMembershipAlreadyExists  = errors.New("An active un-upgradeable membership already exists! Can't create new checkout session.")
+	ErrTierNotEligible          = errors.New("Requested membership tier not eligible for current user. Please try another value.")
+	ErrTierNotFound             = errors.New("Tier with given tier id not found.")
+	ErrMembershipPurchaseClosed = errors.New("Membership purchases are closed until the next membership period.")
+)
+
+/*
+	Public functions
+*/
 
 func (s *MembershipService) GetPublicTiersAndPrices(ctx context.Context) ([]dto.MembershipTierDTO, error) {
 	tiers, err := s.membershipRepo.GetPublicTiersAndPrices(ctx)
@@ -179,8 +188,7 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 	addPriceToTier := func(tier db.GetEligibleTiersWithPricesRow, purchaseType dto.PurchaseType, priceDto dto.MembershipTierPriceDTO) {
 		tierId := tier.ID.String()
 
-		if index, exists := tierIndexById[tierId]; exists {
-			returnTiers[index].Prices = append(returnTiers[index].Prices, priceDto)
+		if _, exists := tierIndexById[tierId]; exists {
 			return
 		}
 
@@ -192,7 +200,7 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 			Slug:         tier.Slug.String,
 			PurchaseType: purchaseType,
 			ProductId:    tier.StripeProductID.String,
-			Prices:       []dto.MembershipTierPriceDTO{priceDto},
+			Price:        priceDto,
 		})
 	}
 
@@ -262,6 +270,10 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 			continue
 		}
 
+		if tier.IsStudentRequired.Valid && tier.IsStudentRequired.Bool != user.IsStudent {
+			continue
+		}
+
 		switch purchaseType {
 		case dto.PurchaseNew:
 			// Get price from stripe price id
@@ -316,16 +328,29 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 }
 
 func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId string, req dto.CheckoutSessionRequest) (*dto.CheckoutSessionResponse, error) {
+	// 1. Ensure user isn't trying to purchase a meaningless membership too late in the membership period
+	isClosed, err := membershipPurchaseClosedAt(time.Now())
+	if err != nil {
+		return nil, err
+	}
+	if isClosed {
+		return nil, ErrMembershipPurchaseClosed
+	}
+
 	reqTier, err := s.getTierByTierId(ctx, req.TierId)
 	if err != nil {
 		return nil, err
 	}
 
-	// 1. Check if an active membership already exists. If if does, return an error.
+	// 2. Check if an active membership already exists. If if does, return an error.
 	membership, err := s.GetCurrentMembershipWithTransaction(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
+
+	// If the user already has an active membership, only allow checkout sessions
+	// for supported upgrade paths. All other purchases are rejected to prevent
+	// multiple active memberships.
 	if membership != nil {
 		currTier, err := s.getTierByTierId(ctx, membership.TierId)
 		if err != nil {
@@ -341,7 +366,7 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 		}
 	}
 
-	// 2. Check if the requested tier is eligible for the user. If not, return an error.
+	// 3. Check if the requested tier is eligible for the user. If not, return an error.
 	eligibleTiers, err := s.GetEligibleTiersWithPrices(ctx, userId)
 	if err != nil {
 		return nil, err
@@ -362,7 +387,7 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 		return nil, ErrTierNotEligible
 	}
 
-	// 3. If there is a pending transaction, then expire it and its stripe checkout session
+	// 4. If there is a pending transaction, then expire it and its stripe checkout session
 	err = s.membershipRepo.WithTx(ctx, func(mr *repository.MembershipRepository) error {
 		pending, err := mr.GetPendingTransactionForUpdate(ctx, userId)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -393,7 +418,7 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 		return nil, err
 	}
 
-	// 4. Create new pending transaction and checkout session
+	// 5. Create new pending transaction and checkout session
 
 	// Get user profile to create checkout session with their email
 	profile, err := s.profileService.GetProfileByUserID(ctx, userId)
@@ -413,13 +438,14 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 		return nil, err
 	}
 
+	// Create stripe checkout session
 	session, err := s.stripeClient.CreateCheckoutSession(ctx, stripeclient.CheckoutSessionRequest{
 		TransactionID: transactionId,
 		UserID:        userId,
 		CustomerEmail: profile.Email,
-		PriceID:       selectedTier.Prices[0].PriceId,
+		PriceID:       selectedTier.Price.PriceId,
 		ProductID:     selectedTier.ProductId,
-		AmountInCents: int64(math.Round(selectedTier.Prices[0].Price * 100)),
+		AmountInCents: int64(math.Round(selectedTier.Price.Price * 100)),
 		Currency:      "cad", // Always in canadian dollars
 		IsUpgrade:     selectedTier.PurchaseType == dto.PurchaseUpgrade,
 	})
@@ -431,6 +457,7 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 		return nil, err
 	}
 
+	// Put strile checkout session id into pending transaction
 	err = s.membershipRepo.PutStripeCheckoutSessionId(ctx, transactionId, session.ID)
 	if err != nil {
 		_, expireErr := s.stripeClient.ExpireCheckoutSession(ctx, session.ID)
@@ -443,6 +470,10 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 
 	return &dto.CheckoutSessionResponse{Url: session.URL}, nil
 }
+
+/*
+	Stripe webhook callback functions
+*/
 
 func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *stripe.CheckoutSession, occurredAt time.Time) error {
 	return s.membershipRepo.WithTx(ctx, func(mr *repository.MembershipRepository) error {
@@ -507,22 +538,6 @@ func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *str
 	})
 }
 
-func membershipExpiresAt(purchasedAt time.Time) (time.Time, error) {
-	location, err := time.LoadLocation("America/Vancouver")
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	localPurchasedAt := purchasedAt.In(location)
-	expiryYear := localPurchasedAt.Year()
-	expiryThisYear := time.Date(expiryYear, time.May, 1, 0, 0, 0, 0, location)
-	if !localPurchasedAt.Before(expiryThisYear) {
-		expiryYear++
-	}
-
-	return time.Date(expiryYear, time.May, 1, 0, 0, 0, 0, location), nil
-}
-
 func (s *MembershipService) HandleCheckoutExpired(ctx context.Context, sessionId string) error {
 	return s.membershipRepo.UpdatePendingTransactionStatusByCheckoutId(ctx, sessionId, dto.TransactionExpired)
 }
@@ -531,6 +546,72 @@ func (s *MembershipService) HandleCheckoutFailed(ctx context.Context, sessionId 
 	return s.membershipRepo.UpdatePendingTransactionStatusByCheckoutId(ctx, sessionId, dto.TransactionFailed)
 }
 
+/*
+	Private functions
+*/
+
+// memberships follow the UBC Esports membership year, which runs from
+// May 1 00:00:00 to April 30 23:59:59 (America/Vancouver).
+//
+// Expiry rules:
+//   - Purchases made from January 1 through April 30 expire on
+//     April 30 23:59:59 of the same calendar year.
+//   - Purchases made on or after May 1 expire on
+//     April 30 23:59:59 of the following calendar year.
+//
+// All calculations are performed in the America/Vancouver time zone,
+// regardless of the purchaser's local time zone.
+func membershipExpiresAt(purchasedAt time.Time) (time.Time, error) {
+	location, err := time.LoadLocation("America/Vancouver")
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	localPurchasedAt := purchasedAt.In(location)
+
+	expiryYear := localPurchasedAt.Year()
+
+	// Membership year rolls over at May 1 00:00:00.
+	cutoff := time.Date(expiryYear, time.May, 1, 0, 0, 0, 0, location)
+
+	if !localPurchasedAt.Before(cutoff) {
+		expiryYear++
+	}
+
+	return time.Date(
+		expiryYear,
+		time.April,
+		30,
+		23, 59, 59,
+		0,
+		location,
+	), nil
+}
+
+func membershipPurchaseClosedAt(now time.Time) (bool, error) {
+	location, err := time.LoadLocation("America/Vancouver")
+	if err != nil {
+		return false, err
+	}
+
+	localNow := now.In(location)
+
+	closedFrom := time.Date(localNow.Year(), time.April, 25, 0, 0, 0, 0, location)
+	closedUntil := time.Date(localNow.Year(), time.May, 1, 0, 0, 0, 0, location)
+
+	return !localNow.Before(closedFrom) && localNow.Before(closedUntil), nil
+}
+
+// returns the highest priority group a user belongs to at the time of membership purchase.
+//
+// Group priority (highest to lowest):
+//   - Board
+//   - Director
+//   - Executive
+//   - Competitive Team
+//   - Member (default)
+//
+// If a user belongs to multiple groups, the highest priority group is used.
 func getGroupAtPurchase(groups []dto.GroupType) dto.GroupType {
 	if slices.Contains(groups, dto.GroupBoard) {
 		return dto.GroupBoard
