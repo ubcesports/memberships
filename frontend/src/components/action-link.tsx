@@ -9,12 +9,7 @@ export type ActionLinkProps = {
 const BASE_CLASS_NAME =
   "inline-flex h-10 items-center justify-center gap-2 border border-brand-border px-4 text-sm font-semibold text-brand-text transition hover:border-brand-text-muted hover:bg-white/5";
 
-export function ActionLink({
-  children,
-  className,
-  icon,
-  ...props
-}: ActionLinkProps) {
+export function ActionLink({ children, className, icon, ...props }: ActionLinkProps) {
   return (
     <a
       {...props}

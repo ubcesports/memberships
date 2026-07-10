@@ -12,33 +12,12 @@ import { SurfacePanel } from "@/components/surface-panel";
 import apiClient from "@/lib/client";
 import { redirectToSignIn } from "@/lib/auth";
 import { formatDate } from "@/lib/utils/formatting";
+import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
 import { useProfile } from "@/lib/profile.hook";
 import Image from "next/image";
 
 const JASPERLABS_ACCOUNT_URL =
-  process.env.NEXT_PUBLIC_JASPERLABS_ACCOUNT_URL ||
-  "https://auth.jasperlabs.net/dashboard";
-
-const GROUP_BADGE_STYLES = {
-  member: "border-sky-300/35 bg-sky-400/12 text-sky-100",
-  competitive_team: "border-fuchsia-300/35 bg-fuchsia-400/12 text-fuchsia-100",
-  executive: "border-emerald-300/35 bg-emerald-400/12 text-emerald-100",
-  director: "border-amber-300/35 bg-amber-400/12 text-amber-100",
-  board: "border-rose-300/35 bg-rose-400/12 text-rose-100",
-} as const;
-
-function titleCase(value: string) {
-  return value
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function getGroupBadgeClass(group: string) {
-  return (
-    GROUP_BADGE_STYLES[group as keyof typeof GROUP_BADGE_STYLES] ||
-    "border-brand-border bg-white/5 text-brand-text-muted"
-  );
-}
+  process.env.NEXT_PUBLIC_JASPERLABS_ACCOUNT_URL || "https://auth.jasperlabs.net/dashboard";
 
 function getInitials(name: string, email: string) {
   const source = name !== "Profile" ? name : email;
@@ -92,9 +71,7 @@ export default function ProfilePage() {
           <div className="mt-10 border border-brand-border bg-brand-surface/80 shadow-2xl shadow-black/25">
             <div className="flex flex-col gap-4 border-b border-brand-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div>
-                <h2 className="text-lg font-semibold text-brand-text">
-                  UBCEA Membership
-                </h2>
+                <h2 className="text-lg font-semibold text-brand-text">UBCEA Membership</h2>
                 <p className="mt-1 text-sm text-brand-text-subtle">
                   Your profile and account status.
                 </p>
@@ -104,12 +81,7 @@ export default function ProfilePage() {
                   onClick={() => signOut()}
                   loading={signOutPending}
                   icon={<LogOut aria-hidden="true" className="size-4" />}
-                  loadingIcon={
-                    <Loader2
-                      aria-hidden="true"
-                      className="size-4 animate-spin"
-                    />
-                  }
+                  loadingIcon={<Loader2 aria-hidden="true" className="size-4 animate-spin" />}
                 >
                   {signOutPending ? "Signing out" : "Sign out"}
                 </ActionButton>
@@ -146,11 +118,7 @@ export default function ProfilePage() {
                           <h3 className="break-words text-2xl font-semibold text-brand-text">
                             {displayName}
                           </h3>
-                          <StatusBadge
-                            tone={
-                              profile.role === "admin" ? "warning" : "default"
-                            }
-                          >
+                          <StatusBadge tone={profile.role === "admin" ? "warning" : "default"}>
                             {titleCase(profile.role)}
                           </StatusBadge>
                         </div>
@@ -199,9 +167,7 @@ export default function ProfilePage() {
 
                   <SurfacePanel>
                     <div className="px-5 py-4">
-                      <h3 className="text-base font-semibold text-brand-text">
-                        Account Details
-                      </h3>
+                      <h3 className="text-base font-semibold text-brand-text">Account Details</h3>
                     </div>
                     <dl>
                       <DetailRow label="Email">
@@ -216,21 +182,13 @@ export default function ProfilePage() {
                       </DetailRow>
                       <DetailRow label="Student ID">
                         {profile.studentId ? (
-                          <span className="break-words font-mono">
-                            {profile.studentId}
-                          </span>
+                          <span className="break-words font-mono">{profile.studentId}</span>
                         ) : (
                           <StatusBadge tone="muted">Not provided</StatusBadge>
                         )}
                       </DetailRow>
                       <DetailRow label="Onboarding">
-                        <StatusBadge
-                          tone={
-                            profile.onboardingCompletedAt
-                              ? "success"
-                              : "warning"
-                          }
-                        >
+                        <StatusBadge tone={profile.onboardingCompletedAt ? "success" : "warning"}>
                           {profile.onboardingCompletedAt
                             ? `Completed ${formatDate(profile.onboardingCompletedAt)}`
                             : "Pending"}
@@ -240,24 +198,15 @@ export default function ProfilePage() {
                     <div className="grid gap-3 border-t border-brand-border px-5 py-4 sm:grid-cols-2">
                       <ActionLink
                         href={JASPERLABS_ACCOUNT_URL}
-                        icon={
-                          <ExternalLink aria-hidden="true" className="size-4" />
-                        }
+                        icon={<ExternalLink aria-hidden="true" className="size-4" />}
                       >
                         Manage
                       </ActionLink>
                       <ActionButton
                         onClick={() => syncAccount()}
                         loading={syncAccountPending}
-                        icon={
-                          <RefreshCw aria-hidden="true" className="size-4" />
-                        }
-                        loadingIcon={
-                          <Loader2
-                            aria-hidden="true"
-                            className="size-4 animate-spin"
-                          />
-                        }
+                        icon={<RefreshCw aria-hidden="true" className="size-4" />}
+                        loadingIcon={<Loader2 aria-hidden="true" className="size-4 animate-spin" />}
                       >
                         {syncAccountPending ? "Syncing" : "Sync"}
                       </ActionButton>
