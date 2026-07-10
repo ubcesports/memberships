@@ -32,10 +32,11 @@ func NewMembershipService(membershipRepo *repository.MembershipRepository, strip
 */
 
 var (
-	ErrMembershipAlreadyExists  = errors.New("An active un-upgradeable membership already exists! Can't create new checkout session.")
-	ErrTierNotEligible          = errors.New("Requested membership tier not eligible for current user. Please try another value.")
-	ErrTierNotFound             = errors.New("Tier with given tier id not found.")
-	ErrMembershipPurchaseClosed = errors.New("Membership purchases are closed until the next membership period.")
+	ErrMembershipAlreadyExists    = errors.New("An active un-upgradeable membership already exists! Can't create new checkout session.")
+	ErrTierNotEligible            = errors.New("Requested membership tier not eligible for current user. Please try another value.")
+	ErrTierNotFound               = errors.New("Tier with given tier id not found.")
+	ErrMembershipPurchaseClosed   = errors.New("Membership purchases are closed until the next membership period.")
+	ErrPendingCheckoutAlreadyPaid = errors.New("A previous checkout payment is still being processed. Please wait a moment and refresh.")
 )
 
 /*
@@ -331,7 +332,7 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 
 func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId string, req dto.CheckoutSessionRequest) (*dto.CheckoutSessionResponse, error) {
 	// 1. Ensure user isn't trying to purchase a meaningless membership too late in the membership period
-	isClosed, err := membershipPurchaseClosedAt(time.Now())
+	isClosed, err := isPurchaseClosed(time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -409,6 +410,11 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 			if getErr != nil {
 				return err
 			}
+
+			if session.Status == stripe.CheckoutSessionStatusComplete {
+				return ErrPendingCheckoutAlreadyPaid
+			}
+
 			if session.Status != stripe.CheckoutSessionStatusExpired {
 				return err
 			}
@@ -485,7 +491,16 @@ func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *str
 			return err
 		}
 
-		// 2. Make the handler idempotent: Stripe can retry or duplicate webhook delivery.
+		// 2. Ensure membership purchase is not closed
+		isClosed, err := isPurchaseClosed(occurredAt)
+		if err != nil {
+			return err
+		}
+		if isClosed {
+			return mr.ExpirePendingTransactionById(ctx, transaction.ID.String())
+		}
+
+		// 3. Make the handler idempotent: Stripe can retry or duplicate webhook delivery.
 		if transaction.Status == db.TransactionStatusTypeCompleted {
 			return nil
 		}
@@ -493,12 +508,12 @@ func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *str
 			return nil
 		}
 
-		// 3. Confirm Stripe says this checkout is paid before fulfilling the membership.
+		// 4. Confirm Stripe says this checkout is paid before fulfilling the membership.
 		if session.PaymentStatus != stripe.CheckoutSessionPaymentStatusPaid {
 			return fmt.Errorf("checkout session %s is not paid", session.ID)
 		}
 
-		// 4. Cross-check Stripe metadata against the locked DB transaction.
+		// 5. Cross-check Stripe metadata against the locked DB transaction.
 		if session.Metadata["transaction_id"] != transaction.ID.String() {
 			return fmt.Errorf("checkout session %s transaction metadata mismatch", session.ID)
 		}
@@ -506,12 +521,12 @@ func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *str
 			return fmt.Errorf("checkout session %s user metadata mismatch", session.ID)
 		}
 
-		// 5. Cancel any old active membership before creating the new fulfilled membership.
+		// 6. Cancel any old active membership before creating the new fulfilled membership.
 		if err := mr.CancelActiveMembershipsByUserId(ctx, transaction.UserID.String(), occurredAt); err != nil {
 			return err
 		}
 
-		// 6. Create the fulfilled membership. Memberships expire after April 30 in Vancouver time.
+		// 7. Create the fulfilled membership. Memberships expire after April 30 in Vancouver time.
 		expiresAt, err := membershipExpiresAt(occurredAt)
 		if err != nil {
 			return err
@@ -526,7 +541,7 @@ func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *str
 			return err
 		}
 
-		// 7. Record payment details and mark the transaction completed.
+		// 8. Record payment details and mark the transaction completed.
 		var paymentIntentId string
 		if session.PaymentIntent != nil {
 			paymentIntentId = session.PaymentIntent.ID
@@ -590,7 +605,11 @@ func membershipExpiresAt(purchasedAt time.Time) (time.Time, error) {
 	), nil
 }
 
-func membershipPurchaseClosedAt(now time.Time) (bool, error) {
+// check if membership purchase is closed at the given time
+//
+// Users should not be able to purchase a membership after April 25, as that will not
+// result in a meaningful length membership
+func isPurchaseClosed(now time.Time) (bool, error) {
 	location, err := time.LoadLocation("America/Vancouver")
 	if err != nil {
 		return false, err

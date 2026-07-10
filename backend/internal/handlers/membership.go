@@ -234,6 +234,10 @@ func (h *MembershipHandler) CreateMembershipCheckoutSession(w http.ResponseWrite
 			util.WriteApiResponse(w, http.StatusForbidden, "MEMBERSHIP_PURCHASE_CLOSED", err.Error())
 			return
 
+		case errors.Is(err, service.ErrPendingCheckoutAlreadyPaid):
+			util.WriteApiResponse(w, http.StatusConflict, "CHECKOUT_ALREADY_PAID", err.Error())
+			return
+
 		default:
 			util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
 		}
