@@ -6,10 +6,7 @@ import {
   isMembershipTierPrice,
   membershipPriceLabel,
 } from "@/components/membership/pricing";
-import type {
-  EligibleMembershipTier,
-  MembershipTier,
-} from "@/lib/membership.hook";
+import type { EligibleMembershipTier, MembershipTier } from "@/lib/membership.hook";
 
 type DayPassCardProps = {
   tier: MembershipTier;
@@ -37,9 +34,7 @@ export function DayPassCard({
           <Clock3 aria-hidden="true" className="size-5 text-brand-text-muted" />
         </div>
         <div>
-          <h3 className="text-xl font-semibold text-brand-text">
-            {tier.title}
-          </h3>
+          <h3 className="text-xl font-semibold text-brand-text">{tier.title}</h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-brand-text-muted">
             {tier.description || "Access for a short visit or single event."}
           </p>
@@ -84,10 +79,7 @@ function BenefitList({ benefits }: { benefits: string[] }) {
     <ul className="mt-4 grid gap-2 text-sm text-brand-text-muted">
       {benefits.map((benefit) => (
         <li key={benefit} className="flex gap-3">
-          <Check
-            aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-blue-200"
-          />
+          <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-blue-200" />
           <span>{benefit}</span>
         </li>
       ))}
@@ -96,10 +88,9 @@ function BenefitList({ benefits }: { benefits: string[] }) {
 }
 
 function InlinePublicPrices({ tier }: { tier: MembershipTier }) {
-  const prices = [
-    getPriceByStudentStatus(tier, true),
-    getPriceByStudentStatus(tier, false),
-  ].filter(isMembershipTierPrice);
+  const prices = [getPriceByStudentStatus(tier, true), getPriceByStudentStatus(tier, false)].filter(
+    isMembershipTierPrice,
+  );
 
   return (
     <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">

@@ -7,13 +7,9 @@ type CheckoutPageProps = {
   }>;
 };
 
-export default async function CheckoutPage({
-  searchParams,
-}: CheckoutPageProps) {
+export default async function CheckoutPage({ searchParams }: CheckoutPageProps) {
   const { success } = await searchParams;
-  const successful = Array.isArray(success)
-    ? success.includes("true")
-    : success === "true";
+  const successful = Array.isArray(success) ? success.includes("true") : success === "true";
 
   return (
     <BasePage>

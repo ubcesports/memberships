@@ -13,9 +13,7 @@ type CheckoutResultProps = {
 
 export function CheckoutResult({ successful }: CheckoutResultProps) {
   const router = useRouter();
-  const [secondsRemaining, setSecondsRemaining] = useState(
-    REDIRECT_DELAY_SECONDS,
-  );
+  const [secondsRemaining, setSecondsRemaining] = useState(REDIRECT_DELAY_SECONDS);
 
   useEffect(() => {
     const countdown = window.setInterval(() => {

@@ -39,10 +39,7 @@ type ProfileResponse = {
 const catalogQuery = queryOptions({
   queryKey: ["membership", "catalog"],
   queryFn: async ({ signal }) => {
-    const response = await apiClient.get<MembershipTier[]>(
-      "/membership/tiers",
-      { signal },
-    );
+    const response = await apiClient.get<MembershipTier[]>("/membership/tiers", { signal });
 
     return response.data;
   },
@@ -63,8 +60,7 @@ const optionalProfileQuery = queryOptions({
     return {
       name: response.data.user.full_name,
       email: response.data.user.email,
-      onboardingCompletedAt:
-        response.data.user.onboarding_completed_at ?? undefined,
+      onboardingCompletedAt: response.data.user.onboarding_completed_at ?? undefined,
     };
   },
   retry: false,
@@ -82,8 +78,7 @@ export const useEligibleMembershipTiers = (enabled: boolean) =>
         "/membership/tiers/eligible",
         {
           signal,
-          validateStatus: (status) =>
-            status === 200 || status === 401 || status === 403,
+          validateStatus: (status) => status === 200 || status === 401 || status === 403,
         },
       );
 

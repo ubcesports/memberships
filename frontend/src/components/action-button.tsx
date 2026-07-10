@@ -33,9 +33,7 @@ export function ActionButton({
       {...props}
       type={type ?? "button"}
       disabled={disabled || loading}
-      className={
-        className ? `${BASE_CLASS_NAME} ${className}` : BASE_CLASS_NAME
-      }
+      className={className ? `${BASE_CLASS_NAME} ${className}` : BASE_CLASS_NAME}
     >
       {content}
     </button>

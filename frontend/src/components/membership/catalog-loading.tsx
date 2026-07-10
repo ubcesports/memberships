@@ -1,9 +1,6 @@
 export function CatalogLoading() {
   return (
-    <div
-      className="grid gap-5 lg:grid-cols-2"
-      aria-label="Loading membership passes"
-    >
+    <div className="grid gap-5 lg:grid-cols-2" aria-label="Loading membership passes">
       {[0, 1].map((item) => (
         <div
           key={item}

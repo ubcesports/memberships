@@ -23,10 +23,7 @@ export function membershipPriceLabel(price: MembershipTierPrice) {
   return STUDENT_LABELS[String(price.is_student_required)] ?? "Member";
 }
 
-export function getPriceByStudentStatus(
-  tier: MembershipTier,
-  isStudent: boolean,
-) {
+export function getPriceByStudentStatus(tier: MembershipTier, isStudent: boolean) {
   return tier.prices.find((price) => price.is_student_required === isStudent);
 }
 

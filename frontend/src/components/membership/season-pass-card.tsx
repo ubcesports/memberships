@@ -6,10 +6,7 @@ import {
   isMembershipTierPrice,
   membershipPriceLabel,
 } from "@/components/membership/pricing";
-import type {
-  EligibleMembershipTier,
-  MembershipTier,
-} from "@/lib/membership.hook";
+import type { EligibleMembershipTier, MembershipTier } from "@/lib/membership.hook";
 
 type SeasonPassCardProps = {
   tier: MembershipTier;
@@ -35,22 +32,16 @@ export function SeasonPassCard({
   return (
     <article
       className={`relative flex min-h-124 flex-col border bg-brand-surface/88 shadow-2xl shadow-black/20 ${
-        featured
-          ? "border-brand-primary shadow-brand-primary/10"
-          : "border-brand-border"
+        featured ? "border-brand-primary shadow-brand-primary/10" : "border-brand-border"
       }`}
     >
-      {featured ? (
-        <div className="absolute inset-x-0 top-0 h-1 bg-brand-primary" />
-      ) : null}
+      {featured ? <div className="absolute inset-x-0 top-0 h-1 bg-brand-primary" /> : null}
       <div className="flex items-start justify-between gap-4 border-b border-brand-border px-6 py-6 sm:px-7">
         <div>
           <p className="mb-2 font-mono text-xs font-semibold uppercase tracking-[0.2em] text-brand-text-subtle">
             Season pass
           </p>
-          <h2 className="text-2xl font-semibold text-brand-text">
-            {tier.title}
-          </h2>
+          <h2 className="text-2xl font-semibold text-brand-text">{tier.title}</h2>
         </div>
         {featured ? (
           <span className="inline-flex items-center gap-1.5 border border-brand-primary/70 bg-brand-primary/15 px-3 py-1.5 text-xs font-semibold text-blue-100">
@@ -75,9 +66,7 @@ export function SeasonPassCard({
               <span className="text-4xl font-semibold tracking-tight text-brand-text">
                 {formatMembershipPrice(eligibleTier.prices.price)}
               </span>
-              <span className="pb-1 text-sm text-brand-text-subtle">
-                one time
-              </span>
+              <span className="pb-1 text-sm text-brand-text-subtle">one time</span>
             </div>
           </div>
         ) : (
@@ -95,12 +84,9 @@ export function SeasonPassCard({
               className="mt-0.5 size-4 shrink-0 text-brand-text-subtle"
             />
             <div>
-              <p className="text-sm font-medium text-brand-text">
-                Valid for the membership year
-              </p>
+              <p className="text-sm font-medium text-brand-text">Valid for the membership year</p>
               <p className="mt-1 text-xs leading-5 text-brand-text-subtle">
-                Regular and Premium passes expire at the end of the membership
-                period.
+                Regular and Premium passes expire at the end of the membership period.
               </p>
             </div>
           </div>
@@ -131,10 +117,7 @@ function BenefitList({ benefits }: { benefits: string[] }) {
     <ul className="mt-5 grid gap-2 border-t border-brand-border/70 pt-5 text-sm text-brand-text-muted">
       {benefits.map((benefit) => (
         <li key={benefit} className="flex gap-3">
-          <Check
-            aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-blue-200"
-          />
+          <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-blue-200" />
           <span>{benefit}</span>
         </li>
       ))}

@@ -61,9 +61,7 @@ export default function PricingPage() {
     isPending: checkoutPending,
   } = useMutation({
     mutationFn: async (tier: EligibleMembershipTier) => {
-      const response = await apiClient.post<
-        CheckoutResponse | ApiErrorResponse
-      >(
+      const response = await apiClient.post<CheckoutResponse | ApiErrorResponse>(
         "/membership/checkout",
         { tier_id: tier.id },
         {
@@ -79,24 +77,18 @@ export default function PricingPage() {
     },
     onError: (error) =>
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Unable to open checkout. Refresh and try again.",
+        error instanceof Error ? error.message : "Unable to open checkout. Refresh and try again.",
       ),
   });
 
-  const tierBySlug = (slug: string) =>
-    catalog?.find((tier) => tier.slug === slug);
-  const eligibleBySlug = (slug: string) =>
-    eligibleTiers.find((tier) => tier.slug === slug);
+  const tierBySlug = (slug: string) => catalog?.find((tier) => tier.slug === slug);
+  const eligibleBySlug = (slug: string) => eligibleTiers.find((tier) => tier.slug === slug);
 
   const mainTiers = [tierBySlug("regular"), tierBySlug("premium")].filter(
     (tier): tier is MembershipTier => Boolean(tier),
   );
   const dayTier = tierBySlug("day");
-  const assignedTiers = eligibleTiers.filter((tier) =>
-    RESTRICTED_TIER_SLUGS.includes(tier.slug),
-  );
+  const assignedTiers = eligibleTiers.filter((tier) => RESTRICTED_TIER_SLUGS.includes(tier.slug));
 
   return (
     <BasePage>
@@ -108,31 +100,25 @@ export default function PricingPage() {
           Choose your UBCEA pass
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-brand-text-muted sm:text-lg">
-          Compare Regular and Premium membership pricing, then sign in to see
-          the lowest price available to your account.
+          Compare Regular and Premium membership pricing, then sign in to see the lowest price
+          available to your account.
         </p>
       </section>
 
       {profile && !profile.onboardingCompletedAt ? (
         <div className="mb-6 border border-amber-300/35 bg-amber-300/10 px-5 py-4 text-sm text-amber-100">
-          Finish your account setup to see your eligible membership prices and
-          purchase a pass.
+          Finish your account setup to see your eligible membership prices and purchase a pass.
         </div>
       ) : profile && eligibilityError ? (
         <div className="mb-6 border border-red-400/35 bg-red-400/10 px-5 py-4 text-sm text-red-100">
-          Your personalized prices could not be loaded. Refresh the page to try
-          again.
+          Your personalized prices could not be loaded. Refresh the page to try again.
         </div>
       ) : profile ? (
         <div className="mb-6 flex flex-col gap-2 border border-brand-primary/35 bg-brand-primary/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <Check
-              aria-hidden="true"
-              className="size-4 shrink-0 text-blue-200"
-            />
+            <Check aria-hidden="true" className="size-4 shrink-0 text-blue-200" />
             <p className="text-sm text-blue-50">
-              Showing eligible checkout options for{" "}
-              {profile.name || profile.email}.
+              Showing eligible checkout options for {profile.name || profile.email}.
             </p>
           </div>
           <p className="text-xs font-medium text-blue-100">
@@ -145,16 +131,12 @@ export default function PricingPage() {
         <CatalogLoading />
       ) : catalogError || !catalog ? (
         <div className="border border-red-400/35 bg-red-400/10 px-6 py-10 text-center text-sm text-red-100">
-          Membership prices are unavailable right now. Refresh the page to try
-          again.
+          Membership prices are unavailable right now. Refresh the page to try again.
         </div>
       ) : (
         <>
           {assignedTiers.length > 0 ? (
-            <section
-              className="pb-10"
-              aria-labelledby="assigned-passes-heading"
-            >
+            <section className="pb-10" aria-labelledby="assigned-passes-heading">
               <div className="mb-5">
                 <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-brand-text-subtle">
                   Assigned access
@@ -171,9 +153,7 @@ export default function PricingPage() {
                   <AssignedPassCard
                     key={tier.id}
                     tier={tier}
-                    checkoutPending={
-                      checkoutPending && checkoutTier?.id === tier.id
-                    }
+                    checkoutPending={checkoutPending && checkoutTier?.id === tier.id}
                     onCheckout={checkout}
                   />
                 ))}
@@ -194,9 +174,7 @@ export default function PricingPage() {
                   Season memberships
                 </h2>
               </div>
-              <p className="hidden text-sm text-brand-text-subtle sm:block">
-                One-time payment
-              </p>
+              <p className="hidden text-sm text-brand-text-subtle sm:block">One-time payment</p>
             </div>
             <div className="grid gap-5 lg:grid-cols-2">
               {mainTiers.map((tier) => (
@@ -204,9 +182,7 @@ export default function PricingPage() {
                   key={tier.id}
                   tier={tier}
                   eligibleTier={eligibleBySlug(tier.slug)}
-                  checkoutPending={
-                    checkoutPending && checkoutTier?.id === tier.id
-                  }
+                  checkoutPending={checkoutPending && checkoutTier?.id === tier.id}
                   isSignedIn={isSignedIn}
                   onCheckout={checkout}
                   onSignIn={() => signIn()}
@@ -217,10 +193,7 @@ export default function PricingPage() {
           </section>
 
           {dayTier ? (
-            <section
-              className="pb-20 pt-12"
-              aria-labelledby="additional-passes-heading"
-            >
+            <section className="pb-20 pt-12" aria-labelledby="additional-passes-heading">
               <div className="mb-5">
                 <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-brand-text-subtle">
                   Additional option
@@ -235,9 +208,7 @@ export default function PricingPage() {
               <DayPassCard
                 tier={dayTier}
                 eligibleTier={eligibleBySlug(dayTier.slug)}
-                checkoutPending={
-                  checkoutPending && checkoutTier?.id === dayTier.id
-                }
+                checkoutPending={checkoutPending && checkoutTier?.id === dayTier.id}
                 isSignedIn={isSignedIn}
                 onCheckout={checkout}
                 onSignIn={() => signIn()}

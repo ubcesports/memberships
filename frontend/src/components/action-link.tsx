@@ -11,12 +11,7 @@ const BASE_CLASS_NAME =
 
 export function ActionLink({ children, className, icon, ...props }: ActionLinkProps) {
   return (
-    <a
-      {...props}
-      className={
-        className ? `${BASE_CLASS_NAME} ${className}` : BASE_CLASS_NAME
-      }
-    >
+    <a {...props} className={className ? `${BASE_CLASS_NAME} ${className}` : BASE_CLASS_NAME}>
       {icon}
       <span>{children}</span>
     </a>

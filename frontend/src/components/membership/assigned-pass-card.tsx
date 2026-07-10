@@ -9,11 +9,7 @@ type AssignedPassCardProps = {
   onCheckout: (tier: EligibleMembershipTier) => void;
 };
 
-export function AssignedPassCard({
-  tier,
-  checkoutPending,
-  onCheckout,
-}: AssignedPassCardProps) {
+export function AssignedPassCard({ tier, checkoutPending, onCheckout }: AssignedPassCardProps) {
   return (
     <article className="grid border border-brand-primary/40 bg-brand-primary/10 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,0.55fr)]">
       <div className="flex gap-5 p-6 sm:p-7">
@@ -24,9 +20,7 @@ export function AssignedPassCard({
           <p className="mb-2 font-mono text-xs font-semibold uppercase tracking-[0.2em] text-blue-100">
             Assigned pass
           </p>
-          <h3 className="text-xl font-semibold text-brand-text">
-            {tier.title}
-          </h3>
+          <h3 className="text-xl font-semibold text-brand-text">{tier.title}</h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-brand-text-muted">
             {tier.description}
           </p>
@@ -34,10 +28,7 @@ export function AssignedPassCard({
             <ul className="mt-4 grid gap-2 text-sm text-brand-text-muted">
               {tier.benefits.map((benefit) => (
                 <li key={benefit} className="flex gap-3">
-                  <Check
-                    aria-hidden="true"
-                    className="mt-0.5 size-4 shrink-0 text-blue-200"
-                  />
+                  <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-blue-200" />
                   <span>{benefit}</span>
                 </li>
               ))}
