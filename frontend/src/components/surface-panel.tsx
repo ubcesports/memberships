@@ -15,7 +15,9 @@ export function SurfacePanel({
   return (
     <div
       {...props}
-      className={className ? `${BASE_CLASS_NAME} ${className}` : BASE_CLASS_NAME}
+      className={
+        className ? `${BASE_CLASS_NAME} ${className}` : BASE_CLASS_NAME
+      }
     >
       {children}
     </div>
