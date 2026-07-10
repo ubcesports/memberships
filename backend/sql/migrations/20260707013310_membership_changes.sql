@@ -9,6 +9,7 @@ ALTER TYPE transaction_status_type ADD VALUE IF NOT EXISTS 'expired';
 
 ALTER TABLE memberships
     DROP COLUMN IF EXISTS group_at_purchase,
+    ADD COLUMN benefits TEXT[] DEFAULT '{}',
     DROP COLUMN IF EXISTS transaction_id;
 
 ALTER TABLE membership_tiers
@@ -53,6 +54,7 @@ DROP TYPE IF EXISTS purchase_type;
 
 ALTER TABLE membership_tiers
     DROP COLUMN IF EXISTS slug,
+    DROP COLUMN IF EXISTS benefits,
     DROP COLUMN IF EXISTS "group";
 
 ALTER TABLE membership_tier_prices

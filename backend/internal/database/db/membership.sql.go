@@ -262,6 +262,7 @@ SELECT
     mt.id,
     mt.title,
     mt.description,
+    mt.benefits,
     mt.stripe_product_id,
     mt.slug,
     mtp.stripe_price_id,
@@ -290,6 +291,7 @@ type GetEligibleTiersWithPricesRow struct {
 	ID                pgtype.UUID
 	Title             string
 	Description       pgtype.Text
+	Benefits          []string
 	StripeProductID   pgtype.Text
 	Slug              pgtype.Text
 	StripePriceID     pgtype.Text
@@ -309,6 +311,7 @@ func (q *Queries) GetEligibleTiersWithPrices(ctx context.Context, id pgtype.UUID
 			&i.ID,
 			&i.Title,
 			&i.Description,
+			&i.Benefits,
 			&i.StripeProductID,
 			&i.Slug,
 			&i.StripePriceID,
@@ -350,6 +353,7 @@ SELECT
     mt.id,
     mt.title,
     mt.description,
+    mt.benefits,
     mt.slug,
     mt.stripe_product_id,
     mtp.stripe_price_id,
@@ -364,6 +368,7 @@ type GetPublicTiersAndPricesRow struct {
 	ID                pgtype.UUID
 	Title             string
 	Description       pgtype.Text
+	Benefits          []string
 	Slug              pgtype.Text
 	StripeProductID   pgtype.Text
 	StripePriceID     pgtype.Text
@@ -383,6 +388,7 @@ func (q *Queries) GetPublicTiersAndPrices(ctx context.Context) ([]GetPublicTiers
 			&i.ID,
 			&i.Title,
 			&i.Description,
+			&i.Benefits,
 			&i.Slug,
 			&i.StripeProductID,
 			&i.StripePriceID,
@@ -403,6 +409,7 @@ SELECT
     mt.id,
     mt.title,
     mt.description,
+    mt.benefits,
     mt.slug,
     mt.stripe_product_id,
     mtp.stripe_price_id,
@@ -417,6 +424,7 @@ type GetTierByTierIdRow struct {
 	ID                pgtype.UUID
 	Title             string
 	Description       pgtype.Text
+	Benefits          []string
 	Slug              pgtype.Text
 	StripeProductID   pgtype.Text
 	StripePriceID     pgtype.Text
@@ -430,6 +438,7 @@ func (q *Queries) GetTierByTierId(ctx context.Context, id pgtype.UUID) (GetTierB
 		&i.ID,
 		&i.Title,
 		&i.Description,
+		&i.Benefits,
 		&i.Slug,
 		&i.StripeProductID,
 		&i.StripePriceID,

@@ -208,6 +208,7 @@ type Membership struct {
 	CancelledAt pgtype.Timestamptz
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
+	Benefits    []string
 }
 
 type MembershipTier struct {
@@ -220,6 +221,7 @@ type MembershipTier struct {
 	IsActive        bool
 	Slug            pgtype.Text
 	Group           NullGroupType
+	Benefits        []string
 }
 
 type MembershipTierPrice struct {

@@ -1,10 +1,13 @@
 BEGIN;
 
-WITH tier_seed(title, description, slug, group_name, stripe_product_id, is_active) AS (
+WITH tier_seed(title, description, benefits, slug, group_name, stripe_product_id, is_active) AS (
     VALUES
         (
             'Day Pass',
-            'Single-day UBC Esports Association membership access.',
+            'Short-term access for members joining a single event or lounge visit.',
+            ARRAY[
+                'Full day access to Legion Lounge'
+            ],
             'day',
             'member',
             'prod_UlEQ2pcezb8VkF',
@@ -12,7 +15,13 @@ WITH tier_seed(title, description, slug, group_name, stripe_product_id, is_activ
         ),
         (
             'Regular Pass',
-            'Standard UBC Esports Association membership pass.',
+            'The standard UBCEA membership for students and community members.',
+            ARRAY[
+                'Daily 1 hour/session access to Legion Lounge',
+                'Discounted ticket prices for UBCEA events',
+                'Regular access to UBCEA member events',
+                'Upgrade to Premium anytime and only pay the price difference'
+            ],
             'regular',
             'member',
             'prod_UnGYL5Cxq8Sr7r',
@@ -20,7 +29,12 @@ WITH tier_seed(title, description, slug, group_name, stripe_product_id, is_activ
         ),
         (
             'Premium Pass',
-            'Premium UBC Esports Association membership pass.',
+            'An upgraded membership with expanded access and additional member perks.',
+            ARRAY[
+                'All Regular Pass benefits',
+                'Expanded daily 2 hour/session access to Legion Lounge',
+                'Higher discounts on ticket prices for UBCEA events'
+            ],
             'premium',
             'member',
             'prod_UnGYUlfwqi6af8',
@@ -28,7 +42,7 @@ WITH tier_seed(title, description, slug, group_name, stripe_product_id, is_activ
         ),
         (
             'Competitive Player Pass',
-            'Membership pass for competitive team players.',
+            'Membership access for players rostered on UBCEA competitive teams.',
             'competitive_team',
             'competitive_team',
             'prod_UnGZnjFGP74y44',
@@ -36,7 +50,7 @@ WITH tier_seed(title, description, slug, group_name, stripe_product_id, is_activ
         ),
         (
             'Executive Pass',
-            'Membership pass for executive, director, and board members.',
+            'Membership access for UBCEA executives, directors, and board members.',
             'executive',
             'executive',
             'prod_UnGZIuiCafLoqL',
@@ -47,6 +61,7 @@ upserted_tiers AS (
     INSERT INTO membership_tiers (
         title,
         description,
+        benefits,
         slug,
         "group",
         stripe_product_id,
@@ -56,6 +71,7 @@ upserted_tiers AS (
     SELECT
         title,
         description,
+        benefits,
         slug,
         group_name::group_type,
         stripe_product_id,
@@ -65,6 +81,7 @@ upserted_tiers AS (
     ON CONFLICT (stripe_product_id) DO UPDATE SET
         title = EXCLUDED.title,
         description = EXCLUDED.description,
+        benefits = EXCLUDED.benefits,
         slug = EXCLUDED.slug,
         "group" = EXCLUDED."group",
         is_active = EXCLUDED.is_active,

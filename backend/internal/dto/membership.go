@@ -10,6 +10,7 @@ type MembershipTierDTO struct {
 	Description string                   `json:"description"`
 	Slug        string                   `json:"slug"`
 	ProductId   string                   `json:"product_id"`
+	Benefits    []string                 `json:"benefits"`
 	Prices      []MembershipTierPriceDTO `json:"prices"`
 }
 
@@ -20,6 +21,7 @@ type EligibleMembershipTierDTO struct {
 	Slug         string                 `json:"slug"`
 	PurchaseType PurchaseType           `json:"purchase_type"`
 	ProductId    string                 `json:"product_id"`
+	Benefits     []string               `json:"benefits"`
 	Price        MembershipTierPriceDTO `json:"prices"`
 }
 
