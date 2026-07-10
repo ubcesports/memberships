@@ -1,14 +1,23 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { checkOnboardingStatus } from "./onboard.api";
 
 export function useOnboardCheck() {
-  return useQuery({
+  const { data, error } = useQuery({
     queryKey: ["onboard", "check"],
     retry: false,
-    queryFn: async () => {
-      const result = await checkOnboardingStatus();
-      window.location.replace(result.destination);
-      return result;
-    },
+    queryFn: checkOnboardingStatus,
   });
+
+  useEffect(() => {
+    if (data) {
+      window.location.replace(data.destination);
+    }
+  }, [data]);
+
+  useEffect(() => {
+    if (error) {
+      console.error(error);
+    }
+  }, [error]);
 }

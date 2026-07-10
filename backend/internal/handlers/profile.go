@@ -80,7 +80,7 @@ func (h *ProfileHandler) GetIsUserOnboarded(w http.ResponseWriter, r *http.Reque
 /*
 Onboard the currently authenticated user.
 
-API URL: PATCH /onboard
+API URL: POST /onboard
 
 Args:
 

@@ -28,7 +28,7 @@ export async function checkOnboardingStatus() {
 }
 
 export async function completeOnboarding(payload: CompleteOnboardingPayload) {
-  const response = await apiClient.patch<ApiErrorResponse>("/onboard", payload, {
+  const response = await apiClient.post<ApiErrorResponse>("/onboard", payload, {
     validateStatus: () => true,
   });
 

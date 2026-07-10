@@ -4,12 +4,12 @@ import { ActionButton } from "@/components/action-button";
 import type { StudentStatus } from "@/lib/onboard/onboard.types";
 
 type OnboardFormProps = {
-  studentStatus: StudentStatus;
+  studentStatus: StudentStatus | null;
   studentId: string;
   validationError: string | null;
   canSubmit: boolean;
   isPending: boolean;
-  onStudentStatusChange: (status: Exclude<StudentStatus, null>) => void;
+  onStudentStatusChange: (status: StudentStatus) => void;
   onStudentIdChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
@@ -59,7 +59,7 @@ export function OnboardForm({
           </div>
         </div>
 
-        {isStudent ? (
+        {isStudent && (
           <div>
             <label htmlFor="student-id" className="text-sm font-medium text-brand-text">
               Student number
@@ -77,10 +77,11 @@ export function OnboardForm({
               aria-describedby={validationError ? "onboard-validation-error" : undefined}
             />
             <p className="mt-2 text-sm leading-6 text-brand-text-subtle">
-              Enter the 8 digit number on your student account.
+              Enter the 8 digit number on your UBC student card. Note that this cannot be changed in
+              the future.
             </p>
           </div>
-        ) : null}
+        )}
 
         {validationError ? (
           <p id="onboard-validation-error" className="text-sm leading-6 text-brand-warning">

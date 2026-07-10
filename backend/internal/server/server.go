@@ -47,7 +47,7 @@ func provideRouter(params RouterParams) *chi.Mux {
 
 		r.Get("/profile", params.ProfileHandler.GetCurrentProfile)
 
-		r.Patch("/onboard", params.ProfileHandler.OnboardUser)
+		r.Post("/onboard", params.ProfileHandler.OnboardUser)
 	})
 
 	// All onboarded routes

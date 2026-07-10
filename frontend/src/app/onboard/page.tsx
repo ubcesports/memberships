@@ -6,12 +6,12 @@ import { useMutation } from "@tanstack/react-query";
 import { BasePage } from "@/components/layout/base-page";
 import { OnboardForm } from "@/components/onboard/onboard-form";
 import { completeOnboarding } from "@/lib/onboard/onboard.api";
-import type { StudentStatus } from "@/lib/onboard/onboard.types";
+import type { CompleteOnboardingPayload, StudentStatus } from "@/lib/onboard/onboard.types";
 
 const STUDENT_ID_PATTERN = /^\d{8}$/;
 
 export default function OnboardPage() {
-  const [studentStatus, setStudentStatus] = useState<StudentStatus>(null);
+  const [studentStatus, setStudentStatus] = useState<StudentStatus | null>(null);
   const [studentId, setStudentId] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -32,10 +32,10 @@ export default function OnboardPage() {
 
   const { mutate: submitOnboarding, isPending } = useMutation({
     mutationFn: async () => {
-      const result = await completeOnboarding({
-        is_student: isStudent,
-        student_id: isStudent ? normalizedStudentId : null,
-      });
+      const payload: CompleteOnboardingPayload = isStudent
+        ? { is_student: true, student_id: normalizedStudentId }
+        : { is_student: false };
+      const result = await completeOnboarding(payload);
       window.location.replace(result.destination);
     },
     onError: (error) => {
@@ -43,7 +43,7 @@ export default function OnboardPage() {
     },
   });
 
-  function handleStudentStatusChange(status: Exclude<StudentStatus, null>) {
+  function handleStudentStatusChange(status: StudentStatus) {
     setStudentStatus(status);
     setValidationError(null);
 

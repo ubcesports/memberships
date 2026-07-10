@@ -1,18 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { BasePage } from "@/components/layout/base-page";
 import { useOnboardCheck } from "@/lib/onboard/onboard.hook";
 
 export default function OnboardCheckPage() {
-  const { error, isError } = useOnboardCheck();
-
-  useEffect(() => {
-    if (isError) {
-      console.error(error);
-    }
-  }, [error, isError]);
+  useOnboardCheck();
 
   return (
     <BasePage>
@@ -25,11 +18,6 @@ export default function OnboardCheckPage() {
           <p className="mt-3 text-sm leading-6 text-brand-text-muted">
             You will be redirected once your account status is confirmed.
           </p>
-          {isError ? (
-            <p className="mt-4 text-sm leading-6 text-brand-text-muted">
-              Unable to check onboarding status. Refresh the page to try again.
-            </p>
-          ) : null}
         </section>
       </div>
     </BasePage>

@@ -4,9 +4,8 @@ export type ApiErrorResponse = {
   message?: string;
 };
 
-export type CompleteOnboardingPayload = {
-  is_student: boolean;
-  student_id: string | null;
-};
+export type CompleteOnboardingPayload =
+  | { is_student: true; student_id: string }
+  | { is_student: false };
 
-export type StudentStatus = "student" | "not_student" | null;
+export type StudentStatus = "student" | "not_student";
