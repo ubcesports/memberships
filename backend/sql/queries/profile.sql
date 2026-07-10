@@ -20,3 +20,12 @@ LEFT JOIN LATERAL (
 ) g ON true
 WHERE u.id = $1
 ;
+
+-- name: OnboardUserByUserId :exec
+UPDATE users
+SET
+    is_student = $2,
+    student_id = $3,
+    onboarding_completed_at = NOW(),
+    updated_at = NOW()
+WHERE id = $1;

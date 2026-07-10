@@ -16,3 +16,8 @@ type ProfileDTO struct {
 	AvatarURL             *string     `json:"avatar_url"`
 	Groups                []GroupType `json:"groups"`
 }
+
+type OnboardUserRequest struct {
+	IsStudent bool    `json:"is_student"`
+	StudentID *string `json:"student_id"`
+}

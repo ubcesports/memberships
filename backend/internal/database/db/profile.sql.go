@@ -68,3 +68,24 @@ func (q *Queries) GetProfileByUserID(ctx context.Context, id pgtype.UUID) (GetPr
 	)
 	return i, err
 }
+
+const onboardUserByUserId = `-- name: OnboardUserByUserId :exec
+UPDATE users
+SET
+    is_student = $2,
+    student_id = $3,
+    onboarding_completed_at = NOW(),
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type OnboardUserByUserIdParams struct {
+	ID        pgtype.UUID
+	IsStudent bool
+	StudentID pgtype.Text
+}
+
+func (q *Queries) OnboardUserByUserId(ctx context.Context, arg OnboardUserByUserIdParams) error {
+	_, err := q.db.Exec(ctx, onboardUserByUserId, arg.ID, arg.IsStudent, arg.StudentID)
+	return err
+}

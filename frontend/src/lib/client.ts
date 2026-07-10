@@ -33,8 +33,8 @@ apiClient.interceptors.response.use(
     }
 
     if (status === 403) {
-      if (code === "ONBOARDING_REQUIRED" && currentPath !== "/onboarding") {
-        window.location.replace("/onboarding");
+      if (code === "ONBOARDING_REQUIRED" && currentPath !== "/onboard") {
+        window.location.replace("/onboard");
       } else if (currentPath !== "/403") {
         window.location.replace("/403");
       }
