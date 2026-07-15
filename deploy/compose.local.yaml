@@ -2,6 +2,8 @@
 services:
   db:
     image: postgres:17
+    ports:
+      - "127.0.0.1:5433:5432"
     restart: unless-stopped
     env_file:
       - .env
@@ -19,7 +21,7 @@ services:
 
   migrate:
     build:
-      context: ./backend
+      context: ../backend
     restart: "no"
     env_file:
       - .env
@@ -37,9 +39,8 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: ../backend
     env_file:
-      - ./backend/.env
       - .env
     environment:
       BASE_URL: http://0.0.0.0:8080
@@ -64,7 +65,7 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ../frontend
       args:
         NEXT_PUBLIC_API_URL: http://localhost:8080
     depends_on:
