@@ -36,6 +36,32 @@ func TestParseAdminUserFiltersRejectsInvalidGroup(t *testing.T) {
 	}
 }
 
+func TestParseAdminAuditLogFilters(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/admin/audit-logs?actor_name=dip&limit=10&offset=20", nil)
+
+	filters, err := parseAdminAuditLogFilters(req)
+	if err != nil {
+		t.Fatalf("expected valid filters, got %v", err)
+	}
+	if filters.ActorName != "dip" || filters.Limit != 10 || filters.Offset != 20 {
+		t.Fatalf("unexpected filters: %#v", filters)
+	}
+}
+
+func TestParseAdminAuditLogFiltersRejectsInvalidPagination(t *testing.T) {
+	tests := []string{
+		"/admin/audit-logs?limit=0",
+		"/admin/audit-logs?offset=-1",
+	}
+
+	for _, target := range tests {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		if _, err := parseAdminAuditLogFilters(req); err == nil {
+			t.Fatalf("expected invalid pagination error for %s", target)
+		}
+	}
+}
+
 func TestSafeCSVCellEscapesFormulaPrefix(t *testing.T) {
 	if got := safeCSVCell("=1+1"); got != "'=1+1" {
 		t.Fatalf("expected formula prefix to be escaped, got %q", got)

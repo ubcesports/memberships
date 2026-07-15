@@ -70,6 +70,7 @@ func provideRouter(params RouterParams) *chi.Mux {
 
 		r.Get("/admin/users", params.AdminUserHandler.GetUsers)
 		r.Get("/admin/users/export", params.AdminUserHandler.ExportUsersCSV)
+		r.Get("/admin/audit-logs", params.AdminUserHandler.GetAdminAuditLogs)
 	})
 
 	return r

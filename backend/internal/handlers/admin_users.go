@@ -13,11 +13,16 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/service"
+	"github.com/ubcesports/memberships/internal/util"
 )
 
 type AdminUserHandler struct {
 	adminUserService *service.AdminUserService
 }
+
+/*
+	Public functions
+*/
 
 func NewAdminUserHandler(adminUserService *service.AdminUserService) *AdminUserHandler {
 	return &AdminUserHandler{adminUserService: adminUserService}
@@ -178,6 +183,85 @@ func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request
 		)
 		return
 	}
+}
+
+/*
+Returns a paginated list of admin audit logs.
+
+API URL: GET /admin/audit-logs
+
+Args (query params):
+
+	actor_name: optional case-insensitive actor name substring
+	limit: optional page size (default 25, maximum 100)
+	offset: optional number of logs to skip (default 0)
+
+Returns:
+
+	logs: paginated admin audit logs (HTTP 200)
+
+Raises:
+
+	400: invalid pagination value
+	401: user is not authenticated
+	403: user is not an admin
+	500: audit logs could not be loaded for some reason
+*/
+func (h *AdminUserHandler) GetAdminAuditLogs(w http.ResponseWriter, r *http.Request) {
+	requestID := middleware.GetReqID(r.Context())
+	filters, err := parseAdminAuditLogFilters(r)
+	if err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error(), requestID)
+		return
+	}
+
+	logs, err := h.adminUserService.GetAdminAuditLogs(r.Context(), filters)
+	if err != nil {
+		slog.ErrorContext(r.Context(), "unable to load admin audit logs",
+			"error", err,
+			"request_id", requestID,
+		)
+		util.WriteApiResponse(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"Unable to load admin audit logs. Please try again.",
+			requestID,
+		)
+		return
+	}
+
+	util.WriteJson(w, http.StatusOK, logs)
+}
+
+/*
+	Private functions
+*/
+
+func parseAdminAuditLogFilters(r *http.Request) (service.AdminAuditLogFilters, error) {
+	query := r.URL.Query()
+	filters := service.AdminAuditLogFilters{
+		ActorName: query.Get("actor_name"),
+		Limit:     25,
+	}
+
+	if value := query.Get("limit"); value != "" {
+		parsed, err := strconv.ParseInt(value, 10, 32)
+		if err != nil || parsed <= 0 {
+			return service.AdminAuditLogFilters{}, errors.New("limit must be a positive integer")
+		}
+		filters.Limit = int32(parsed)
+	}
+
+	if value := query.Get("offset"); value != "" {
+		parsed, err := strconv.ParseInt(value, 10, 32)
+		if err != nil || parsed < 0 {
+			return service.AdminAuditLogFilters{}, errors.New("offset must be a non-negative integer")
+		}
+		filters.Offset = int32(parsed)
+	}
+
+	return filters, nil
 }
 
 func parseAdminUserFilters(r *http.Request, includePagination bool) (service.AdminUserFilters, error) {

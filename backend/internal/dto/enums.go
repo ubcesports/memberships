@@ -25,3 +25,11 @@ const (
 	TransactionFailed    TransactionStatusType = "failed"
 	TransactionRefunded  TransactionStatusType = "refunded"
 )
+
+type AdminAuditLogOutcomeType string
+
+const (
+	AuditLogSuccess AdminAuditLogOutcomeType = "success"
+	AuditLogFailed  AdminAuditLogOutcomeType = "failed"
+	AuditLogDenied  AdminAuditLogOutcomeType = "denied"
+)

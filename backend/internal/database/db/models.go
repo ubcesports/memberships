@@ -11,6 +11,49 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AdminAuditOutcomeType string
+
+const (
+	AdminAuditOutcomeTypeSuccess AdminAuditOutcomeType = "success"
+	AdminAuditOutcomeTypeFailed  AdminAuditOutcomeType = "failed"
+	AdminAuditOutcomeTypeDenied  AdminAuditOutcomeType = "denied"
+)
+
+func (e *AdminAuditOutcomeType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AdminAuditOutcomeType(s)
+	case string:
+		*e = AdminAuditOutcomeType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AdminAuditOutcomeType: %T", src)
+	}
+	return nil
+}
+
+type NullAdminAuditOutcomeType struct {
+	AdminAuditOutcomeType AdminAuditOutcomeType
+	Valid                 bool // Valid is true if AdminAuditOutcomeType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAdminAuditOutcomeType) Scan(value interface{}) error {
+	if value == nil {
+		ns.AdminAuditOutcomeType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AdminAuditOutcomeType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAdminAuditOutcomeType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AdminAuditOutcomeType), nil
+}
+
 type GroupType string
 
 const (
@@ -154,6 +197,17 @@ type Account struct {
 	IDToken              pgtype.Text
 	CreatedAt            pgtype.Timestamptz
 	UpdatedAt            pgtype.Timestamptz
+}
+
+type AdminAuditLog struct {
+	ID           pgtype.UUID
+	OccurredAt   pgtype.Timestamptz
+	ActorUserID  pgtype.UUID
+	Action       string
+	TargetUserID pgtype.UUID
+	Outcome      AdminAuditOutcomeType
+	RequestID    string
+	Description  pgtype.Text
 }
 
 type Membership struct {

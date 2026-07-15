@@ -35,3 +35,19 @@ func (r *AdminUserRepository) CountUsers(
 	}
 	return count, nil
 }
+
+func (r *AdminUserRepository) CreateAdminAuditLog(ctx context.Context, params db.CreateAdminAuditLogParams) error {
+	err := r.store.CreateAdminAuditLog(ctx, params)
+	if err != nil {
+		return fmt.Errorf("create admin audit log: %w", err)
+	}
+	return nil
+}
+
+func (r *AdminUserRepository) GetAdminAuditLogs(ctx context.Context, params db.GetAdminAuditLogsParams) ([]db.GetAdminAuditLogsRow, error) {
+	logs, err := r.store.GetAdminAuditLogs(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("query admin audit logs: %w", err)
+	}
+	return logs, nil
+}

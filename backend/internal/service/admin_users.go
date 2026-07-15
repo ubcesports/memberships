@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ubcesports/memberships/internal/database/db"
@@ -21,9 +22,19 @@ type AdminUserFilters struct {
 	Offset    int32
 }
 
+type AdminAuditLogFilters struct {
+	ActorName string
+	Limit     int32
+	Offset    int32
+}
+
 type AdminUserService struct {
 	adminUserRepository *repository.AdminUserRepository
 }
+
+/*
+	Public functions
+*/
 
 func NewAdminUserService(adminUserRepository *repository.AdminUserRepository) *AdminUserService {
 	return &AdminUserService{adminUserRepository: adminUserRepository}
@@ -67,6 +78,64 @@ func (s *AdminUserService) GetUsers(ctx context.Context, filters AdminUserFilter
 func (s *AdminUserService) ExportUsers(ctx context.Context, filters AdminUserFilters) ([]dto.ProfileDTO, error) {
 	return s.getUsers(ctx, buildAdminUserQueryParams(filters))
 }
+
+func (s *AdminUserService) GetAdminAuditLogs(ctx context.Context, filters AdminAuditLogFilters) ([]dto.AdminAuditLogResponse, error) {
+	// Ensure limit is a proper number. Shouldn't return too many items at once
+	if filters.Limit <= 0 {
+		filters.Limit = 25
+	}
+	if filters.Limit > 100 {
+		filters.Limit = 100
+	}
+	if filters.Offset < 0 {
+		filters.Offset = 0
+	}
+
+	actorName := strings.TrimSpace(filters.ActorName)
+	rows, err := s.adminUserRepository.GetAdminAuditLogs(ctx, db.GetAdminAuditLogsParams{
+		ActorName: pgtype.Text{
+			String: actorName,
+			Valid:  actorName != "",
+		},
+		Limit:  filters.Limit,
+		Offset: filters.Offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	logs := make([]dto.AdminAuditLogResponse, 0, len(rows))
+	for _, row := range rows {
+		var targetUser *dto.AdminAuditLogActor
+		if row.TargetID.Valid {
+			targetUser = &dto.AdminAuditLogActor{
+				ActorUserId:    row.TargetID.String(),
+				ActorFullName:  row.TargetName.String,
+				ActorAvatarURL: row.TargetAvatarUrl.String,
+			}
+		}
+
+		logs = append(logs, dto.AdminAuditLogResponse{
+			Actor: dto.AdminAuditLogActor{
+				ActorUserId:    row.ActorID.String(),
+				ActorFullName:  row.ActorName,
+				ActorAvatarURL: row.ActorAvatarUrl.String,
+			},
+			OccuredAt:   row.OccurredAt.Time,
+			Action:      row.Action,
+			Description: util.TextPointer(row.Description),
+			Outcome:     dto.AdminAuditLogOutcomeType(row.Outcome),
+			RequestId:   row.RequestID,
+			TargetUser:  targetUser,
+		})
+	}
+
+	return logs, nil
+}
+
+/*
+	Private functions
+*/
 
 func buildAdminUserQueryParams(filters AdminUserFilters) db.GetUsersAdminParams {
 	isStudent := pgtype.Bool{}
