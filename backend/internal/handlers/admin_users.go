@@ -4,12 +4,13 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/service"
 )
@@ -59,7 +60,10 @@ func (h *AdminUserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 
 	users, total, err := h.adminUserService.GetUsers(r.Context(), filters)
 	if err != nil {
-		log.Printf("unable to load users: %v", err)
+		slog.ErrorContext(r.Context(), "unable to load users",
+			"error", err,
+			"request_id", middleware.GetReqID(r.Context()),
+		)
 		http.Error(w, "unable to load users", http.StatusInternalServerError)
 		return
 	}
@@ -105,7 +109,10 @@ func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request
 
 	users, err := h.adminUserService.ExportUsers(r.Context(), filters)
 	if err != nil {
-		log.Printf("unable to export users: %v", err)
+		slog.ErrorContext(r.Context(), "unable to export users",
+			"error", err,
+			"request_id", middleware.GetReqID(r.Context()),
+		)
 		http.Error(w, "unable to export users", http.StatusInternalServerError)
 		return
 	}
@@ -128,6 +135,10 @@ func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request
 		"Onboarding Completed At",
 		"Avatar URL",
 	}); err != nil {
+		slog.ErrorContext(r.Context(), "unable to write CSV header",
+			"error", err,
+			"request_id", middleware.GetReqID(r.Context()),
+		)
 		return
 	}
 
@@ -151,12 +162,20 @@ func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request
 			optionalTime(user.OnboardingCompletedAt),
 			safeCSVCell(optionalString(user.AvatarURL)),
 		}); err != nil {
+			slog.ErrorContext(r.Context(), "unable to write CSV row",
+				"error", err,
+				"request_id", middleware.GetReqID(r.Context()),
+			)
 			return
 		}
 	}
 
 	writer.Flush()
 	if err := writer.Error(); err != nil {
+		slog.ErrorContext(r.Context(), "unable to flush CSV response",
+			"error", err,
+			"request_id", middleware.GetReqID(r.Context()),
+		)
 		return
 	}
 }

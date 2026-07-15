@@ -3,7 +3,8 @@ package database
 import (
 	"context"
 	"database/sql"
-	"log"
+	"fmt"
+	"log/slog"
 	"os"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -19,30 +20,33 @@ var Module = fx.Module("database",
 func provideDatabase(lc fx.Lifecycle) (*db.Queries, error) {
 	pool, err := ConnectDB()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("connect application database pool: %w", err)
 	}
 
 	lc.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
-			log.Println("Closing database connection pool...")
+			slog.InfoContext(ctx, "closing database connection pool")
 			pool.Close()
 			return nil
 		},
 	})
 
-	log.Println("Database connection established successfully.")
+	slog.Info("database connection established")
 	return db.New(pool), nil
 }
 
 func provideStdlibDB(lc fx.Lifecycle) (*sql.DB, error) {
 	sqlDB, err := sql.Open("pgx", os.Getenv("DATABASE_URL"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open authentication database connection: %w", err)
 	}
 	lc.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
-			log.Println("Closing Limen database connection...")
-			return sqlDB.Close()
+			slog.InfoContext(ctx, "closing authentication database connection")
+			if err := sqlDB.Close(); err != nil {
+				return fmt.Errorf("close authentication database connection: %w", err)
+			}
+			return nil
 		},
 	})
 	return sqlDB, nil

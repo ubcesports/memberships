@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/ubcesports/memberships/internal/service"
 )
 
@@ -18,7 +20,7 @@ func NewHealthHandler(healthService *service.HealthService) *HealthHandler {
 func (h *HealthHandler) IsDatabaseHealthy(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	healthy := h.healthService.IsDatabaseHealthy(r.Context())
+	healthy, err := h.healthService.IsDatabaseHealthy(r.Context())
 
 	response := map[string]interface{}{
 		"status": "healthy",
@@ -27,7 +29,14 @@ func (h *HealthHandler) IsDatabaseHealthy(w http.ResponseWriter, r *http.Request
 		},
 	}
 
-	if !healthy {
+	if err != nil {
+		slog.ErrorContext(r.Context(), "database health check failed",
+			"error", err,
+			"request_id", middleware.GetReqID(r.Context()),
+		)
+	}
+
+	if err != nil || !healthy {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		response["status"] = "unhealthy"
 		response["database"].(map[string]string)["status"] = "disconnected"

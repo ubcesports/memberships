@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ubcesports/memberships/internal/database/db"
 )
@@ -17,12 +18,20 @@ func NewAdminUserRepository(store *db.Queries) *AdminUserRepository {
 func (r *AdminUserRepository) GetUsers(
 	ctx context.Context,
 	params db.GetUsersAdminParams) ([]db.GetUsersAdminRow, error) {
-	return r.store.GetUsersAdmin(ctx, params)
+	rows, err := r.store.GetUsersAdmin(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("query admin users: %w", err)
+	}
+	return rows, nil
 }
 
 func (r *AdminUserRepository) CountUsers(
 	ctx context.Context,
 	params db.CountUsersAdminParams,
 ) (int64, error) {
-	return r.store.CountUsersAdmin(ctx, params)
+	count, err := r.store.CountUsersAdmin(ctx, params)
+	if err != nil {
+		return 0, fmt.Errorf("count admin users: %w", err)
+	}
+	return count, nil
 }
