@@ -106,17 +106,26 @@ Raises:
 	500: users could not be exported
 */
 func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request) {
+	requestId := middleware.GetReqID(r.Context())
+
+	// Get current user id
+	userId, ok := util.CurrentUserID(r)
+	if !ok {
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestId)
+		return
+	}
+
 	filters, err := parseAdminUserFilters(r, false)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	users, err := h.adminUserService.ExportUsers(r.Context(), filters)
+	users, err := h.adminUserService.ExportUsers(r.Context(), filters, userId, requestId)
 	if err != nil {
 		slog.ErrorContext(r.Context(), "unable to export users",
 			"error", err,
-			"request_id", middleware.GetReqID(r.Context()),
+			"request_id", requestId,
 		)
 		http.Error(w, "unable to export users", http.StatusInternalServerError)
 		return
@@ -142,7 +151,7 @@ func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request
 	}); err != nil {
 		slog.ErrorContext(r.Context(), "unable to write CSV header",
 			"error", err,
-			"request_id", middleware.GetReqID(r.Context()),
+			"request_id", requestId,
 		)
 		return
 	}
@@ -169,7 +178,7 @@ func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request
 		}); err != nil {
 			slog.ErrorContext(r.Context(), "unable to write CSV row",
 				"error", err,
-				"request_id", middleware.GetReqID(r.Context()),
+				"request_id", requestId,
 			)
 			return
 		}
@@ -179,7 +188,7 @@ func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request
 	if err := writer.Error(); err != nil {
 		slog.ErrorContext(r.Context(), "unable to flush CSV response",
 			"error", err,
-			"request_id", middleware.GetReqID(r.Context()),
+			"request_id", requestId,
 		)
 		return
 	}

@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -26,6 +28,15 @@ type AdminAuditLogFilters struct {
 	ActorName string
 	Limit     int32
 	Offset    int32
+}
+
+type AdminAuditLogInput struct {
+	ActorUserID  string
+	Action       string
+	TargetUserID string
+	Outcome      db.AdminAuditOutcomeType
+	RequestID    string
+	Description  string
 }
 
 type AdminUserService struct {
@@ -75,8 +86,45 @@ func (s *AdminUserService) GetUsers(ctx context.Context, filters AdminUserFilter
 	return users, total, nil
 }
 
-func (s *AdminUserService) ExportUsers(ctx context.Context, filters AdminUserFilters) ([]dto.ProfileDTO, error) {
-	return s.getUsers(ctx, buildAdminUserQueryParams(filters))
+func (s *AdminUserService) ExportUsers(
+	ctx context.Context,
+	filters AdminUserFilters,
+	actorId string,
+	requestId string,
+) ([]dto.ProfileDTO, error) {
+	users, exportErr := s.getUsers(ctx, buildAdminUserQueryParams(filters))
+
+	outcome := db.AdminAuditOutcomeTypeSuccess
+	description := fmt.Sprintf("Exported %d users", len(users))
+
+	if exportErr != nil {
+		outcome = db.AdminAuditOutcomeTypeFailed
+		description = "Failed to export users"
+	}
+
+	auditErr := s.createAdminAuditLog(ctx, AdminAuditLogInput{
+		ActorUserID: actorId,
+		Action:      "users.exported",
+		Outcome:     outcome,
+		RequestID:   requestId,
+		Description: description,
+	})
+
+	if auditErr != nil {
+		if exportErr != nil {
+			return nil, errors.Join(exportErr, auditErr)
+		}
+
+		// Fail closed: don't return sensitive export data when it could not
+		// be recorded in the audit trail.
+		return nil, auditErr
+	}
+
+	if exportErr != nil {
+		return nil, exportErr
+	}
+
+	return users, nil
 }
 
 func (s *AdminUserService) GetAdminAuditLogs(ctx context.Context, filters AdminAuditLogFilters) ([]dto.AdminAuditLogResponse, error) {
@@ -136,6 +184,51 @@ func (s *AdminUserService) GetAdminAuditLogs(ctx context.Context, filters AdminA
 /*
 	Private functions
 */
+
+func (s *AdminUserService) createAdminAuditLog(ctx context.Context, input AdminAuditLogInput) error {
+	actorID, err := util.GetValidatedUUID(input.ActorUserID)
+	if err != nil {
+		return fmt.Errorf("invalid audit actor user ID: %w", err)
+	}
+
+	targetID := pgtype.UUID{}
+	if input.TargetUserID != "" {
+		targetID, err = util.GetValidatedUUID(input.TargetUserID)
+		if err != nil {
+			return fmt.Errorf("invalid audit target user ID: %w", err)
+		}
+	}
+
+	action := strings.TrimSpace(input.Action)
+	if action == "" {
+		return fmt.Errorf("audit action is required")
+	}
+	requestID := strings.TrimSpace(input.RequestID)
+	if requestID == "" {
+		return fmt.Errorf("audit request ID is required")
+	}
+
+	switch input.Outcome {
+	case db.AdminAuditOutcomeTypeSuccess,
+		db.AdminAuditOutcomeTypeFailed,
+		db.AdminAuditOutcomeTypeDenied:
+	default:
+		return fmt.Errorf("invalid audit outcome: %q", input.Outcome)
+	}
+
+	description := strings.TrimSpace(input.Description)
+	return s.adminUserRepository.CreateAdminAuditLog(ctx, db.CreateAdminAuditLogParams{
+		ActorUserID:  actorID,
+		Action:       action,
+		TargetUserID: targetID,
+		Outcome:      input.Outcome,
+		RequestID:    requestID,
+		Description: pgtype.Text{
+			String: description,
+			Valid:  description != "",
+		},
+	})
+}
 
 func buildAdminUserQueryParams(filters AdminUserFilters) db.GetUsersAdminParams {
 	isStudent := pgtype.Bool{}
