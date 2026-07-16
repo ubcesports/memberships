@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, LogOut, Menu, UserRound, WalletCards } from "lucide-react";
+import { ChevronDown, Logs, LogOut, Menu, UserRound, UsersRound, WalletCards } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -41,6 +41,37 @@ function DropdownLink({
   );
 }
 
+function AdminMenuLinks() {
+  return (
+    <div className="border-t border-brand-border p-1.5">
+      <details className="group/admin">
+        <summary className="flex cursor-pointer list-none items-center gap-3 px-2.5 py-2.5 text-sm font-semibold text-brand-text-muted transition hover:bg-white/5 hover:text-brand-text focus-visible:bg-white/5 focus-visible:text-brand-text focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+          <UsersRound aria-hidden="true" className="size-4" />
+          <span>Admin</span>
+          <ChevronDown
+            aria-hidden="true"
+            className="ml-auto size-3.5 text-brand-text-subtle transition group-open/admin:rotate-180"
+          />
+        </summary>
+        <div className="mt-1 ml-3 border-l border-brand-border">
+          <DropdownLink
+            href="/admin/users"
+            icon={<UsersRound aria-hidden="true" className="size-4" />}
+          >
+            Users
+          </DropdownLink>
+          <DropdownLink
+            href="/admin/audit-logs"
+            icon={<Logs aria-hidden="true" className="size-4" />}
+          >
+            Audit logs
+          </DropdownLink>
+        </div>
+      </details>
+    </div>
+  );
+}
+
 export function Header() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
@@ -52,8 +83,6 @@ export function Header() {
       window.location.replace("/");
     },
   });
-
-  const displayName = profile?.name || profile?.email || "Member";
 
   return (
     <header className="relative z-30 mx-auto mt-3 w-[calc(100%-1.5rem)] max-w-7xl border border-brand-border/70 bg-brand-surface/90 shadow-2xl shadow-black/25 backdrop-blur-xl md:mt-5 md:w-[calc(100%-2.5rem)]">
@@ -140,6 +169,7 @@ export function Header() {
                 >
                   My memberships
                 </DropdownLink>
+                {profile.role === "admin" ? <AdminMenuLinks /> : null}
                 <div className="border-t border-brand-border p-1.5">
                   <button
                     type="button"
@@ -255,6 +285,7 @@ export function Header() {
                 >
                   My memberships
                 </DropdownLink>
+                {profile.role === "admin" ? <AdminMenuLinks /> : null}
                 <div className="border-t border-brand-border p-1.5">
                   <button
                     type="button"
