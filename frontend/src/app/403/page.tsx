@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { BasePage } from "@/components/layout/base-page";
 import { StatusPage } from "../../components/status-page";
+
+export const metadata: Metadata = {
+  title: "Access Denied",
+};
 
 export default function ForbiddenPage() {
   return (
