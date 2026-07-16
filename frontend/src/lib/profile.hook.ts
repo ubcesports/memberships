@@ -53,3 +53,28 @@ const query = queryOptions({
 });
 
 export const useProfile = (options?: Partial<typeof query>) => useQuery({ ...query, ...options });
+
+const optionalProfileQuery = queryOptions({
+  queryKey: ["auth", "optional-profile"],
+  queryFn: async ({ signal }) => {
+    const response = await apiClient.get<SessionResponse>("/profile", {
+      signal,
+      validateStatus: (status) => status === 200 || status === 401,
+    });
+
+    if (response.status === 401 || !response.data.user) {
+      return null;
+    }
+
+    const { user } = response.data;
+
+    return {
+      name: user.full_name,
+      email: user.email,
+      avatarUrl: user.avatar_url ?? undefined,
+      role: user.role,
+    };
+  },
+});
+
+export const useOptionalProfile = () => useQuery(optionalProfileQuery);
