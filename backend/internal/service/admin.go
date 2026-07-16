@@ -39,19 +39,19 @@ type AdminAuditLogInput struct {
 	Description  string
 }
 
-type AdminUserService struct {
-	adminUserRepository *repository.AdminUserRepository
+type AdminService struct {
+	adminRepository *repository.AdminRepository
 }
 
 /*
 	Public functions
 */
 
-func NewAdminUserService(adminUserRepository *repository.AdminUserRepository) *AdminUserService {
-	return &AdminUserService{adminUserRepository: adminUserRepository}
+func NewAdminService(adminRepository *repository.AdminRepository) *AdminService {
+	return &AdminService{adminRepository: adminRepository}
 }
 
-func (s *AdminUserService) GetUsers(ctx context.Context, filters AdminUserFilters) ([]dto.ProfileDTO, int64, error) {
+func (s *AdminService) GetUsers(ctx context.Context, filters AdminUserFilters) ([]dto.ProfileDTO, int64, error) {
 	if filters.Limit <= 0 {
 		filters.Limit = 25
 	}
@@ -62,11 +62,11 @@ func (s *AdminUserService) GetUsers(ctx context.Context, filters AdminUserFilter
 		filters.Offset = 0
 	}
 
-	params := buildAdminUserQueryParams(filters)
+	params := buildAdminQueryParams(filters)
 	params.Limit = pgtype.Int4{Int32: filters.Limit, Valid: true}
 	params.Offset = pgtype.Int4{Int32: filters.Offset, Valid: true}
 
-	total, err := s.adminUserRepository.CountUsers(ctx, db.CountUsersAdminParams{
+	total, err := s.adminRepository.CountUsers(ctx, db.CountUsersAdminParams{
 		FullName:  params.FullName,
 		StudentID: params.StudentID,
 		Email:     params.Email,
@@ -86,13 +86,13 @@ func (s *AdminUserService) GetUsers(ctx context.Context, filters AdminUserFilter
 	return users, total, nil
 }
 
-func (s *AdminUserService) ExportUsers(
+func (s *AdminService) ExportUsers(
 	ctx context.Context,
 	filters AdminUserFilters,
 	actorId string,
 	requestId string,
 ) ([]dto.ProfileDTO, error) {
-	users, exportErr := s.getUsers(ctx, buildAdminUserQueryParams(filters))
+	users, exportErr := s.getUsers(ctx, buildAdminQueryParams(filters))
 
 	outcome := db.AdminAuditOutcomeTypeSuccess
 	description := fmt.Sprintf("Exported %d users", len(users))
@@ -127,7 +127,7 @@ func (s *AdminUserService) ExportUsers(
 	return users, nil
 }
 
-func (s *AdminUserService) GetAdminAuditLogs(ctx context.Context, filters AdminAuditLogFilters) ([]dto.AdminAuditLogResponse, error) {
+func (s *AdminService) GetAdminAuditLogs(ctx context.Context, filters AdminAuditLogFilters) ([]dto.AdminAuditLogResponse, error) {
 	// Ensure limit is a proper number. Shouldn't return too many items at once
 	if filters.Limit <= 0 {
 		filters.Limit = 25
@@ -140,7 +140,7 @@ func (s *AdminUserService) GetAdminAuditLogs(ctx context.Context, filters AdminA
 	}
 
 	actorName := strings.TrimSpace(filters.ActorName)
-	rows, err := s.adminUserRepository.GetAdminAuditLogs(ctx, db.GetAdminAuditLogsParams{
+	rows, err := s.adminRepository.GetAdminAuditLogs(ctx, db.GetAdminAuditLogsParams{
 		ActorName: pgtype.Text{
 			String: actorName,
 			Valid:  actorName != "",
@@ -185,7 +185,7 @@ func (s *AdminUserService) GetAdminAuditLogs(ctx context.Context, filters AdminA
 	Private functions
 */
 
-func (s *AdminUserService) createAdminAuditLog(ctx context.Context, input AdminAuditLogInput) error {
+func (s *AdminService) createAdminAuditLog(ctx context.Context, input AdminAuditLogInput) error {
 	actorID, err := util.GetValidatedUUID(input.ActorUserID)
 	if err != nil {
 		return fmt.Errorf("invalid audit actor user ID: %w", err)
@@ -217,7 +217,7 @@ func (s *AdminUserService) createAdminAuditLog(ctx context.Context, input AdminA
 	}
 
 	description := strings.TrimSpace(input.Description)
-	return s.adminUserRepository.CreateAdminAuditLog(ctx, db.CreateAdminAuditLogParams{
+	return s.adminRepository.CreateAdminAuditLog(ctx, db.CreateAdminAuditLogParams{
 		ActorUserID:  actorID,
 		Action:       action,
 		TargetUserID: targetID,
@@ -230,7 +230,7 @@ func (s *AdminUserService) createAdminAuditLog(ctx context.Context, input AdminA
 	})
 }
 
-func buildAdminUserQueryParams(filters AdminUserFilters) db.GetUsersAdminParams {
+func buildAdminQueryParams(filters AdminUserFilters) db.GetUsersAdminParams {
 	isStudent := pgtype.Bool{}
 	if filters.IsStudent != nil {
 		isStudent = pgtype.Bool{
@@ -264,8 +264,8 @@ func buildAdminUserQueryParams(filters AdminUserFilters) db.GetUsersAdminParams 
 	}
 }
 
-func (s *AdminUserService) getUsers(ctx context.Context, params db.GetUsersAdminParams) ([]dto.ProfileDTO, error) {
-	rows, err := s.adminUserRepository.GetUsers(ctx, params)
+func (s *AdminService) getUsers(ctx context.Context, params db.GetUsersAdminParams) ([]dto.ProfileDTO, error) {
+	rows, err := s.adminRepository.GetUsers(ctx, params)
 	if err != nil {
 		return nil, err
 	}

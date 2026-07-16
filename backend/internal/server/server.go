@@ -25,10 +25,10 @@ var Module = fx.Module("server",
 type RouterParams struct {
 	fx.In
 
-	HealthHandler    *handlers.HealthHandler
-	ProfileHandler   *handlers.ProfileHandler
-	AdminUserHandler *handlers.AdminUserHandler
-	Limen            *limen.Limen
+	HealthHandler  *handlers.HealthHandler
+	ProfileHandler *handlers.ProfileHandler
+	AdminHandler   *handlers.AdminHandler
+	Limen          *limen.Limen
 }
 
 // Add all new routes here
@@ -68,9 +68,9 @@ func provideRouter(params RouterParams) *chi.Mux {
 		r.Use(auth.RequireAuth(params.Limen))
 		r.Use(auth.RequireRole("admin"))
 
-		r.Get("/admin/users", params.AdminUserHandler.GetUsers)
-		r.Get("/admin/users/export", params.AdminUserHandler.ExportUsersCSV)
-		r.Get("/admin/audit-logs", params.AdminUserHandler.GetAdminAuditLogs)
+		r.Get("/admin/users", params.AdminHandler.GetUsers)
+		r.Get("/admin/users/export", params.AdminHandler.ExportUsersCSV)
+		r.Get("/admin/audit-logs", params.AdminHandler.GetAdminAuditLogs)
 	})
 
 	return r

@@ -16,16 +16,16 @@ import (
 	"github.com/ubcesports/memberships/internal/util"
 )
 
-type AdminUserHandler struct {
-	adminUserService *service.AdminUserService
+type AdminHandler struct {
+	adminService *service.AdminService
 }
 
 /*
 	Public functions
 */
 
-func NewAdminUserHandler(adminUserService *service.AdminUserService) *AdminUserHandler {
-	return &AdminUserHandler{adminUserService: adminUserService}
+func NewAdminHandler(adminService *service.AdminService) *AdminHandler {
+	return &AdminHandler{adminService: adminService}
 }
 
 /*
@@ -56,14 +56,14 @@ Raises:
 	403: user is not an admin
 	500: users could not be loaded
 */
-func (h *AdminUserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
+func (h *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	filters, err := parseAdminUserFilters(r, true)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	users, total, err := h.adminUserService.GetUsers(r.Context(), filters)
+	users, total, err := h.adminService.GetUsers(r.Context(), filters)
 	if err != nil {
 		slog.ErrorContext(r.Context(), "unable to load users",
 			"error", err,
@@ -105,7 +105,7 @@ Raises:
 	403: user is not an admin
 	500: users could not be exported
 */
-func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request) {
+func (h *AdminHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request) {
 	requestId := middleware.GetReqID(r.Context())
 
 	// Get current user id
@@ -117,17 +117,17 @@ func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request
 
 	filters, err := parseAdminUserFilters(r, false)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		util.WriteApiResponse(w, http.StatusBadRequest, "BAD_REQUEST", "Filters to get users could not be parsed.", requestId)
 		return
 	}
 
-	users, err := h.adminUserService.ExportUsers(r.Context(), filters, userId, requestId)
+	users, err := h.adminService.ExportUsers(r.Context(), filters, userId, requestId)
 	if err != nil {
 		slog.ErrorContext(r.Context(), "unable to export users",
 			"error", err,
 			"request_id", requestId,
 		)
-		http.Error(w, "unable to export users", http.StatusInternalServerError)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to export users.", requestId)
 		return
 	}
 
@@ -216,7 +216,7 @@ Raises:
 	403: user is not an admin
 	500: audit logs could not be loaded for some reason
 */
-func (h *AdminUserHandler) GetAdminAuditLogs(w http.ResponseWriter, r *http.Request) {
+func (h *AdminHandler) GetAdminAuditLogs(w http.ResponseWriter, r *http.Request) {
 	requestID := middleware.GetReqID(r.Context())
 	filters, err := parseAdminAuditLogFilters(r)
 	if err != nil {
@@ -224,7 +224,7 @@ func (h *AdminUserHandler) GetAdminAuditLogs(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	logs, err := h.adminUserService.GetAdminAuditLogs(r.Context(), filters)
+	logs, err := h.adminService.GetAdminAuditLogs(r.Context(), filters)
 	if err != nil {
 		slog.ErrorContext(r.Context(), "unable to load admin audit logs",
 			"error", err,

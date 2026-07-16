@@ -6,6 +6,6 @@ var Module = fx.Module("repository",
 	fx.Provide(
 		NewHealthHandler,
 		NewProfileHandler,
-		NewAdminUserHandler,
+		NewAdminHandler,
 	),
 )

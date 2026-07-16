@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestParseAdminUserFiltersForExportIgnoresPagination(t *testing.T) {
+func TestParseAdminFiltersForExportIgnoresPagination(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodGet,
 		"/admin/users/export?full_name=dip&role=member&group=competitive_team&is_student=false&limit=invalid",
@@ -28,7 +28,7 @@ func TestParseAdminUserFiltersForExportIgnoresPagination(t *testing.T) {
 	}
 }
 
-func TestParseAdminUserFiltersRejectsInvalidGroup(t *testing.T) {
+func TestParseAdminFiltersRejectsInvalidGroup(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/admin/users?group=invalid", nil)
 
 	if _, err := parseAdminUserFilters(req, true); err == nil {

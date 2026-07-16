@@ -1,12 +1,7 @@
 import { Download, Loader2, RotateCcw } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
-import type {
-  AdminUserFilters,
-  GroupType,
-  RoleType,
-  SearchMode,
-} from "@/lib/admin/admin-users.types";
-import { GROUP_OPTIONS, ROLE_OPTIONS, SEARCH_MODE_OPTIONS } from "@/lib/admin/admin-users.types";
+import type { AdminFilters, GroupType, RoleType, SearchMode } from "@/lib/admin/admin.types";
+import { GROUP_OPTIONS, ROLE_OPTIONS, SEARCH_MODE_OPTIONS } from "@/lib/admin/admin.types";
 
 const FIELD_CLASS_NAME =
   "h-10 border border-brand-border bg-brand-surface px-3 text-sm text-brand-text";
@@ -16,7 +11,7 @@ type IsStudentFilter = "all" | "yes" | "no";
 type UsersToolbarProps = {
   searchMode: SearchMode;
   searchInput: string;
-  filters: AdminUserFilters;
+  filters: AdminFilters;
   total: number;
   isExporting: boolean;
   onSearchModeChange: (mode: SearchMode) => void;
@@ -29,7 +24,7 @@ type UsersToolbarProps = {
   onExport: () => void;
 };
 
-function getIsStudentFilterValue(filters: AdminUserFilters): IsStudentFilter {
+function getIsStudentFilterValue(filters: AdminFilters): IsStudentFilter {
   if (filters.isStudent === true) {
     return "yes";
   }
@@ -41,7 +36,7 @@ function getIsStudentFilterValue(filters: AdminUserFilters): IsStudentFilter {
   return "all";
 }
 
-function hasActiveFilters(filters: AdminUserFilters) {
+function hasActiveFilters(filters: AdminFilters) {
   return (
     filters.role !== undefined || filters.group !== undefined || filters.isStudent !== undefined
   );

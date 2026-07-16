@@ -7,15 +7,15 @@ import (
 	"github.com/ubcesports/memberships/internal/database/db"
 )
 
-type AdminUserRepository struct {
+type AdminRepository struct {
 	store *db.Queries
 }
 
-func NewAdminUserRepository(store *db.Queries) *AdminUserRepository {
-	return &AdminUserRepository{store: store}
+func NewAdminRepository(store *db.Queries) *AdminRepository {
+	return &AdminRepository{store: store}
 }
 
-func (r *AdminUserRepository) GetUsers(
+func (r *AdminRepository) GetUsers(
 	ctx context.Context,
 	params db.GetUsersAdminParams) ([]db.GetUsersAdminRow, error) {
 	rows, err := r.store.GetUsersAdmin(ctx, params)
@@ -25,7 +25,7 @@ func (r *AdminUserRepository) GetUsers(
 	return rows, nil
 }
 
-func (r *AdminUserRepository) CountUsers(
+func (r *AdminRepository) CountUsers(
 	ctx context.Context,
 	params db.CountUsersAdminParams,
 ) (int64, error) {
@@ -36,7 +36,7 @@ func (r *AdminUserRepository) CountUsers(
 	return count, nil
 }
 
-func (r *AdminUserRepository) CreateAdminAuditLog(ctx context.Context, params db.CreateAdminAuditLogParams) error {
+func (r *AdminRepository) CreateAdminAuditLog(ctx context.Context, params db.CreateAdminAuditLogParams) error {
 	err := r.store.CreateAdminAuditLog(ctx, params)
 	if err != nil {
 		return fmt.Errorf("create admin audit log: %w", err)
@@ -44,7 +44,7 @@ func (r *AdminUserRepository) CreateAdminAuditLog(ctx context.Context, params db
 	return nil
 }
 
-func (r *AdminUserRepository) GetAdminAuditLogs(ctx context.Context, params db.GetAdminAuditLogsParams) ([]db.GetAdminAuditLogsRow, error) {
+func (r *AdminRepository) GetAdminAuditLogs(ctx context.Context, params db.GetAdminAuditLogsParams) ([]db.GetAdminAuditLogsRow, error) {
 	logs, err := r.store.GetAdminAuditLogs(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("query admin audit logs: %w", err)
