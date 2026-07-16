@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { useMutation } from "@tanstack/react-query";
 import { BasePage } from "@/components/layout/base-page";
 import { OnboardForm } from "@/components/onboard/onboard-form";
@@ -37,9 +36,6 @@ export default function OnboardPage() {
         : { is_student: false };
       const result = await completeOnboarding(payload);
       window.location.replace(result.destination);
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Unable to complete onboarding.");
     },
   });
 

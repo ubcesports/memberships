@@ -5,7 +5,6 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { AxiosError } from "axios";
 import { UsersPagination } from "@/components/admin/users/users-pagination";
 import { UsersTable } from "@/components/admin/users/users-table";
 import { UsersToolbar } from "@/components/admin/users/users-toolbar";
@@ -22,17 +21,6 @@ import type {
 import { DEFAULT_PAGE_SIZE } from "@/lib/admin/admin.types";
 import { useProfile } from "@/lib/profile.hook";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
-
-function getApiErrorMessage(error: unknown, fallback: string) {
-  const axiosError = error as AxiosError<string>;
-  const message = axiosError.response?.data;
-
-  if (typeof message === "string" && message.trim()) {
-    return message;
-  }
-
-  return fallback;
-}
 
 export default function UsersPage() {
   const router = useRouter();
@@ -54,7 +42,7 @@ export default function UsersPage() {
 
   const isAdmin = profile?.role === "admin";
 
-  const { data, error, isPending, isFetching, isPlaceholderData } = useUsers(
+  const { data, isPending, isFetching, isPlaceholderData } = useUsers(
     appliedSearch,
     filters,
     { limit, offset },
@@ -69,9 +57,6 @@ export default function UsersPage() {
       downloadCSVBlob(blob);
       toast.success("Users exported");
     },
-    onError: (exportError) => {
-      toast.error(getApiErrorMessage(exportError, "Unable to export users"));
-    },
   });
 
   useEffect(() => {
@@ -79,12 +64,6 @@ export default function UsersPage() {
       router.replace("/403");
     }
   }, [isProfilePending, profile, router]);
-
-  useEffect(() => {
-    if (error) {
-      toast.error(getApiErrorMessage(error, "Unable to load users"));
-    }
-  }, [error]);
 
   const handleSearchModeChange = (mode: SearchMode) => {
     setSearchMode(mode);

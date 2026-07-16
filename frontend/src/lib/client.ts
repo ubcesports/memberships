@@ -1,9 +1,10 @@
 import axios, { AxiosError } from "axios";
+import { toast } from "sonner";
 
-type ApiErrorResponse = {
-  code?: string;
-  detail?: string;
-  message?: string;
+export type ApiErrorResponse = {
+  code: string;
+  message: string;
+  request_id: string;
 };
 
 export const API_BASE =
@@ -16,14 +17,31 @@ const apiClient = axios.create({
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<ApiErrorResponse>) => {
+  async (error: AxiosError<ApiErrorResponse | Blob>) => {
     const status = error.response?.status;
-    const code = error.response?.data?.code;
     const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
 
     if (typeof window === "undefined") {
       return Promise.reject(error);
     }
+
+    let data = error.response?.data;
+    if (data instanceof Blob && data.type.includes("application/json")) {
+      try {
+        data = JSON.parse(await data.text()) as ApiErrorResponse;
+      } catch {
+        data = undefined;
+      }
+    }
+
+    const apiError = data instanceof Blob ? undefined : data;
+    const code = apiError?.code;
+    const message = apiError?.message || "Something went wrong. Please try again.";
+    const requestId = apiError?.request_id;
+
+    toast.error(message, {
+      description: requestId ? `Request ID: ${requestId}` : undefined,
+    });
 
     if (status === 401) {
       if (currentPath !== "/login") {
