@@ -21,6 +21,17 @@ LEFT JOIN LATERAL (
 WHERE u.id = $1
 ;
 
+-- name: EnsureMemberGroupForUser :exec
+INSERT INTO user_groups (
+    user_id,
+    "group"
+)
+VALUES (
+    $1,
+    'member'
+)
+ON CONFLICT (user_id, "group") DO NOTHING;
+
 -- name: OnboardUserByUserId :exec
 UPDATE users
 SET

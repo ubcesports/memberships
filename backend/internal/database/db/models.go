@@ -56,6 +56,48 @@ func (ns NullGroupType) Value() (driver.Value, error) {
 	return string(ns.GroupType), nil
 }
 
+type PurchaseType string
+
+const (
+	PurchaseTypeNew     PurchaseType = "new"
+	PurchaseTypeUpgrade PurchaseType = "upgrade"
+)
+
+func (e *PurchaseType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PurchaseType(s)
+	case string:
+		*e = PurchaseType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PurchaseType: %T", src)
+	}
+	return nil
+}
+
+type NullPurchaseType struct {
+	PurchaseType PurchaseType
+	Valid        bool // Valid is true if PurchaseType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPurchaseType) Scan(value interface{}) error {
+	if value == nil {
+		ns.PurchaseType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PurchaseType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPurchaseType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PurchaseType), nil
+}
+
 type RoleType string
 
 const (
@@ -105,6 +147,7 @@ const (
 	TransactionStatusTypeCompleted TransactionStatusType = "completed"
 	TransactionStatusTypeFailed    TransactionStatusType = "failed"
 	TransactionStatusTypeRefunded  TransactionStatusType = "refunded"
+	TransactionStatusTypeExpired   TransactionStatusType = "expired"
 )
 
 func (e *TransactionStatusType) Scan(src interface{}) error {
@@ -157,16 +200,15 @@ type Account struct {
 }
 
 type Membership struct {
-	ID              pgtype.UUID
-	UserID          pgtype.UUID
-	TierID          pgtype.UUID
-	TransactionID   pgtype.UUID
-	GroupAtPurchase GroupType
-	StartedAt       pgtype.Timestamptz
-	ExpiresAt       pgtype.Timestamptz
-	CancelledAt     pgtype.Timestamptz
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
+	ID          pgtype.UUID
+	UserID      pgtype.UUID
+	TierID      pgtype.UUID
+	StartedAt   pgtype.Timestamptz
+	ExpiresAt   pgtype.Timestamptz
+	CancelledAt pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	Benefits    []string
 }
 
 type MembershipTier struct {
@@ -177,16 +219,18 @@ type MembershipTier struct {
 	UpdatedAt       pgtype.Timestamptz
 	StripeProductID pgtype.Text
 	IsActive        bool
+	Slug            pgtype.Text
+	Group           NullGroupType
+	Benefits        []string
 }
 
 type MembershipTierPrice struct {
-	ID            pgtype.UUID
-	TierID        pgtype.UUID
-	Group         GroupType
-	Price         pgtype.Numeric
-	StripePriceID pgtype.Text
-	CreatedAt     pgtype.Timestamptz
-	UpdatedAt     pgtype.Timestamptz
+	ID                pgtype.UUID
+	TierID            pgtype.UUID
+	StripePriceID     pgtype.Text
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+	IsStudentRequired pgtype.Bool
 }
 
 type Session struct {
@@ -200,14 +244,19 @@ type Session struct {
 }
 
 type Transaction struct {
-	ID                    pgtype.UUID
-	UserID                pgtype.UUID
-	MembershipID          pgtype.UUID
-	StripePaymentIntentID pgtype.Text
-	PriceAmount           pgtype.Numeric
-	Status                TransactionStatusType
-	CreatedAt             pgtype.Timestamptz
-	UpdatedAt             pgtype.Timestamptz
+	ID                      pgtype.UUID
+	UserID                  pgtype.UUID
+	MembershipID            pgtype.UUID
+	StripePaymentIntentID   pgtype.Text
+	Status                  TransactionStatusType
+	CreatedAt               pgtype.Timestamptz
+	UpdatedAt               pgtype.Timestamptz
+	GroupAtPurchase         NullGroupType
+	StudentAtPurchase       pgtype.Bool
+	AmountPaidCents         pgtype.Int8
+	PurchaseType            NullPurchaseType
+	StripeCheckoutSessionID pgtype.Text
+	TierID                  pgtype.UUID
 }
 
 type User struct {

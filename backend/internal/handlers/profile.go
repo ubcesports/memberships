@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/ubcesports/memberships/internal/auth"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/service"
 	"github.com/ubcesports/memberships/internal/util"
@@ -40,7 +39,7 @@ Raises:
 */
 func (h *ProfileHandler) GetCurrentProfile(w http.ResponseWriter, r *http.Request) {
 	// Get current user id
-	userId, ok := currentUserID(r)
+	userId, ok := util.CurrentUserID(r)
 	if !ok {
 		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 		return
@@ -99,7 +98,7 @@ Raises:
 */
 func (h *ProfileHandler) OnboardUser(w http.ResponseWriter, r *http.Request) {
 	// Get current user id
-	userId, ok := currentUserID(r)
+	userId, ok := util.CurrentUserID(r)
 	if !ok {
 		log.Printf("unauthorized onboard attempt: missing current user id")
 		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
@@ -134,20 +133,4 @@ func (h *ProfileHandler) OnboardUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.WriteApiResponse(w, http.StatusOK, "OK", "User onboarded successfully!")
-}
-
-/*
-	Private functions
-*/
-
-func currentUserID(r *http.Request) (string, bool) {
-	session := auth.SessionFromContext(r.Context())
-	if session == nil || session.User == nil {
-		return "", false
-	}
-	value, ok := session.User.ID.(string)
-	if !ok || value == "" {
-		return "", false
-	}
-	return value, true
 }

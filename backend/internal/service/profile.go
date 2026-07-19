@@ -31,6 +31,10 @@ func NewProfileService(profileRepository *repository.ProfileRepository) *Profile
 }
 
 func (s *ProfileService) GetProfileByUserID(ctx context.Context, userID string) (*dto.ProfileDTO, error) {
+	if err := s.profileRepository.EnsureMemberGroupForUser(ctx, userID); err != nil {
+		return nil, err
+	}
+
 	row, err := s.profileRepository.GetProfileByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
