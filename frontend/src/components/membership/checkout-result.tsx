@@ -2,8 +2,7 @@
 
 import { Check, CircleCheckBig, RotateCcw, XCircle } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRedirectCountdown } from "@/lib/use-redirect-countdown.hook";
 
 const REDIRECT_DELAY_SECONDS = 6;
 
@@ -12,22 +11,7 @@ type CheckoutResultProps = {
 };
 
 export function CheckoutResult({ successful }: CheckoutResultProps) {
-  const router = useRouter();
-  const [secondsRemaining, setSecondsRemaining] = useState(REDIRECT_DELAY_SECONDS);
-
-  useEffect(() => {
-    const countdown = window.setInterval(() => {
-      setSecondsRemaining((current) => Math.max(0, current - 1));
-    }, 1_000);
-    const redirect = window.setTimeout(() => {
-      router.replace("/pricing");
-    }, REDIRECT_DELAY_SECONDS * 1_000);
-
-    return () => {
-      window.clearInterval(countdown);
-      window.clearTimeout(redirect);
-    };
-  }, [router]);
+  const secondsRemaining = useRedirectCountdown("/pricing", REDIRECT_DELAY_SECONDS);
 
   return (
     <section className="mx-auto flex w-full max-w-xl flex-col items-center border border-brand-border bg-brand-surface/90 px-6 py-10 text-center shadow-2xl shadow-black/25 sm:px-10 sm:py-12">

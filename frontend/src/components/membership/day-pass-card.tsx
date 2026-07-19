@@ -44,7 +44,7 @@ export function DayPassCard({
       </div>
 
       <div className="border-t border-brand-border p-6 lg:border-l lg:border-t-0">
-        {eligibleTier ? (
+        {eligibleTier && (
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-brand-text-subtle">
@@ -56,7 +56,7 @@ export function DayPassCard({
             </div>
             <Check aria-hidden="true" className="mb-2 size-4 text-blue-200" />
           </div>
-        ) : null}
+        )}
         <PurchaseButton
           tier={eligibleTier}
           isSignedIn={isSignedIn}

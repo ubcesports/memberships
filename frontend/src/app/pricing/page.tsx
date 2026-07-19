@@ -5,7 +5,6 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BasePage } from "@/components/layout/base-page";
 import { AssignedPassCard } from "@/components/membership/assigned-pass-card";
-import { CatalogLoading } from "@/components/membership/catalog-loading";
 import { DayPassCard } from "@/components/membership/day-pass-card";
 import { SeasonPassCard } from "@/components/membership/season-pass-card";
 import { redirectToSignIn } from "@/lib/auth";
@@ -17,6 +16,7 @@ import {
   useMembershipCatalog,
   useOptionalProfile,
 } from "@/lib/membership.hook";
+import { notNull } from "@/lib/utils/type-guards";
 
 type CheckoutResponse = {
   url: string;
@@ -42,8 +42,8 @@ export default function PricingPage() {
     isError: catalogError,
   } = useMembershipCatalog();
   const { data: profile } = useOptionalProfile();
-  const isSignedIn = Boolean(profile);
-  const canLoadEligibility = Boolean(profile?.onboardingCompletedAt);
+  const isSignedIn = !!profile;
+  const canLoadEligibility = !!profile?.onboardingCompletedAt;
   const {
     data: eligibleTiers = [],
     isPending: eligibilityPending,
@@ -84,9 +84,7 @@ export default function PricingPage() {
   const tierBySlug = (slug: string) => catalog?.find((tier) => tier.slug === slug);
   const eligibleBySlug = (slug: string) => eligibleTiers.find((tier) => tier.slug === slug);
 
-  const mainTiers = [tierBySlug("regular"), tierBySlug("premium")].filter(
-    (tier): tier is MembershipTier => Boolean(tier),
-  );
+  const mainTiers = [tierBySlug("regular"), tierBySlug("premium")].filter(notNull);
   const dayTier = tierBySlug("day");
   const assignedTiers = eligibleTiers.filter((tier) => RESTRICTED_TIER_SLUGS.includes(tier.slug));
 
@@ -128,7 +126,14 @@ export default function PricingPage() {
       ) : null}
 
       {catalogPending || (canLoadEligibility && eligibilityPending) ? (
-        <CatalogLoading />
+        <div className="grid gap-5 lg:grid-cols-2" aria-label="Loading membership passes">
+          {[0, 1].map((item) => (
+            <div
+              key={item}
+              className="h-124 animate-pulse border border-brand-border bg-brand-surface/60"
+            />
+          ))}
+        </div>
       ) : catalogError || !catalog ? (
         <div className="border border-red-400/35 bg-red-400/10 px-6 py-10 text-center text-sm text-red-100">
           Membership prices are unavailable right now. Refresh the page to try again.

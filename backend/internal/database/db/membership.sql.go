@@ -273,13 +273,10 @@ JOIN membership_tier_prices mtp
 JOIN users u
     on u.id = $1
 WHERE mt.is_active = TRUE
-    AND (
-        mt."group" = 'member'
-        OR EXISTS (
-            SELECT 1
-            FROM user_groups ug
-            WHERE ug.user_id = u.id AND ug."group" = mt."group"
-        )
+    AND EXISTS (
+        SELECT 1
+        FROM user_groups ug
+        WHERE ug.user_id = u.id AND ug."group" = mt."group"
     )
     AND (
         mtp.is_student_required IS NULL

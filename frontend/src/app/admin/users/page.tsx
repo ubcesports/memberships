@@ -21,7 +21,7 @@ import type {
 } from "@/lib/admin/admin-users.types";
 import { DEFAULT_PAGE_SIZE } from "@/lib/admin/admin-users.types";
 import { useProfile } from "@/lib/profile.hook";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useDebouncedValue } from "@/lib/use-debounced-value.hook";
 
 function getApiErrorMessage(error: unknown, fallback: string) {
   const axiosError = error as AxiosError<string>;
