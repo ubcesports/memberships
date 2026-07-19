@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/ubcesports/memberships/internal/auth"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/service"
 	"github.com/ubcesports/memberships/internal/util"
@@ -91,7 +90,7 @@ Raises:
 	500: eligible membership tiers and prices could not be retrieved
 */
 func (h *MembershipHandler) GetEligibleTiersWithPrices(w http.ResponseWriter, r *http.Request) {
-	userId, ok := currentUserID(r)
+	userId, ok := util.CurrentUserID(r)
 	if !ok {
 		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 		return
@@ -130,7 +129,7 @@ Raises:
 	500: current membership could not be retrieved
 */
 func (h *MembershipHandler) GetCurrentMembershipWithTransaction(w http.ResponseWriter, r *http.Request) {
-	userId, ok := currentUserID(r)
+	userId, ok := util.CurrentUserID(r)
 	if !ok {
 		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 		return
@@ -164,7 +163,7 @@ Raises:
 	500: memberships could not be retrieved
 */
 func (h *MembershipHandler) GetAllMembershipsWithTransactions(w http.ResponseWriter, r *http.Request) {
-	userId, ok := currentUserID(r)
+	userId, ok := util.CurrentUserID(r)
 	if !ok {
 		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 		return
@@ -203,7 +202,7 @@ Raises:
 	500: checkout session could not be created
 */
 func (h *MembershipHandler) CreateMembershipCheckoutSession(w http.ResponseWriter, r *http.Request) {
-	userId, ok := currentUserID(r)
+	userId, ok := util.CurrentUserID(r)
 	if !ok {
 		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 		return
@@ -246,16 +245,4 @@ func (h *MembershipHandler) CreateMembershipCheckoutSession(w http.ResponseWrite
 	}
 
 	util.WriteJson(w, http.StatusOK, *checkoutSessionResponse)
-}
-
-func currentUserID(r *http.Request) (string, bool) {
-	session := auth.SessionFromContext(r.Context())
-	if session == nil || session.User == nil {
-		return "", false
-	}
-	value, ok := session.User.ID.(string)
-	if !ok || value == "" {
-		return "", false
-	}
-	return value, true
 }

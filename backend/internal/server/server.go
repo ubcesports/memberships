@@ -50,12 +50,16 @@ func provideRouter(params RouterParams) *chi.Mux {
 		r.Use(auth.RequireAuth(params.Limen))
 
 		r.Get("/profile", params.ProfileHandler.GetCurrentProfile)
+
+		r.Post("/onboard", params.ProfileHandler.OnboardUser)
 	})
 
 	// All onboarded routes
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAuth(params.Limen))
 		r.Use(auth.RequireOnboarded)
+
+		r.Get("/onboard/check", params.ProfileHandler.GetIsUserOnboarded)
 
 		r.Get("/membership/me/current", params.MembershipHandler.GetCurrentMembershipWithTransaction)
 		r.Get("/membership/me/all", params.MembershipHandler.GetAllMembershipsWithTransactions)
