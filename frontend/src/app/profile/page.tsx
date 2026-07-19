@@ -9,9 +9,9 @@ import { BasePage } from "@/components/layout/base-page";
 import { StatusBadge } from "@/components/status-badge";
 import { SummaryTile } from "@/components/summary-tile";
 import { SurfacePanel } from "@/components/surface-panel";
-import apiClient from "@/lib/client";
 import { redirectToSignIn } from "@/lib/auth";
-import { formatDate } from "@/lib/utils/formatting";
+import { useSignOut } from "@/lib/use-sign-out.hook";
+import { formatDate, getInitials } from "@/lib/utils/formatting";
 import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
 import { useProfile } from "@/lib/profile.hook";
 import Image from "next/image";
@@ -19,34 +19,10 @@ import Image from "next/image";
 const JASPERLABS_ACCOUNT_URL =
   process.env.NEXT_PUBLIC_JASPERLABS_ACCOUNT_URL || "https://auth.jasperlabs.net/dashboard";
 
-function getInitials(name: string, email: string) {
-  const source = name !== "Profile" ? name : email;
-  const parts = source
-    .split(/[\s@.]+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (parts.length === 0) {
-    return "UB";
-  }
-
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-}
-
 export default function ProfilePage() {
   const { data: profile, isPending } = useProfile();
 
-  const {
-    mutate: signOut,
-    error: signOutError,
-    isPending: signOutPending,
-  } = useMutation({
-    mutationFn: async () => await apiClient.post("/auth/signout", {}),
-    onSuccess: () => window.location.replace("/"),
-  });
+  const { mutate: signOut, error: signOutError, isPending: signOutPending } = useSignOut();
 
   const {
     mutate: syncAccount,
