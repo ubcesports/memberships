@@ -28,3 +28,15 @@ func CurrentUserID(r *http.Request) (string, bool) {
 	}
 	return value, true
 }
+
+func CurrentUserID(r *http.Request) (string, bool) {
+	session := auth.SessionFromContext(r.Context())
+	if session == nil || session.User == nil {
+		return "", false
+	}
+	value, ok := session.User.ID.(string)
+	if !ok || value == "" {
+		return "", false
+	}
+	return value, true
+}

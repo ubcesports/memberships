@@ -25,10 +25,12 @@ var Module = fx.Module("server",
 type RouterParams struct {
 	fx.In
 
-	HealthHandler  *handlers.HealthHandler
-	ProfileHandler *handlers.ProfileHandler
-	AdminHandler   *handlers.AdminHandler
-	Limen          *limen.Limen
+	HealthHandler        *handlers.HealthHandler
+	ProfileHandler       *handlers.ProfileHandler
+	AdminHandler         *handlers.AdminHandler
+	MembershipHandler    *handlers.MembershipHandler
+	StripeWebhookHandler *handlers.StripeWebhookHandler
+	Limen                *limen.Limen
 }
 
 // Add all new routes here
@@ -42,9 +44,9 @@ func provideRouter(params RouterParams) *chi.Mux {
 	r.Mount("/", params.Limen.Handler())
 
 	// All public routes
-	r.Group(func(r chi.Router) {
-		r.Get("/health", params.HealthHandler.IsDatabaseHealthy)
-	})
+	r.Get("/health", params.HealthHandler.IsDatabaseHealthy)
+	r.Get("/membership/tiers", params.MembershipHandler.GetPublicTiersWithPrices)
+	r.Post("/webhooks/stripe", params.StripeWebhookHandler.Handle)
 
 	// All protected routes
 	r.Group(func(r chi.Router) {
@@ -61,6 +63,11 @@ func provideRouter(params RouterParams) *chi.Mux {
 		r.Use(auth.RequireOnboarded)
 
 		r.Get("/onboard/check", params.ProfileHandler.GetIsUserOnboarded)
+
+		r.Get("/membership/me/current", params.MembershipHandler.GetCurrentMembershipWithTransaction)
+		r.Get("/membership/me/all", params.MembershipHandler.GetAllMembershipsWithTransactions)
+		r.Get("/membership/tiers/eligible", params.MembershipHandler.GetEligibleTiersWithPrices)
+		r.Post("/membership/checkout", params.MembershipHandler.CreateMembershipCheckoutSession)
 	})
 
 	// All admin routes

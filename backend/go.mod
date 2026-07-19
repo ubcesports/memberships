@@ -8,6 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/joho/godotenv v1.5.1
 	github.com/resend/resend-go/v3 v3.7.0
+	github.com/stripe/stripe-go/v86 v86.1.0
 	github.com/thecodearcher/limen v0.1.1
 	github.com/thecodearcher/limen/adapters/sql v0.1.0
 	github.com/thecodearcher/limen/plugins/oauth v0.1.0

@@ -20,7 +20,7 @@ import type {
 } from "@/lib/admin/admin.types";
 import { DEFAULT_PAGE_SIZE } from "@/lib/admin/admin.types";
 import { useProfile } from "@/lib/profile.hook";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useDebouncedValue } from "@/lib/use-debounced-value.hook";
 
 export default function UsersPage() {
   const router = useRouter();

@@ -8,8 +8,25 @@ package db
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const ensureMemberGroupForUser = `-- name: EnsureMemberGroupForUser :exec
+INSERT INTO user_groups (
+    user_id,
+    "group"
+)
+VALUES (
+    $1,
+    'member'
+)
+ON CONFLICT (user_id, "group") DO NOTHING
+`
+
+func (q *Queries) EnsureMemberGroupForUser(ctx context.Context, userID pgtype.UUID) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, ensureMemberGroupForUser, userID)
+}
 
 const getProfileByUserID = `-- name: GetProfileByUserID :one
 SELECT

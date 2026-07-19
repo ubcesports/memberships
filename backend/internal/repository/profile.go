@@ -56,3 +56,13 @@ func (r *ProfileRepository) OnboardUserByUserId(
 	}
 	return nil
 }
+
+func (r *ProfileRepository) EnsureMemberGroupForUser(ctx context.Context, userId string) error {
+	pgUserId, err := util.GetValidatedUUID(userId)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.store.EnsureMemberGroupForUser(ctx, pgUserId)
+	return err
+}

@@ -15,6 +15,7 @@ import (
 	"github.com/ubcesports/memberships/internal/repository"
 	"github.com/ubcesports/memberships/internal/server"
 	"github.com/ubcesports/memberships/internal/service"
+	"github.com/ubcesports/memberships/internal/stripeclient"
 )
 
 func main() {
@@ -33,5 +34,6 @@ func main() {
 		handlers.Module,
 		server.Module,
 		mailer.Module,
+		stripeclient.Module,
 	).Run()
 }
