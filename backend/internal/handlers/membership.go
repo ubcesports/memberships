@@ -3,10 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/service"
 	"github.com/ubcesports/memberships/internal/util"
@@ -42,10 +42,11 @@ Raises:
 	500: public membership tiers and prices could not be retrieved
 */
 func (h *MembershipHandler) GetPublicTiersWithPrices(w http.ResponseWriter, r *http.Request) {
+	requestID := middleware.GetReqID(r.Context())
 	tiers, err := h.membershipService.GetPublicTiersAndPrices(r.Context())
 	if err != nil {
-		log.Printf("failed to get public tiers and prices: %v", err)
-		util.WriteApiResponse(w, 500, "ErrorGetPublicTiersWithPrices", fmt.Sprintf("Error retrieving public tiers and prices. Error message: %v", err))
+		slog.ErrorContext(r.Context(), "unable to load public membership tiers", "error", err, "request_id", requestID)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to load membership tiers", requestID)
 		return
 	}
 	util.WriteJson(w, 200, tiers)
@@ -90,16 +91,17 @@ Raises:
 	500: eligible membership tiers and prices could not be retrieved
 */
 func (h *MembershipHandler) GetEligibleTiersWithPrices(w http.ResponseWriter, r *http.Request) {
+	requestID := middleware.GetReqID(r.Context())
 	userId, ok := util.CurrentUserID(r)
 	if !ok {
-		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestID)
 		return
 	}
 
 	tiers, err := h.membershipService.GetEligibleTiersWithPrices(r.Context(), userId)
 	if err != nil {
-		log.Printf("failed to get eligible tiers and prices: %v", err)
-		util.WriteApiResponse(w, 500, "ErrorGetEligibleTiersWithPrices", fmt.Sprintf("Error retrieving eligible tiers and prices. Error message: %v", err))
+		slog.ErrorContext(r.Context(), "unable to load eligible membership tiers", "error", err, "request_id", requestID, "user_id", userId)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to load eligible membership tiers", requestID)
 		return
 	}
 
@@ -129,16 +131,17 @@ Raises:
 	500: current membership could not be retrieved
 */
 func (h *MembershipHandler) GetCurrentMembershipWithTransaction(w http.ResponseWriter, r *http.Request) {
+	requestID := middleware.GetReqID(r.Context())
 	userId, ok := util.CurrentUserID(r)
 	if !ok {
-		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestID)
 		return
 	}
 
 	membership, err := h.membershipService.GetCurrentMembershipWithTransaction(r.Context(), userId)
 	if err != nil {
-		log.Printf("failed to get current membership: %v", err)
-		util.WriteApiResponse(w, 500, "ErrorGetCurrentMembershipWithTransaction", fmt.Sprintf("Error retrieving current user's membership. Error message: %v", err))
+		slog.ErrorContext(r.Context(), "unable to load current membership", "error", err, "request_id", requestID, "user_id", userId)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to load current membership", requestID)
 		return
 	}
 	util.WriteJson(w, 200, membership)
@@ -163,16 +166,17 @@ Raises:
 	500: memberships could not be retrieved
 */
 func (h *MembershipHandler) GetAllMembershipsWithTransactions(w http.ResponseWriter, r *http.Request) {
+	requestID := middleware.GetReqID(r.Context())
 	userId, ok := util.CurrentUserID(r)
 	if !ok {
-		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestID)
 		return
 	}
 
 	memberships, err := h.membershipService.GetAllMembershipsWithTransactions(r.Context(), userId)
 	if err != nil {
-		log.Printf("failed to get all memberships: %v", err)
-		util.WriteApiResponse(w, 500, "ErrorGetAllMembershipsWithTransactions", fmt.Sprintf("Error retrieving current user's memberships. Error message: %v", err))
+		slog.ErrorContext(r.Context(), "unable to load memberships", "error", err, "request_id", requestID, "user_id", userId)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to load memberships", requestID)
 		return
 	}
 	util.WriteJson(w, 200, memberships)
@@ -202,15 +206,16 @@ Raises:
 	500: checkout session could not be created
 */
 func (h *MembershipHandler) CreateMembershipCheckoutSession(w http.ResponseWriter, r *http.Request) {
+	requestID := middleware.GetReqID(r.Context())
 	userId, ok := util.CurrentUserID(r)
 	if !ok {
-		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestID)
 		return
 	}
 
 	var checkoutSessionRequest dto.CheckoutSessionRequest
 	if err := json.NewDecoder(r.Body).Decode(&checkoutSessionRequest); err != nil {
-		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again.")
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again.", requestID)
 		return
 	}
 
@@ -218,27 +223,28 @@ func (h *MembershipHandler) CreateMembershipCheckoutSession(w http.ResponseWrite
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrMembershipAlreadyExists):
-			util.WriteApiResponse(w, http.StatusConflict, "CONFLICT", err.Error())
+			util.WriteApiResponse(w, http.StatusConflict, "CONFLICT", err.Error(), requestID)
 			return
 
 		case errors.Is(err, service.ErrTierNotEligible):
-			util.WriteApiResponse(w, http.StatusForbidden, "TIER_NOT_AVAILABLE", err.Error())
+			util.WriteApiResponse(w, http.StatusForbidden, "TIER_NOT_AVAILABLE", err.Error(), requestID)
 			return
 
 		case errors.Is(err, service.ErrTierNotFound):
-			util.WriteApiResponse(w, http.StatusNotFound, "NOT_FOUND", err.Error())
+			util.WriteApiResponse(w, http.StatusNotFound, "NOT_FOUND", err.Error(), requestID)
 			return
 
 		case errors.Is(err, service.ErrMembershipPurchaseClosed):
-			util.WriteApiResponse(w, http.StatusForbidden, "MEMBERSHIP_PURCHASE_CLOSED", err.Error())
+			util.WriteApiResponse(w, http.StatusForbidden, "MEMBERSHIP_PURCHASE_CLOSED", err.Error(), requestID)
 			return
 
 		case errors.Is(err, service.ErrPendingCheckoutAlreadyPaid):
-			util.WriteApiResponse(w, http.StatusConflict, "CHECKOUT_ALREADY_PAID", err.Error())
+			util.WriteApiResponse(w, http.StatusConflict, "CHECKOUT_ALREADY_PAID", err.Error(), requestID)
 			return
 
 		default:
-			util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+			slog.ErrorContext(r.Context(), "unable to create membership checkout session", "error", err, "request_id", requestID, "user_id", userId)
+			util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to create checkout session", requestID)
 		}
 
 		return

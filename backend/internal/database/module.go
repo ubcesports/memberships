@@ -34,7 +34,7 @@ func providePool(lc fx.Lifecycle) (*pgxpool.Pool, error) {
 	})
 
 	slog.Info("database connection established")
-	return db.New(pool), nil
+	return pool, nil
 }
 
 func provideDatabase(pool *pgxpool.Pool) *db.Queries {

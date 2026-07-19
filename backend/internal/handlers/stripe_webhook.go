@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stripe/stripe-go/v86"
 	"github.com/stripe/stripe-go/v86/webhook"
 	"github.com/ubcesports/memberships/internal/service"
@@ -55,16 +56,17 @@ Raises:
 	500: the verified event could not be processed
 */
 func (h *StripeWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
+	requestID := middleware.GetReqID(r.Context())
 	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 64<<10))
 	if err != nil {
-		log.Printf("Stripe webhook request body failed: %v", err)
-		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_WEBHOOK", "Unable to read webhook")
+		slog.WarnContext(r.Context(), "unable to read Stripe webhook body", "error", err, "request_id", requestID)
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_WEBHOOK", "Unable to read webhook", requestID)
 		return
 	}
 	event, err := webhook.ConstructEvent(payload, r.Header.Get("Stripe-Signature"), h.webhookSecret)
 	if err != nil {
-		log.Printf("Stripe webhook signature verification failed: %v", err)
-		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_WEBHOOK_SIGNATURE", "Invalid webhook signature")
+		slog.WarnContext(r.Context(), "Stripe webhook signature verification failed", "error", err, "request_id", requestID)
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_WEBHOOK_SIGNATURE", "Invalid webhook signature", requestID)
 		return
 	}
 	occurredAt := time.Unix(event.Created, 0).UTC()
@@ -74,7 +76,7 @@ func (h *StripeWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	// The checkout is completed successfully and the payment has gone through
 	case "checkout.session.completed", "checkout.session.async_payment_succeeded":
-		session, ok := decodeCheckoutSession(w, event)
+		session, ok := decodeCheckoutSession(w, r, event)
 		if !ok {
 			return
 		}
@@ -82,7 +84,7 @@ func (h *StripeWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	// The checkout session was expired
 	case "checkout.session.expired":
-		session, ok := decodeCheckoutSession(w, event)
+		session, ok := decodeCheckoutSession(w, r, event)
 		if !ok {
 			return
 		}
@@ -90,25 +92,26 @@ func (h *StripeWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	// The checkout session's payment failed to go through
 	case "checkout.session.async_payment_failed":
-		session, ok := decodeCheckoutSession(w, event)
+		session, ok := decodeCheckoutSession(w, r, event)
 		if !ok {
 			return
 		}
 		err = h.service.HandleCheckoutFailed(r.Context(), session.ID)
 	}
 	if err != nil {
-		log.Printf("Stripe webhook event %s (%s) processing failed: %v", event.ID, event.Type, err)
-		util.WriteApiResponse(w, http.StatusInternalServerError, "WEBHOOK_PROCESSING_FAILED", "Webhook processing failed")
+		slog.ErrorContext(r.Context(), "Stripe webhook processing failed", "error", err, "request_id", requestID, "stripe_event_id", event.ID, "stripe_event_type", event.Type)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "WEBHOOK_PROCESSING_FAILED", "Webhook processing failed", requestID)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
-func decodeCheckoutSession(w http.ResponseWriter, event stripe.Event) (*stripe.CheckoutSession, bool) {
+func decodeCheckoutSession(w http.ResponseWriter, r *http.Request, event stripe.Event) (*stripe.CheckoutSession, bool) {
 	var session stripe.CheckoutSession
 	if err := json.Unmarshal(event.Data.Raw, &session); err != nil {
-		log.Printf("Stripe webhook event %s (%s) decoding failed: %v", event.ID, event.Type, err)
-		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_WEBHOOK", "Invalid Checkout Session")
+		requestID := middleware.GetReqID(r.Context())
+		slog.WarnContext(r.Context(), "unable to decode Stripe checkout session", "error", err, "request_id", requestID, "stripe_event_id", event.ID, "stripe_event_type", event.Type)
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_WEBHOOK", "Invalid Checkout Session", requestID)
 		return nil, false
 	}
 	return &session, true
