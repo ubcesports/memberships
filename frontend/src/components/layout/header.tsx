@@ -1,25 +1,18 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Logs, LogOut, Menu, UserRound, UsersRound, WalletCards } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import apiClient from "@/lib/client";
 import { useOptionalProfile } from "@/lib/profile.hook";
+import { useSignOut } from "@/lib/use-sign-out.hook";
+import { cn } from "@/lib/utils/cn";
+import { getInitials } from "@/lib/utils/formatting";
 
 const navItems = [
   { href: "/", label: "Home" },
   { href: "/pricing", label: "Pricing" },
 ];
-
-function getInitials(name: string, email: string) {
-  const words = (name || email).split(/[\s@.]+/).filter(Boolean);
-  return words
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase())
-    .join("");
-}
 
 function DropdownLink({
   href,
@@ -74,15 +67,8 @@ function AdminMenuLinks() {
 
 export function Header() {
   const pathname = usePathname();
-  const queryClient = useQueryClient();
   const { data: profile, isPending } = useOptionalProfile();
-  const { mutate: signOut, isPending: isSigningOut } = useMutation({
-    mutationFn: async () => apiClient.post("/auth/signout", {}),
-    onSuccess: () => {
-      queryClient.clear();
-      window.location.replace("/");
-    },
-  });
+  const { mutate: signOut, isPending: isSigningOut } = useSignOut();
 
   return (
     <header className="relative z-30 mx-auto mt-3 w-[calc(100%-1.5rem)] max-w-7xl border border-brand-border/70 bg-brand-surface/90 shadow-2xl shadow-black/25 backdrop-blur-xl md:mt-5 md:w-[calc(100%-2.5rem)]">
@@ -132,11 +118,12 @@ export function Header() {
                     key={item.href}
                     href={item.href}
                     aria-current={isActive ? "page" : undefined}
-                    className={`flex items-center border-l-2 px-3 py-3 text-sm font-semibold transition focus-visible:outline-none ${
+                    className={cn(
+                      "flex items-center border-l-2 px-3 py-3 text-sm font-semibold transition focus-visible:outline-none",
                       isActive
                         ? "border-brand-primary bg-white/5 text-brand-text"
-                        : "border-transparent text-brand-text-muted hover:bg-white/5 hover:text-brand-text"
-                    }`}
+                        : "border-transparent text-brand-text-muted hover:bg-white/5 hover:text-brand-text",
+                    )}
                   >
                     {item.label}
                   </Link>

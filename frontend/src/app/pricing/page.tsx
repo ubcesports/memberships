@@ -11,11 +11,10 @@ import { redirectToSignIn } from "@/lib/auth";
 import apiClient from "@/lib/client";
 import {
   type EligibleMembershipTier,
-  type MembershipTier,
   useEligibleMembershipTiers,
   useMembershipCatalog,
-  useOptionalProfile,
 } from "@/lib/membership.hook";
+import { useOptionalProfile } from "@/lib/profile.hook";
 import { notNull } from "@/lib/utils/type-guards";
 
 type CheckoutResponse = {

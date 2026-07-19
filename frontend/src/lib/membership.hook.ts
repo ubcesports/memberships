@@ -22,20 +22,6 @@ export type EligibleMembershipTier = Omit<MembershipTier, "prices"> & {
   prices: MembershipTierPrice;
 };
 
-export type OptionalProfile = {
-  name: string;
-  email: string;
-  onboardingCompletedAt?: string;
-};
-
-type ProfileResponse = {
-  user?: {
-    email: string;
-    full_name: string;
-    onboarding_completed_at: string | null;
-  };
-};
-
 const catalogQuery = queryOptions({
   queryKey: ["membership", "catalog"],
   queryFn: async ({ signal }) => {
@@ -45,30 +31,7 @@ const catalogQuery = queryOptions({
   },
 });
 
-const optionalProfileQuery = queryOptions({
-  queryKey: ["auth", "optional-profile"],
-  queryFn: async ({ signal }) => {
-    const response = await apiClient.get<ProfileResponse>("/profile", {
-      signal,
-      validateStatus: (status) => status === 200 || status === 401,
-    });
-
-    if (response.status === 401 || !response.data.user) {
-      return null;
-    }
-
-    return {
-      name: response.data.user.full_name,
-      email: response.data.user.email,
-      onboardingCompletedAt: response.data.user.onboarding_completed_at ?? undefined,
-    };
-  },
-  retry: false,
-});
-
 export const useMembershipCatalog = () => useQuery(catalogQuery);
-
-export const useOptionalProfile = () => useQuery(optionalProfileQuery);
 
 export const useEligibleMembershipTiers = (enabled: boolean) =>
   useQuery({
