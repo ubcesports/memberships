@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ubcesports/memberships/internal/database/db"
@@ -23,7 +24,11 @@ func (r *ProfileRepository) GetProfileByUserID(ctx context.Context, userId strin
 		return db.GetProfileByUserIDRow{}, err
 	}
 
-	return r.store.GetProfileByUserID(ctx, pgUserId)
+	row, err := r.store.GetProfileByUserID(ctx, pgUserId)
+	if err != nil {
+		return db.GetProfileByUserIDRow{}, fmt.Errorf("query profile by user ID: %w", err)
+	}
+	return row, nil
 }
 
 func (r *ProfileRepository) OnboardUserByUserId(
@@ -38,7 +43,7 @@ func (r *ProfileRepository) OnboardUserByUserId(
 		return err
 	}
 
-	return r.store.OnboardUserByUserId(ctx, db.OnboardUserByUserIdParams{
+	err = r.store.OnboardUserByUserId(ctx, db.OnboardUserByUserIdParams{
 		ID:        pgUserId,
 		IsStudent: isStudent,
 		StudentID: pgtype.Text{
@@ -46,6 +51,10 @@ func (r *ProfileRepository) OnboardUserByUserId(
 			Valid:  studentId != "",
 		},
 	})
+	if err != nil {
+		return fmt.Errorf("update user onboarding status: %w", err)
+	}
+	return nil
 }
 
 func (r *ProfileRepository) EnsureMemberGroupForUser(ctx context.Context, userId string) error {

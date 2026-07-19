@@ -7,6 +7,7 @@ export function ThemedToaster() {
     <Toaster
       position="top-right"
       closeButton
+      duration={5000}
       toastOptions={{
         style: {
           background: "var(--color-surface)",
@@ -14,7 +15,7 @@ export function ThemedToaster() {
           color: "var(--color-text)",
         },
         classNames: {
-          description: "text-brand-text-muted",
+          description: "text-xs! text-brand-text-subtle!",
           actionButton: "bg-brand-primary text-white hover:bg-brand-primary-hover",
           cancelButton: "border border-brand-border bg-transparent text-brand-text",
         },

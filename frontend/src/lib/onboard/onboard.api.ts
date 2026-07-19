@@ -1,11 +1,8 @@
 import apiClient from "@/lib/client";
-import type { ApiErrorResponse, CompleteOnboardingPayload } from "./onboard.types";
+import type { ApiErrorResponse } from "@/lib/client";
+import type { CompleteOnboardingPayload } from "./onboard.types";
 
 export const ONBOARDING_REQUIRED = "ONBOARDING_REQUIRED";
-
-export function getApiErrorMessage(data?: ApiErrorResponse) {
-  return data?.detail || data?.message || "Unable to complete onboarding. Try again.";
-}
 
 export async function checkOnboardingStatus() {
   const response = await apiClient.get<ApiErrorResponse>("/onboard/check", {
@@ -28,17 +25,6 @@ export async function checkOnboardingStatus() {
 }
 
 export async function completeOnboarding(payload: CompleteOnboardingPayload) {
-  const response = await apiClient.post<ApiErrorResponse>("/onboard", payload, {
-    validateStatus: () => true,
-  });
-
-  if (response.status === 200) {
-    return { destination: "/" };
-  }
-
-  if (response.status === 401) {
-    return { destination: "/login" };
-  }
-
-  throw new Error(getApiErrorMessage(response.data));
+  await apiClient.post("/onboard", payload);
+  return { destination: "/" };
 }

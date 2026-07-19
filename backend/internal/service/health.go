@@ -14,12 +14,6 @@ func NewHealthService(healthRepo *repository.HealthRepository) *HealthService {
 	return &HealthService{healthRepo: healthRepo}
 }
 
-func (s *HealthService) IsDatabaseHealthy(context context.Context) bool {
-	healthy, err := s.healthRepo.IsDatabaseHealthy(context)
-
-	if err != nil {
-		return false
-	}
-
-	return healthy
+func (s *HealthService) IsDatabaseHealthy(context context.Context) (bool, error) {
+	return s.healthRepo.IsDatabaseHealthy(context)
 }

@@ -78,6 +78,136 @@ func (q *Queries) CountUsersAdmin(ctx context.Context, arg CountUsersAdminParams
 	return count, err
 }
 
+const createAdminAuditLog = `-- name: CreateAdminAuditLog :exec
+INSERT INTO admin_audit_logs (
+    actor_user_id,
+    action,
+    target_user_id,
+    outcome,
+    request_id,
+    description
+) VALUES (
+    $1::uuid,
+    $2::text,
+    $3::uuid,
+    $4::admin_audit_outcome_type,
+    $5::text,
+    $6::text
+)
+`
+
+type CreateAdminAuditLogParams struct {
+	ActorUserID  pgtype.UUID
+	Action       string
+	TargetUserID pgtype.UUID
+	Outcome      AdminAuditOutcomeType
+	RequestID    string
+	Description  pgtype.Text
+}
+
+func (q *Queries) CreateAdminAuditLog(ctx context.Context, arg CreateAdminAuditLogParams) error {
+	_, err := q.db.Exec(ctx, createAdminAuditLog,
+		arg.ActorUserID,
+		arg.Action,
+		arg.TargetUserID,
+		arg.Outcome,
+		arg.RequestID,
+		arg.Description,
+	)
+	return err
+}
+
+const getAdminAuditLogs = `-- name: GetAdminAuditLogs :many
+WITH args AS (
+    SELECT
+        $1::text AS actor_name,
+        $2::integer AS "limit",
+        $3::integer AS "offset"
+)
+SELECT
+    aal.id,
+    aal.occurred_at,
+    aal.action,
+    aal.outcome,
+    aal.request_id,
+    aal.description,
+    actor.id AS actor_id,
+    actor.full_name AS actor_name,
+    actor.avatar_url AS actor_avatar_url,
+    target.id AS target_id,
+    target.full_name AS target_name,
+    target.avatar_url AS target_avatar_url
+FROM admin_audit_logs aal
+JOIN users actor
+    ON actor.id = aal.actor_user_id
+LEFT JOIN users target
+    ON target.id = aal.target_user_id
+CROSS JOIN args a
+WHERE (
+    a.actor_name IS NULL
+    OR actor.full_name ILIKE '%' || a.actor_name || '%'
+)
+ORDER BY
+    aal.occurred_at DESC,
+    aal.id DESC
+LIMIT (SELECT "limit" FROM args)
+OFFSET (SELECT "offset" FROM args)
+`
+
+type GetAdminAuditLogsParams struct {
+	ActorName pgtype.Text
+	Limit     int32
+	Offset    int32
+}
+
+type GetAdminAuditLogsRow struct {
+	ID              pgtype.UUID
+	OccurredAt      pgtype.Timestamptz
+	Action          string
+	Outcome         AdminAuditOutcomeType
+	RequestID       string
+	Description     pgtype.Text
+	ActorID         pgtype.UUID
+	ActorName       string
+	ActorAvatarUrl  pgtype.Text
+	TargetID        pgtype.UUID
+	TargetName      pgtype.Text
+	TargetAvatarUrl pgtype.Text
+}
+
+func (q *Queries) GetAdminAuditLogs(ctx context.Context, arg GetAdminAuditLogsParams) ([]GetAdminAuditLogsRow, error) {
+	rows, err := q.db.Query(ctx, getAdminAuditLogs, arg.ActorName, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAdminAuditLogsRow
+	for rows.Next() {
+		var i GetAdminAuditLogsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OccurredAt,
+			&i.Action,
+			&i.Outcome,
+			&i.RequestID,
+			&i.Description,
+			&i.ActorID,
+			&i.ActorName,
+			&i.ActorAvatarUrl,
+			&i.TargetID,
+			&i.TargetName,
+			&i.TargetAvatarUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsersAdmin = `-- name: GetUsersAdmin :many
 WITH args AS (
     SELECT

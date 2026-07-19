@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ubcesports/memberships/internal/database/db"
 )
@@ -19,7 +20,7 @@ func NewHealthRepository(store *db.Queries) *HealthRepository {
 func (r *HealthRepository) IsDatabaseHealthy(context context.Context) (bool, error) {
 	res, err := r.store.PingDatabase(context)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("ping database: %w", err)
 	}
 
 	return res == 1, nil

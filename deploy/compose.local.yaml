@@ -1,14 +1,18 @@
+# For locally testing services using docker
 services:
   db:
     image: postgres:17
+    ports:
+      - "127.0.0.1:5433:5432"
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - .env
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - ./data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -16,9 +20,11 @@ services:
       retries: 5
 
   migrate:
-    image: ${BACKEND_IMAGE}
+    build:
+      context: ../backend
     restart: "no"
-    env_file: .env
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
     depends_on:
@@ -32,18 +38,22 @@ services:
       ]
 
   backend:
-    image: ${BACKEND_IMAGE}
-    restart: unless-stopped
-    env_file: .env
+    build:
+      context: ../backend
+    env_file:
+      - .env
     environment:
+      BASE_URL: http://0.0.0.0:8080
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      FRONTEND_URL: http://localhost:3000
+      OAUTH_CALLBACK_URL: http://localhost:8080/auth/oauth/jasperlabs/callback
     depends_on:
       db:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "8080:8080"
     labels:
       com.ubcea.logs.enabled: "true"
     logging:
@@ -51,33 +61,45 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+    restart: unless-stopped
 
   frontend:
-    image: ${FRONTEND_IMAGE}
-    restart: unless-stopped
+    build:
+      context: ../frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+    depends_on:
+      - backend
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "3000:3000"
+    labels:
+      com.ubcea.logs.enabled: "true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    restart: unless-stopped
 
   alloy:
     image: grafana/alloy:latest
-    container_name: ubcea-alloy
-    restart: unless-stopped
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
       - --storage.path=/var/lib/alloy/data
       - /etc/alloy/config.alloy
+    environment:
+      GCLOUD_HOSTED_LOGS_URL: ${GCLOUD_HOSTED_LOGS_URL:?Set GCLOUD_HOSTED_LOGS_URL}
+      GCLOUD_HOSTED_LOGS_ID: ${GCLOUD_HOSTED_LOGS_ID:?Set GCLOUD_HOSTED_LOGS_ID}
+      GCLOUD_RW_API_KEY: ${GCLOUD_RW_API_KEY:?Set GCLOUD_RW_API_KEY}
     volumes:
       - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - alloy-data:/var/lib/alloy/data
-    environment:
-      GCLOUD_HOSTED_LOGS_URL: ${GCLOUD_HOSTED_LOGS_URL}
-      GCLOUD_HOSTED_LOGS_ID: ${GCLOUD_HOSTED_LOGS_ID}
-      GCLOUD_RW_API_KEY: ${GCLOUD_RW_API_KEY}
-
     ports:
       - "127.0.0.1:12345:12345"
+    restart: unless-stopped
 
 volumes:
+  postgres-data:
   alloy-data:

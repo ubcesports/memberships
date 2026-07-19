@@ -6,7 +6,7 @@ var Module = fx.Module("handler",
 	fx.Provide(
 		NewHealthHandler,
 		NewProfileHandler,
-		NewAdminUserHandler,
+		NewAdminHandler,
 		NewMembershipHandler,
 		NewStripeWebhookHandler,
 	),

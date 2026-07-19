@@ -33,3 +33,11 @@ const (
 	PurchaseNew     PurchaseType = "new"
 	PurchaseUpgrade PurchaseType = "upgrade"
 )
+
+type AdminAuditLogOutcomeType string
+
+const (
+	AuditLogSuccess AdminAuditLogOutcomeType = "success"
+	AuditLogFailed  AdminAuditLogOutcomeType = "failed"
+	AuditLogDenied  AdminAuditLogOutcomeType = "denied"
+)

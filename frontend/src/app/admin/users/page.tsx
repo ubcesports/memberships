@@ -5,36 +5,24 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { AxiosError } from "axios";
 import { UsersPagination } from "@/components/admin/users/users-pagination";
 import { UsersTable } from "@/components/admin/users/users-table";
 import { UsersToolbar } from "@/components/admin/users/users-toolbar";
 import { BasePage } from "@/components/layout/base-page";
-import { downloadCSVBlob, exportAdminUsersCSV } from "@/lib/admin/admin-users.api";
-import { useAdminUsers } from "@/lib/admin/admin-users.hook";
+import { downloadCSVBlob, exportUsersCSV } from "@/lib/admin/admin.api";
+import { useUsers } from "@/lib/admin/admin.hook";
 import type {
   AdminUserFilters,
   AppliedSearch,
   GroupType,
   RoleType,
   SearchMode,
-} from "@/lib/admin/admin-users.types";
-import { DEFAULT_PAGE_SIZE } from "@/lib/admin/admin-users.types";
+} from "@/lib/admin/admin.types";
+import { DEFAULT_PAGE_SIZE } from "@/lib/admin/admin.types";
 import { useProfile } from "@/lib/profile.hook";
 import { useDebouncedValue } from "@/lib/use-debounced-value.hook";
 
-function getApiErrorMessage(error: unknown, fallback: string) {
-  const axiosError = error as AxiosError<string>;
-  const message = axiosError.response?.data;
-
-  if (typeof message === "string" && message.trim()) {
-    return message;
-  }
-
-  return fallback;
-}
-
-export default function AdminUsersPage() {
+export default function UsersPage() {
   const router = useRouter();
   const { data: profile, isPending: isProfilePending } = useProfile();
 
@@ -54,7 +42,7 @@ export default function AdminUsersPage() {
 
   const isAdmin = profile?.role === "admin";
 
-  const { data, error, isPending, isFetching, isPlaceholderData } = useAdminUsers(
+  const { data, isPending, isFetching, isPlaceholderData } = useUsers(
     appliedSearch,
     filters,
     { limit, offset },
@@ -64,13 +52,10 @@ export default function AdminUsersPage() {
   );
 
   const { mutate: exportUsers, isPending: isExporting } = useMutation({
-    mutationFn: () => exportAdminUsersCSV(appliedSearch, filters),
+    mutationFn: () => exportUsersCSV(appliedSearch, filters),
     onSuccess: (blob) => {
       downloadCSVBlob(blob);
       toast.success("Users exported");
-    },
-    onError: (exportError) => {
-      toast.error(getApiErrorMessage(exportError, "Unable to export users"));
     },
   });
 
@@ -79,12 +64,6 @@ export default function AdminUsersPage() {
       router.replace("/403");
     }
   }, [isProfilePending, profile, router]);
-
-  useEffect(() => {
-    if (error) {
-      toast.error(getApiErrorMessage(error, "Unable to load users"));
-    }
-  }, [error]);
 
   const handleSearchModeChange = (mode: SearchMode) => {
     setSearchMode(mode);

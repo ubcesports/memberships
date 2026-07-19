@@ -2,9 +2,9 @@ package service
 
 import "testing"
 
-func TestBuildAdminUserQueryParamsLeavesPaginationNullForExport(t *testing.T) {
+func TestBuildAdminQueryParamsLeavesPaginationNullForExport(t *testing.T) {
 	isStudent := false
-	params := buildAdminUserQueryParams(AdminUserFilters{
+	params := buildAdminQueryParams(AdminUserFilters{
 		FullName:  "dip",
 		IsStudent: &isStudent,
 	})

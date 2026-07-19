@@ -1,15 +1,15 @@
 import apiClient from "../client";
 import type {
   AdminUserFilters,
-  AdminUserPagination,
-  AdminUsersResponse,
+  AdminPagination,
   AppliedSearch,
-} from "./admin-users.types";
+  UsersResponse,
+} from "./admin.types";
 
 export function buildAdminUserParams(
   appliedSearch: AppliedSearch,
   filters: AdminUserFilters,
-  pagination?: AdminUserPagination,
+  pagination?: AdminPagination,
 ): Record<string, string | number | boolean> {
   const params: Record<string, string | number | boolean> = {};
 
@@ -37,13 +37,13 @@ export function buildAdminUserParams(
   return params;
 }
 
-export async function fetchAdminUsers(
+export async function fetchUsers(
   appliedSearch: AppliedSearch,
   filters: AdminUserFilters,
-  pagination: AdminUserPagination,
+  pagination: AdminPagination,
   signal?: AbortSignal,
-): Promise<AdminUsersResponse> {
-  const response = await apiClient.get<AdminUsersResponse>("/admin/users", {
+): Promise<UsersResponse> {
+  const response = await apiClient.get<UsersResponse>("/admin/users", {
     params: buildAdminUserParams(appliedSearch, filters, pagination),
     signal,
   });
@@ -51,7 +51,7 @@ export async function fetchAdminUsers(
   return response.data;
 }
 
-export async function exportAdminUsersCSV(
+export async function exportUsersCSV(
   appliedSearch: AppliedSearch,
   filters: AdminUserFilters,
   signal?: AbortSignal,

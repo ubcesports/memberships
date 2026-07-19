@@ -15,7 +15,7 @@ export type AdminUserFilters = {
   isStudent?: boolean;
 };
 
-export type AdminUser = {
+export type User = {
   id: string;
   email: string;
   student_id: string | null;
@@ -30,12 +30,12 @@ export type AdminUser = {
   groups: GroupType[];
 };
 
-export type AdminUsersResponse = {
-  users: AdminUser[];
+export type UsersResponse = {
+  users: User[];
   total: number;
 };
 
-export type AdminUserPagination = {
+export type AdminPagination = {
   limit: number;
   offset: number;
 };

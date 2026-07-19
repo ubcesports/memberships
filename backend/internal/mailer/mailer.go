@@ -3,7 +3,7 @@ package mailer
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/resend/resend-go/v3"
@@ -47,7 +47,7 @@ func Init() error {
 //		"Welcome to our platform!",
 //		"<h1>Thanks for signing up!</h1>",
 //	)
-func SendEmailAsync(to []string, subject string, htmlContent string) {
+func SendEmailAsync(to []string, subject string, htmlContent string, requesdId string, userId string) {
 	go func() {
 		params := &resend.SendEmailRequest{
 			From:    senderEmail,
@@ -58,10 +58,19 @@ func SendEmailAsync(to []string, subject string, htmlContent string) {
 
 		_, err := client.Emails.SendWithContext(context.Background(), params)
 		if err != nil {
-			log.Printf("Failed to send email to %v: %v", to, err)
+			slog.Error("email delivery failed",
+				"error", err,
+				"request_id", requesdId,
+				"used_id", userId,
+				"recipient_count", len(to),
+			)
 			return
 		}
 
-		log.Printf("Email successfully sent asynchronously to %v", to)
+		slog.Info("email delivered",
+			"request_id", requesdId,
+			"used_id", userId,
+			"recipient_count", len(to),
+		)
 	}()
 }

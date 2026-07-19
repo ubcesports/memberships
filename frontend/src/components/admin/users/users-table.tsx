@@ -2,12 +2,12 @@ import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import { StatusBadge } from "@/components/status-badge";
 import { SurfacePanel } from "@/components/surface-panel";
-import type { AdminUser } from "@/lib/admin/admin-users.types";
+import type { User } from "@/lib/admin/admin.types";
 import { formatTime } from "@/lib/utils/formatting";
 import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
 
 type UsersTableProps = {
-  users: AdminUser[];
+  users: User[];
   isLoading: boolean;
   isFetching: boolean;
 };
@@ -24,7 +24,7 @@ function formatOptionalTime(value: string | null) {
   return formatTime(value);
 }
 
-function UserAvatar({ user }: { user: AdminUser }) {
+function UserAvatar({ user }: { user: User }) {
   if (!user.avatar_url) {
     return <EmptyValue />;
   }

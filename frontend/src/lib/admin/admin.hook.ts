@@ -1,16 +1,16 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { fetchAdminUsers } from "./admin-users.api";
-import type { AdminUserFilters, AdminUserPagination, AppliedSearch } from "./admin-users.types";
+import { fetchUsers } from "./admin.api";
+import type { AdminUserFilters, AdminPagination, AppliedSearch } from "./admin.types";
 
-export function useAdminUsers(
+export function useUsers(
   appliedSearch: AppliedSearch,
   filters: AdminUserFilters,
-  pagination: AdminUserPagination,
+  pagination: AdminPagination,
   options?: { enabled?: boolean },
 ) {
   return useQuery({
     queryKey: ["admin", "users", { appliedSearch, filters, pagination }],
-    queryFn: ({ signal }) => fetchAdminUsers(appliedSearch, filters, pagination, signal),
+    queryFn: ({ signal }) => fetchUsers(appliedSearch, filters, pagination, signal),
     placeholderData: keepPreviousData,
     enabled: options?.enabled ?? true,
   });
