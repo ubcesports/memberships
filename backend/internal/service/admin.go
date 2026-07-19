@@ -115,8 +115,6 @@ func (s *AdminService) ExportUsers(
 			return nil, errors.Join(exportErr, auditErr)
 		}
 
-		// Fail closed: don't return sensitive export data when it could not
-		// be recorded in the audit trail.
 		return nil, auditErr
 	}
 
