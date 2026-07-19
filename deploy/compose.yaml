@@ -44,9 +44,40 @@ services:
         condition: service_completed_successfully
     ports:
       - "${BACKEND_PORT:-8080}:8080"
+    labels:
+      com.ubcea.logs.enabled: "true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   frontend:
     image: ${FRONTEND_IMAGE}
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: ubcea-alloy
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data
+    environment:
+      GCLOUD_HOSTED_LOGS_URL: ${GCLOUD_HOSTED_LOGS_URL}
+      GCLOUD_HOSTED_LOGS_ID: ${GCLOUD_HOSTED_LOGS_ID}
+      GCLOUD_RW_API_KEY: ${GCLOUD_RW_API_KEY}
+
+    ports:
+      - "127.0.0.1:12345:12345"
+
+volumes:
+  alloy-data:

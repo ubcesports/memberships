@@ -6,6 +6,7 @@ var Module = fx.Module("repository",
 	fx.Provide(
 		NewHealthRepository,
 		NewProfileRepository,
-		NewAdminUserRepository,
+		NewAdminRepository,
+		NewMembershipRepository,
 	),
 )

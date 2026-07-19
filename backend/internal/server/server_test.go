@@ -1,10 +1,66 @@
 package server
 
 import (
+	"bytes"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/go-chi/chi/v5/middleware"
 )
+
+func TestRequestLoggerAddsRequestIDAndLogsRequest(t *testing.T) {
+	var logs bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
+
+	handler := middleware.RequestID(logger(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+	})))
+	req := httptest.NewRequest(http.MethodPost, "/onboard", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Header().Get("X-Request-ID") == "" {
+		t.Fatal("expected an X-Request-ID response header")
+	}
+	for _, expected := range []string{`"msg":"request completed"`, `"path":"/onboard"`, `"status":201`} {
+		if !strings.Contains(logs.String(), expected) {
+			t.Fatalf("expected log to contain %s, got %s", expected, logs.String())
+		}
+	}
+}
+
+func TestRecovererReturns500AndLogsPanic(t *testing.T) {
+	var logs bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
+
+	handler := middleware.RequestID(logger(recoverer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		panic("test panic")
+	}))))
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rec.Code)
+	}
+	if rec.Header().Get("X-Request-ID") == "" {
+		t.Fatal("expected an X-Request-ID response header")
+	}
+	for _, expected := range []string{`"msg":"panic recovered"`, `"panic":"test panic"`, `"stack":`} {
+		if !strings.Contains(logs.String(), expected) {
+			t.Fatalf("expected panic log to contain %s, got %s", expected, logs.String())
+		}
+	}
+}
 
 func TestCORSMiddlewareAllowsCredentialedFrontendRequests(t *testing.T) {
 	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -25,6 +81,9 @@ func TestCORSMiddlewareAllowsCredentialedFrontendRequests(t *testing.T) {
 	}
 	if got := rec.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
 		t.Fatalf("expected credentials to be allowed, got %q", got)
+	}
+	if got := rec.Header().Get("Access-Control-Expose-Headers"); got != "X-Request-ID" {
+		t.Fatalf("expected request ID header to be exposed, got %q", got)
 	}
 }
 

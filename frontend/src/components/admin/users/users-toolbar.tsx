@@ -1,12 +1,7 @@
 import { Download, Loader2, RotateCcw } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
-import type {
-  AdminUserFilters,
-  GroupType,
-  RoleType,
-  SearchMode,
-} from "@/lib/admin/admin-users.types";
-import { GROUP_OPTIONS, ROLE_OPTIONS, SEARCH_MODE_OPTIONS } from "@/lib/admin/admin-users.types";
+import type { AdminUserFilters, GroupType, RoleType, SearchMode } from "@/lib/admin/admin.types";
+import { GROUP_OPTIONS, ROLE_OPTIONS, SEARCH_MODE_OPTIONS } from "@/lib/admin/admin.types";
 
 const FIELD_CLASS_NAME =
   "h-10 border border-brand-border bg-brand-surface px-3 text-sm text-brand-text";

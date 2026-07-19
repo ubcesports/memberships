@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestParseAdminUserFiltersForExportIgnoresPagination(t *testing.T) {
+func TestParseAdminFiltersForExportIgnoresPagination(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodGet,
 		"/admin/users/export?full_name=dip&role=member&group=competitive_team&is_student=false&limit=invalid",
@@ -28,11 +28,37 @@ func TestParseAdminUserFiltersForExportIgnoresPagination(t *testing.T) {
 	}
 }
 
-func TestParseAdminUserFiltersRejectsInvalidGroup(t *testing.T) {
+func TestParseAdminFiltersRejectsInvalidGroup(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/admin/users?group=invalid", nil)
 
 	if _, err := parseAdminUserFilters(req, true); err == nil {
 		t.Fatal("expected invalid group error")
+	}
+}
+
+func TestParseAdminAuditLogFilters(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/admin/audit-logs?actor_name=dip&limit=10&offset=20", nil)
+
+	filters, err := parseAdminAuditLogFilters(req)
+	if err != nil {
+		t.Fatalf("expected valid filters, got %v", err)
+	}
+	if filters.ActorName != "dip" || filters.Limit != 10 || filters.Offset != 20 {
+		t.Fatalf("unexpected filters: %#v", filters)
+	}
+}
+
+func TestParseAdminAuditLogFiltersRejectsInvalidPagination(t *testing.T) {
+	tests := []string{
+		"/admin/audit-logs?limit=0",
+		"/admin/audit-logs?offset=-1",
+	}
+
+	for _, target := range tests {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		if _, err := parseAdminAuditLogFilters(req); err == nil {
+			t.Fatalf("expected invalid pagination error for %s", target)
+		}
 	}
 }
 

@@ -3,6 +3,8 @@ package util
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/ubcesports/memberships/internal/auth"
 )
 
 func WriteJson(w http.ResponseWriter, status int, value any) {
@@ -11,6 +13,18 @@ func WriteJson(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
-func WriteApiResponse(w http.ResponseWriter, status int, code, message string) {
-	WriteJson(w, status, map[string]string{"code": code, "message": message})
+func WriteApiResponse(w http.ResponseWriter, status int, code, message, requestID string) {
+	WriteJson(w, status, map[string]string{"code": code, "message": message, "request_id": requestID})
+}
+
+func CurrentUserID(r *http.Request) (string, bool) {
+	session := auth.SessionFromContext(r.Context())
+	if session == nil || session.User == nil {
+		return "", false
+	}
+	value, ok := session.User.ID.(string)
+	if !ok || value == "" {
+		return "", false
+	}
+	return value, true
 }

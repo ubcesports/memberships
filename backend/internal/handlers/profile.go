@@ -3,10 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 
-	"github.com/ubcesports/memberships/internal/auth"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/service"
 	"github.com/ubcesports/memberships/internal/util"
@@ -39,16 +39,30 @@ Raises:
 	500: unable to load profile
 */
 func (h *ProfileHandler) GetCurrentProfile(w http.ResponseWriter, r *http.Request) {
+	requestId := middleware.GetReqID(r.Context())
+
 	// Get current user id
-	userId, ok := currentUserID(r)
+	userId, ok := util.CurrentUserID(r)
 	if !ok {
-		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestId)
 		return
 	}
 
 	profile, err := h.profileService.GetProfileByUserID(r.Context(), userId)
 	if err != nil {
-		http.Error(w, "Unable to load profile", http.StatusInternalServerError)
+		slog.ErrorContext(r.Context(), "unable to load profile",
+			"error", err,
+			"request_id", middleware.GetReqID(r.Context()),
+			"user_id", userId,
+		)
+
+		util.WriteApiResponse(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"Unable to load profile",
+			requestId,
+		)
 		return
 	}
 
@@ -98,19 +112,19 @@ Raises:
 	500: internal error, when onboarding fails unexpectedly
 */
 func (h *ProfileHandler) OnboardUser(w http.ResponseWriter, r *http.Request) {
+	requestId := middleware.GetReqID(r.Context())
+
 	// Get current user id
-	userId, ok := currentUserID(r)
+	userId, ok := util.CurrentUserID(r)
 	if !ok {
-		log.Printf("unauthorized onboard attempt: missing current user id")
-		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestId)
 		return
 	}
 
 	// Ensure request body is valid
 	var onboardUserRequest dto.OnboardUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&onboardUserRequest); err != nil {
-		log.Printf("invalid onboard request body: user_id=%s error=%v", userId, err)
-		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again.")
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again.", requestId)
 		return
 	}
 
@@ -118,36 +132,22 @@ func (h *ProfileHandler) OnboardUser(w http.ResponseWriter, r *http.Request) {
 	if err := h.profileService.OnboardUser(r.Context(), userId, onboardUserRequest); err != nil {
 		switch {
 		case errors.Is(err, service.ErrValidation):
-			log.Printf("onboard validation failed: user_id=%s error=%v", userId, err)
-			util.WriteApiResponse(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+			util.WriteApiResponse(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), requestId)
 
 		case errors.Is(err, service.ErrConflict):
-			log.Printf("onboard conflict: user_id=%s error=%v", userId, err)
-			util.WriteApiResponse(w, http.StatusConflict, "CONFLICT", err.Error())
+			util.WriteApiResponse(w, http.StatusConflict, "CONFLICT", err.Error(), requestId)
 
 		default:
-			log.Printf("onboard failed: user_id=%s error=%v", userId, err)
-			util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Error onboarding user. Please try again.")
+			slog.ErrorContext(r.Context(), "unable to onboard user",
+				"error", err,
+				"request_id", middleware.GetReqID(r.Context()),
+				"user_id", userId,
+			)
+			util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Error onboarding user. Please try again.", requestId)
 		}
 
 		return
 	}
 
-	util.WriteApiResponse(w, http.StatusOK, "OK", "User onboarded successfully!")
-}
-
-/*
-	Private functions
-*/
-
-func currentUserID(r *http.Request) (string, bool) {
-	session := auth.SessionFromContext(r.Context())
-	if session == nil || session.User == nil {
-		return "", false
-	}
-	value, ok := session.User.ID.(string)
-	if !ok || value == "" {
-		return "", false
-	}
-	return value, true
+	util.WriteApiResponse(w, http.StatusOK, "OK", "User onboarded successfully!", requestId)
 }

@@ -4,22 +4,28 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/service"
+	"github.com/ubcesports/memberships/internal/util"
 )
 
-type AdminUserHandler struct {
-	adminUserService *service.AdminUserService
+type AdminHandler struct {
+	adminService *service.AdminService
 }
 
-func NewAdminUserHandler(adminUserService *service.AdminUserService) *AdminUserHandler {
-	return &AdminUserHandler{adminUserService: adminUserService}
+/*
+	Public functions
+*/
+
+func NewAdminHandler(adminService *service.AdminService) *AdminHandler {
+	return &AdminHandler{adminService: adminService}
 }
 
 /*
@@ -50,16 +56,19 @@ Raises:
 	403: user is not an admin
 	500: users could not be loaded
 */
-func (h *AdminUserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
+func (h *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	filters, err := parseAdminUserFilters(r, true)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	users, total, err := h.adminUserService.GetUsers(r.Context(), filters)
+	users, total, err := h.adminService.GetUsers(r.Context(), filters)
 	if err != nil {
-		log.Printf("unable to load users: %v", err)
+		slog.ErrorContext(r.Context(), "unable to load users",
+			"error", err,
+			"request_id", middleware.GetReqID(r.Context()),
+		)
 		http.Error(w, "unable to load users", http.StatusInternalServerError)
 		return
 	}
@@ -96,17 +105,29 @@ Raises:
 	403: user is not an admin
 	500: users could not be exported
 */
-func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request) {
-	filters, err := parseAdminUserFilters(r, false)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+func (h *AdminHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request) {
+	requestId := middleware.GetReqID(r.Context())
+
+	// Get current user id
+	userId, ok := util.CurrentUserID(r)
+	if !ok {
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestId)
 		return
 	}
 
-	users, err := h.adminUserService.ExportUsers(r.Context(), filters)
+	filters, err := parseAdminUserFilters(r, false)
 	if err != nil {
-		log.Printf("unable to export users: %v", err)
-		http.Error(w, "unable to export users", http.StatusInternalServerError)
+		util.WriteApiResponse(w, http.StatusBadRequest, "BAD_REQUEST", "Filters to get users could not be parsed.", requestId)
+		return
+	}
+
+	users, err := h.adminService.ExportUsers(r.Context(), filters, userId, requestId)
+	if err != nil {
+		slog.ErrorContext(r.Context(), "unable to export users",
+			"error", err,
+			"request_id", requestId,
+		)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to export users.", requestId)
 		return
 	}
 
@@ -128,6 +149,10 @@ func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request
 		"Onboarding Completed At",
 		"Avatar URL",
 	}); err != nil {
+		slog.ErrorContext(r.Context(), "unable to write CSV header",
+			"error", err,
+			"request_id", requestId,
+		)
 		return
 	}
 
@@ -151,14 +176,101 @@ func (h *AdminUserHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request
 			optionalTime(user.OnboardingCompletedAt),
 			safeCSVCell(optionalString(user.AvatarURL)),
 		}); err != nil {
+			slog.ErrorContext(r.Context(), "unable to write CSV row",
+				"error", err,
+				"request_id", requestId,
+			)
 			return
 		}
 	}
 
 	writer.Flush()
 	if err := writer.Error(); err != nil {
+		slog.ErrorContext(r.Context(), "unable to flush CSV response",
+			"error", err,
+			"request_id", requestId,
+		)
 		return
 	}
+}
+
+/*
+Returns a paginated list of admin audit logs.
+
+API URL: GET /admin/audit-logs
+
+Args (query params):
+
+	actor_name: optional case-insensitive actor name substring
+	limit: optional page size (default 25, maximum 100)
+	offset: optional number of logs to skip (default 0)
+
+Returns:
+
+	logs: paginated admin audit logs (HTTP 200)
+
+Raises:
+
+	400: invalid pagination value
+	401: user is not authenticated
+	403: user is not an admin
+	500: audit logs could not be loaded for some reason
+*/
+func (h *AdminHandler) GetAdminAuditLogs(w http.ResponseWriter, r *http.Request) {
+	requestID := middleware.GetReqID(r.Context())
+	filters, err := parseAdminAuditLogFilters(r)
+	if err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error(), requestID)
+		return
+	}
+
+	logs, err := h.adminService.GetAdminAuditLogs(r.Context(), filters)
+	if err != nil {
+		slog.ErrorContext(r.Context(), "unable to load admin audit logs",
+			"error", err,
+			"request_id", requestID,
+		)
+		util.WriteApiResponse(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"Unable to load admin audit logs. Please try again.",
+			requestID,
+		)
+		return
+	}
+
+	util.WriteJson(w, http.StatusOK, logs)
+}
+
+/*
+	Private functions
+*/
+
+func parseAdminAuditLogFilters(r *http.Request) (service.AdminAuditLogFilters, error) {
+	query := r.URL.Query()
+	filters := service.AdminAuditLogFilters{
+		ActorName: query.Get("actor_name"),
+		Limit:     25,
+	}
+
+	if value := query.Get("limit"); value != "" {
+		parsed, err := strconv.ParseInt(value, 10, 32)
+		if err != nil || parsed <= 0 {
+			return service.AdminAuditLogFilters{}, errors.New("limit must be a positive integer")
+		}
+		filters.Limit = int32(parsed)
+	}
+
+	if value := query.Get("offset"); value != "" {
+		parsed, err := strconv.ParseInt(value, 10, 32)
+		if err != nil || parsed < 0 {
+			return service.AdminAuditLogFilters{}, errors.New("offset must be a non-negative integer")
+		}
+		filters.Offset = int32(parsed)
+	}
+
+	return filters, nil
 }
 
 func parseAdminUserFilters(r *http.Request, includePagination bool) (service.AdminUserFilters, error) {

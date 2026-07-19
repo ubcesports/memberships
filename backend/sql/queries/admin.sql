@@ -108,3 +108,56 @@ AND (
           AND filter_group."group" = a."group"
     )
 );
+
+-- name: CreateAdminAuditLog :exec
+INSERT INTO admin_audit_logs (
+    actor_user_id,
+    action,
+    target_user_id,
+    outcome,
+    request_id,
+    description
+) VALUES (
+    sqlc.arg('actor_user_id')::uuid,
+    sqlc.arg('action')::text,
+    sqlc.narg('target_user_id')::uuid,
+    sqlc.arg('outcome')::admin_audit_outcome_type,
+    sqlc.arg('request_id')::text,
+    sqlc.narg('description')::text
+);
+
+-- name: GetAdminAuditLogs :many
+WITH args AS (
+    SELECT
+        sqlc.narg('actor_name')::text AS actor_name,
+        sqlc.arg('limit')::integer AS "limit",
+        sqlc.arg('offset')::integer AS "offset"
+)
+SELECT
+    aal.id,
+    aal.occurred_at,
+    aal.action,
+    aal.outcome,
+    aal.request_id,
+    aal.description,
+    actor.id AS actor_id,
+    actor.full_name AS actor_name,
+    actor.avatar_url AS actor_avatar_url,
+    target.id AS target_id,
+    target.full_name AS target_name,
+    target.avatar_url AS target_avatar_url
+FROM admin_audit_logs aal
+JOIN users actor
+    ON actor.id = aal.actor_user_id
+LEFT JOIN users target
+    ON target.id = aal.target_user_id
+CROSS JOIN args a
+WHERE (
+    a.actor_name IS NULL
+    OR actor.full_name ILIKE '%' || a.actor_name || '%'
+)
+ORDER BY
+    aal.occurred_at DESC,
+    aal.id DESC
+LIMIT (SELECT "limit" FROM args)
+OFFSET (SELECT "offset" FROM args);

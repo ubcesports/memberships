@@ -24,4 +24,20 @@ const (
 	TransactionCompleted TransactionStatusType = "completed"
 	TransactionFailed    TransactionStatusType = "failed"
 	TransactionRefunded  TransactionStatusType = "refunded"
+	TransactionExpired   TransactionStatusType = "expired"
+)
+
+type PurchaseType string
+
+const (
+	PurchaseNew     PurchaseType = "new"
+	PurchaseUpgrade PurchaseType = "upgrade"
+)
+
+type AdminAuditLogOutcomeType string
+
+const (
+	AuditLogSuccess AdminAuditLogOutcomeType = "success"
+	AuditLogFailed  AdminAuditLogOutcomeType = "failed"
+	AuditLogDenied  AdminAuditLogOutcomeType = "denied"
 )

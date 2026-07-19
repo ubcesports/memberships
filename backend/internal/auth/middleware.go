@@ -10,6 +10,10 @@ import (
 )
 
 type contextKey string
+type requestMetadataKey struct{}
+type RequestMetadata struct {
+	UserID string
+}
 
 const sessionKey contextKey = "session"
 
@@ -22,6 +26,15 @@ func RequireAuth(auth *limen.Limen) func(http.Handler) http.Handler {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
+
+			if session.User != nil {
+				if userID, ok := session.User.ID.(string); ok {
+					if metadata := RequestMetadataFromContext(r.Context()); metadata != nil {
+						metadata.UserID = userID
+					}
+				}
+			}
+
 			ctx := context.WithValue(r.Context(), sessionKey, session)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -97,4 +110,14 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 func SessionFromContext(ctx context.Context) *limen.ValidatedSession {
 	session, _ := ctx.Value(sessionKey).(*limen.ValidatedSession)
 	return session
+}
+
+func WithRequestMetadata(ctx context.Context) (context.Context, *RequestMetadata) {
+	metadata := &RequestMetadata{}
+	return context.WithValue(ctx, requestMetadataKey{}, metadata), metadata
+}
+
+func RequestMetadataFromContext(ctx context.Context) *RequestMetadata {
+	metadata, _ := ctx.Value(requestMetadataKey{}).(*RequestMetadata)
+	return metadata
 }

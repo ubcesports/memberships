@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
-	"log"
+	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,23 +25,28 @@ var Module = fx.Module("server",
 type RouterParams struct {
 	fx.In
 
-	HealthHandler    *handlers.HealthHandler
-	ProfileHandler   *handlers.ProfileHandler
-	AdminUserHandler *handlers.AdminUserHandler
-	Limen            *limen.Limen
+	HealthHandler        *handlers.HealthHandler
+	ProfileHandler       *handlers.ProfileHandler
+	AdminHandler         *handlers.AdminHandler
+	MembershipHandler    *handlers.MembershipHandler
+	StripeWebhookHandler *handlers.StripeWebhookHandler
+	Limen                *limen.Limen
 }
 
 // Add all new routes here
 func provideRouter(params RouterParams) *chi.Mux {
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	r.Use(middleware.RequestID)
+	r.Use(logger)
+	r.Use(recoverer)
 	r.Use(corsMiddleware)
 
 	r.Mount("/", params.Limen.Handler())
 
 	// All public routes
 	r.Get("/health", params.HealthHandler.IsDatabaseHealthy)
+	r.Get("/membership/tiers", params.MembershipHandler.GetPublicTiersWithPrices)
+	r.Post("/webhooks/stripe", params.StripeWebhookHandler.Handle)
 
 	// All protected routes
 	r.Group(func(r chi.Router) {
@@ -56,6 +63,11 @@ func provideRouter(params RouterParams) *chi.Mux {
 		r.Use(auth.RequireOnboarded)
 
 		r.Get("/onboard/check", params.ProfileHandler.GetIsUserOnboarded)
+
+		r.Get("/membership/me/current", params.MembershipHandler.GetCurrentMembershipWithTransaction)
+		r.Get("/membership/me/all", params.MembershipHandler.GetAllMembershipsWithTransactions)
+		r.Get("/membership/tiers/eligible", params.MembershipHandler.GetEligibleTiersWithPrices)
+		r.Post("/membership/checkout", params.MembershipHandler.CreateMembershipCheckoutSession)
 	})
 
 	// All admin routes
@@ -63,8 +75,9 @@ func provideRouter(params RouterParams) *chi.Mux {
 		r.Use(auth.RequireAuth(params.Limen))
 		r.Use(auth.RequireRole("admin"))
 
-		r.Get("/admin/users", params.AdminUserHandler.GetUsers)
-		r.Get("/admin/users/export", params.AdminUserHandler.ExportUsersCSV)
+		r.Get("/admin/users", params.AdminHandler.GetUsers)
+		r.Get("/admin/users/export", params.AdminHandler.ExportUsersCSV)
+		r.Get("/admin/audit-logs", params.AdminHandler.GetAdminAuditLogs)
 	})
 
 	return r
@@ -81,6 +94,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 		if _, ok := allowedOrigins[origin]; ok {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Access-Control-Expose-Headers", "X-Request-ID")
 			w.Header().Add("Vary", "Origin")
 		}
 
@@ -95,31 +109,36 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func startServer(lc fx.Lifecycle, r *chi.Mux) {
+func startServer(lc fx.Lifecycle, r *chi.Mux) error {
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
-		log.Fatal("BASE_URL environment variable is required")
+		return errors.New("BASE_URL environment variable is required")
 	}
 
 	parsed, err := url.Parse(baseURL)
 	if err != nil {
-		log.Fatalf("Invalid BASE_URL: %v", err)
+		return fmt.Errorf("error parsing BASE_URL: %w", err)
 	}
 
 	srv := &http.Server{Addr: parsed.Host, Handler: r}
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			log.Printf("Server running on %s", baseURL)
+			slog.InfoContext(ctx, "server running", "base_url", baseURL)
 			go func() {
 				if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-					log.Fatalf("Server failed to start: %v", err)
+					slog.Error("server stopped unexpectedly", "error", err)
+					os.Exit(1)
 				}
 			}()
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			log.Println("Stopping server...")
-			return srv.Shutdown(ctx)
+			slog.InfoContext(ctx, "stopping server...")
+			if err := srv.Shutdown(ctx); err != nil {
+				return fmt.Errorf("error shutting down server: %w", err)
+			}
+			return nil
 		},
 	})
+	return nil
 }
