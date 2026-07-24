@@ -14,43 +14,50 @@ WITH tier_seed(title, description, benefits, slug, group_name, stripe_product_id
             TRUE
         ),
         (
-            'Regular Pass',
+            'Basic Tier',
             'The standard UBCEA membership for students and community members.',
             ARRAY[
-                'Daily 1 hour/session access to Legion Lounge',
-                'Discounted ticket prices for UBCEA events',
-                'Regular access to UBCEA member events',
-                'Upgrade to Premium anytime and only pay the price difference'
+                'No access to the Legion Lounge',
+                'Cab access',
+                'Discounted raffle & ticket prices for UBCEA events',
+                'Upgrade to Lounge Tier anytime & only pay the price difference'
             ],
-            'regular',
+            'basic',
             'member',
             'prod_UnGYL5Cxq8Sr7r',
             TRUE
         ),
         (
-            'Premium Pass',
-            'An upgraded membership with expanded access and additional member perks.',
+            'Lounge Tier',
+            'An upgraded membership with Lounge access and additional member perks.',
             ARRAY[
-                'All Regular Pass benefits',
-                'Expanded daily 2 hour/session access to Legion Lounge',
-                'Higher discounts on ticket prices for UBCEA events'
+                'All Basic Tier benefits',
+                'Unlimited daily 2 hour/session access to the Legion Lounge',
+                'Higher discounts on raffle & ticket prices for UBCEA events'
             ],
-            'premium',
+            'lounge',
             'member',
             'prod_UnGYUlfwqi6af8',
             TRUE
         ),
         (
-            'Competitive Player Pass',
+            'Competitive Player Tier',
             'Membership access for players rostered on UBCEA competitive teams.',
+            ARRAY[
+                'Only accessible for UBCEA competitive team players',
+                'Unlimited access to the Legion Lounge'
+            ],
             'competitive_team',
             'competitive_team',
             'prod_UnGZnjFGP74y44',
             TRUE
         ),
         (
-            'Executive Pass',
+            'Executive Tier',
             'Membership access for UBCEA executives, directors, and board members.',
+            ARRAY[
+                'Only accessible for the UBCEA executive team'
+            ],
             'executive',
             'executive',
             'prod_UnGZIuiCafLoqL',
@@ -92,10 +99,10 @@ price_seed(slug, stripe_price_id, is_student_required) AS (
     VALUES
         ('day', 'price_1TlhxGDEhs9s474KiqWxmkwk', TRUE),
         ('day', 'price_1TlhxaDEhs9s474KjGKdv4Zl', FALSE),
-        ('regular', 'price_1Tng1SDEhs9s474KmB0chFf4', TRUE),
-        ('regular', 'price_1Tng2XDEhs9s474KeFwj2xfZ', FALSE),
-        ('premium', 'price_1Tng1hDEhs9s474KJUoSaOy8', TRUE),
-        ('premium', 'price_1Tng30DEhs9s474KWdiXE6iK', FALSE),
+        ('basic', 'price_1Tng1SDEhs9s474KmB0chFf4', TRUE),
+        ('basic', 'price_1Tng2XDEhs9s474KeFwj2xfZ', FALSE),
+        ('lounge', 'price_1Tng1hDEhs9s474KJUoSaOy8', TRUE),
+        ('lounge', 'price_1Tng30DEhs9s474KWdiXE6iK', FALSE),
         ('competitive_team', 'price_1Tng27DEhs9s474KStx6hYtV', NULL),
         ('executive', 'price_1Tng1sDEhs9s474KxHto1E80', TRUE),
         ('executive', 'price_1Tng3TDEhs9s474K0MpRQlaG', FALSE)
