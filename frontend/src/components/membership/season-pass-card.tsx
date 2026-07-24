@@ -27,7 +27,7 @@ export function SeasonPassCard({
   onSignIn,
   signInPending,
 }: SeasonPassCardProps) {
-  const featured = tier.slug === "premium";
+  const featured = tier.slug === "lounge";
 
   return (
     <article
@@ -46,7 +46,7 @@ export function SeasonPassCard({
         {featured ? (
           <span className="inline-flex items-center gap-1.5 border border-brand-primary/70 bg-brand-primary/15 px-3 py-1.5 text-xs font-semibold text-blue-100">
             <Sparkles aria-hidden="true" className="size-3.5" />
-            Premium
+            Popular
           </span>
         ) : null}
       </div>
@@ -73,21 +73,26 @@ export function SeasonPassCard({
           <PublicPriceGrid tier={tier} />
         )}
 
-        <div className="mt-6 flex-1">
-          <p className="text-sm leading-6 text-brand-text-muted">
-            {tier.description || `${tier.title} UBCEA membership pass.`}
-          </p>
-          <BenefitList benefits={tier.benefits} />
-          <div className="mt-5 flex items-start gap-3 border-t border-brand-border/70 pt-5">
-            <CalendarDays
-              aria-hidden="true"
-              className="mt-0.5 size-4 shrink-0 text-brand-text-subtle"
-            />
-            <div>
-              <p className="text-sm font-medium text-brand-text">Valid for the membership year</p>
-              <p className="mt-1 text-xs leading-5 text-brand-text-subtle">
-                Regular and Premium passes expire at the end of the membership period.
-              </p>
+        <div className="mt-6 flex flex-1 flex-col">
+          <div>
+            <p className="text-sm leading-6 text-brand-text-muted">
+              {tier.description || `${tier.title} UBCEA membership pass.`}
+            </p>
+            <BenefitList benefits={tier.benefits} />
+          </div>
+
+          <div className="mt-auto pt-5">
+            <div className="flex items-start gap-3 border-t border-brand-border/70 pt-5">
+              <CalendarDays
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0 text-brand-text-subtle"
+              />
+              <div>
+                <p className="text-sm font-medium text-brand-text">Valid for the membership year</p>
+                <p className="mt-1 text-xs leading-5 text-brand-text-subtle">
+                  Basic and Lounge tiers expire at the end of the membership period.
+                </p>
+              </div>
             </div>
           </div>
         </div>
