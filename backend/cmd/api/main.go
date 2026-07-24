@@ -7,6 +7,8 @@ import (
 	"github.com/joho/godotenv"
 	"go.uber.org/fx"
 
+	_ "time/tzdata"
+
 	"github.com/ubcesports/memberships/internal/auth"
 	"github.com/ubcesports/memberships/internal/database"
 	"github.com/ubcesports/memberships/internal/handlers"
