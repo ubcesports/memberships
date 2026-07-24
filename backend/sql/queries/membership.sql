@@ -70,7 +70,14 @@ WHERE mt.is_active = TRUE
     AND EXISTS (
         SELECT 1
         FROM user_groups ug
-        WHERE ug.user_id = u.id AND ug."group" = mt."group"
+        WHERE ug.user_id = u.id
+            AND (
+                ug."group" = mt."group"
+                OR (
+                    mt."group" = 'executive'
+                    AND ug."group" IN ('director', 'board')
+                )
+            )
     )
     AND (
         mtp.is_student_required IS NULL

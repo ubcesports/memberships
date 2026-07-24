@@ -262,7 +262,6 @@ type Membership struct {
 	CancelledAt pgtype.Timestamptz
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
-	Benefits    []string
 }
 
 type MembershipTier struct {
