@@ -14,13 +14,36 @@ import { useSignOut } from "@/lib/use-sign-out.hook";
 import { formatDate, getInitials } from "@/lib/utils/formatting";
 import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
 import { useProfile } from "@/lib/profile.hook";
+import { useAllMemberships } from "@/lib/membership.hook";
+import type { Membership } from "@/lib/membership.hook";
 import Image from "next/image";
 
 const JASPERLABS_ACCOUNT_URL =
   process.env.NEXT_PUBLIC_JASPERLABS_ACCOUNT_URL || "https://auth.jasperlabs.net/dashboard";
 
+function getMembershipStatus(membership: Membership): "active" | "expired" | "cancelled" {
+  if (membership.cancelled_at) return "cancelled";
+  if (new Date(membership.expires_at) < new Date()) return "expired";
+  return "active";
+}
+
+const MEMBERSHIP_STATUS_TONE = {
+  active: "success",
+  expired: "muted",
+  cancelled: "muted",
+} as const;
+
+const TRANSACTION_STATUS_TONE = {
+  completed: "success",
+  pending: "warning",
+  failed: "muted",
+  refunded: "muted",
+  expired: "muted",
+} as const;
+
 export default function ProfilePage() {
   const { data: profile, isPending } = useProfile();
+  const { data: memberships, isPending: membershipsPending } = useAllMemberships();
 
   const { mutate: signOut, error: signOutError, isPending: signOutPending } = useSignOut();
 
@@ -189,6 +212,72 @@ export default function ProfilePage() {
                     </div>
                   </SurfacePanel>
                 </div>
+
+                <SurfacePanel className="mt-6">
+                  <div className="px-5 py-4">
+                    <h3 className="text-base font-semibold text-brand-text">Membership History</h3>
+                  </div>
+
+                  {membershipsPending ? (
+                    <div className="flex items-center gap-3 px-5 py-6 text-brand-text-muted">
+                      <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                      <span className="text-sm">Loading memberships</span>
+                    </div>
+                  ) : !memberships?.length ? (
+                    <p className="border-t border-brand-border px-5 py-6 text-sm text-brand-text-muted">
+                      No memberships found.
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-brand-border border-t border-brand-border">
+                      {memberships.map((membership) => {
+                        const status = getMembershipStatus(membership);
+                        const tierName = membership.tier_title;
+
+                        return (
+                          <li
+                            key={membership.id}
+                            className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2 px-5 py-4"
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-medium text-brand-text">
+                                {tierName}
+                              </span>
+                              <StatusBadge tone={MEMBERSHIP_STATUS_TONE[status]}>
+                                {titleCase(status)}
+                              </StatusBadge>
+                            </div>
+
+                            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-brand-text-muted">
+                              <span>
+                                Started{" "}
+                                <span className="text-brand-text">
+                                  {formatDate(membership.started_at)}
+                                </span>
+                              </span>
+                              <span>
+                                {membership.cancelled_at ? "Cancelled" : "Expires"}{" "}
+                                <span className="text-brand-text">
+                                  {formatDate(membership.cancelled_at ?? membership.expires_at)}
+                                </span>
+                              </span>
+                              <span>
+                                <StatusBadge
+                                  tone={TRANSACTION_STATUS_TONE[membership.transaction.status]}
+                                >
+                                  {titleCase(membership.transaction.status)}
+                                </StatusBadge>
+                              </span>
+                              <span>
+                                ${membership.transaction.amount_paid} ·{" "}
+                                {titleCase(membership.transaction.group_at_purchase)}
+                              </span>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </SurfacePanel>
               </div>
             ) : (
               <div className="px-6 py-12 text-brand-text-muted">

@@ -53,3 +53,29 @@ export const useEligibleMembershipTiers = (enabled: boolean) =>
     },
     enabled,
   });
+
+export type Transaction = {
+  id: string;
+  amount_paid: string;
+  status: "pending" | "completed" | "failed" | "refunded" | "expired";
+  group_at_purchase: string;
+};
+
+export type Membership = {
+  id: string;
+  tier_id: string;
+  tier_title: string;
+  started_at: string;
+  expires_at: string;
+  cancelled_at: string | null;
+  transaction: Transaction;
+};
+
+export const useAllMemberships = () =>
+  useQuery({
+    queryKey: ["membership", "all"],
+    queryFn: async ({ signal }) => {
+      const response = await apiClient.get<Membership[]>("/membership/me/all", { signal });
+      return response.data;
+    },
+  });
