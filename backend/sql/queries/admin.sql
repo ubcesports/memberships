@@ -161,3 +161,13 @@ ORDER BY
     aal.id DESC
 LIMIT (SELECT "limit" FROM args)
 OFFSET (SELECT "offset" FROM args);
+
+-- name: CountAdminAuditLogs :one
+SELECT COUNT(*)
+FROM admin_audit_logs aal
+JOIN users actor
+    ON actor.id = aal.actor_user_id
+WHERE (
+    sqlc.narg(actor_name)::text IS NULL
+    OR actor.full_name ILIKE '%' || sqlc.narg(actor_name)::text || '%'
+);

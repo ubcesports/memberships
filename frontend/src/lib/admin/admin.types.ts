@@ -1,3 +1,5 @@
+import { ActionResult } from "next/dist/shared/lib/app-router-types";
+
 export type RoleType = "member" | "admin";
 
 export type GroupType = "member" | "competitive_team" | "executive" | "director" | "board";
@@ -28,6 +30,29 @@ export type User = {
   onboarding_completed_at: string | null;
   avatar_url: string | null;
   groups: GroupType[];
+};
+
+export type AuditLogActor = {
+  actor_user_id: string;
+  actor_full_name: string;
+  actor_avatar_url: string;
+};
+
+export type AuditLogOutcome = "success" | "failed" | "denied";
+
+export type AuditLogResponse = {
+  logs: AuditLogEntry[];
+  total: number;
+};
+
+export type AuditLogEntry = {
+  actor: AuditLogActor;
+  occured_at: string;
+  action: string;
+  description: string | null;
+  outcome: AuditLogOutcome;
+  request_id: string;
+  target_user: AuditLogActor | null;
 };
 
 export type UsersResponse = {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ubcesports/memberships/internal/database/db"
 )
 
@@ -32,6 +33,17 @@ func (r *AdminRepository) CountUsers(
 	count, err := r.store.CountUsersAdmin(ctx, params)
 	if err != nil {
 		return 0, fmt.Errorf("count admin users: %w", err)
+	}
+	return count, nil
+}
+
+func (r *AdminRepository) CountAdminAuditLogs(
+	ctx context.Context,
+	params pgtype.Text,
+) (int64, error) {
+	count, err := r.store.CountAdminAuditLogs(ctx, params)
+	if err != nil {
+		return 0, fmt.Errorf("count admin audit logs: %w", err)
 	}
 	return count, nil
 }

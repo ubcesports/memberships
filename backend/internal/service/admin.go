@@ -125,7 +125,7 @@ func (s *AdminService) ExportUsers(
 	return users, nil
 }
 
-func (s *AdminService) GetAdminAuditLogs(ctx context.Context, filters AdminAuditLogFilters) ([]dto.AdminAuditLogResponse, error) {
+func (s *AdminService) GetAdminAuditLogs(ctx context.Context, filters AdminAuditLogFilters) ([]dto.AdminAuditLogResponse, int64, error) {
 	// Ensure limit is a proper number. Shouldn't return too many items at once
 	if filters.Limit <= 0 {
 		filters.Limit = 25
@@ -138,6 +138,11 @@ func (s *AdminService) GetAdminAuditLogs(ctx context.Context, filters AdminAudit
 	}
 
 	actorName := strings.TrimSpace(filters.ActorName)
+	total, err := s.adminRepository.CountAdminAuditLogs(ctx, pgtype.Text{
+		String: actorName,
+		Valid:  actorName != "",
+	})
+
 	rows, err := s.adminRepository.GetAdminAuditLogs(ctx, db.GetAdminAuditLogsParams{
 		ActorName: pgtype.Text{
 			String: actorName,
@@ -147,7 +152,7 @@ func (s *AdminService) GetAdminAuditLogs(ctx context.Context, filters AdminAudit
 		Offset: filters.Offset,
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	logs := make([]dto.AdminAuditLogResponse, 0, len(rows))
@@ -176,7 +181,7 @@ func (s *AdminService) GetAdminAuditLogs(ctx context.Context, filters AdminAudit
 		})
 	}
 
-	return logs, nil
+	return logs, total, nil
 }
 
 /*
