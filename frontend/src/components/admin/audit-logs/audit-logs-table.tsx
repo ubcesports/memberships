@@ -2,6 +2,7 @@ import { SurfacePanel } from "@/components/surface-panel";
 import { AuditLogActor, AuditLogEntry, User } from "@/lib/admin/admin.types";
 import { formatTime } from "@/lib/utils/formatting";
 import { Loader2 } from "lucide-react";
+import Link from "next/link";
 import Image from "next/image";
 
 type AuditLogsTableProps = {
@@ -96,10 +97,14 @@ export function AuditLogsTable({ logs, isLoading, isFetching }: AuditLogsTablePr
             {logs.map((log) => (
               <tr key={log.request_id} className="border-b border-brand-border/70 last:border-b-0">
                 <td className="whitespace-nowrap px-4 py-3 font-medium text-brand-text">
-                  {log.actor.actor_full_name}
+                  <Link href={`/admin/users/${log.actor.actor_user_id}`}>
+                    {log.actor.actor_full_name}
+                  </Link>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">
-                  <UserAvatar actor={log.actor} />
+                  <Link href={`/admin/users/${log.actor.actor_user_id}`}>
+                    <UserAvatar actor={log.actor} />
+                  </Link>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-brand-text-muted">
                   {formatOptionalTime(log.occured_at)}
@@ -114,13 +119,21 @@ export function AuditLogsTable({ logs, isLoading, isFetching }: AuditLogsTablePr
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-brand-text-muted">
                   {log.target_user?.actor_full_name ? (
-                    log.target_user.actor_full_name
+                    <Link href={`/admin/users/${log.target_user.actor_user_id}`}>
+                      {log.target_user.actor_full_name}
+                    </Link>
                   ) : (
                     <EmptyValue />
                   )}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">
-                  {log.target_user ? <UserAvatar actor={log.target_user} /> : <EmptyValue />}
+                  {log.target_user ? (
+                    <Link href={`/admin/users/${log.target_user.actor_user_id}`}>
+                      <UserAvatar actor={log.target_user} />
+                    </Link>
+                  ) : (
+                    <EmptyValue />
+                  )}
                 </td>
               </tr>
             ))}
