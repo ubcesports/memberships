@@ -36,24 +36,24 @@ export type AuditLogActor = {
   actor_user_id: string;
   actor_full_name: string;
   actor_avatar_url: string;
-}
+};
 
 export type AuditLogOutcome = "success" | "failed" | "denied";
 
 export type AuditLogResponse = {
   logs: AuditLogEntry[];
   total: number;
-}
+};
 
 export type AuditLogEntry = {
   actor: AuditLogActor;
   occured_at: string;
-  action: string; 
+  action: string;
   description: string | null;
   outcome: AuditLogOutcome;
   request_id: string;
   target_user: AuditLogActor | null;
-}
+};
 
 export type UsersResponse = {
   users: User[];

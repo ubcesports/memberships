@@ -6,40 +6,40 @@ const FIELD_CLASS_NAME =
   "h-10 border border-brand-border bg-brand-surface px-3 text-sm text-brand-text";
 
 type AuditLogsPaginationProps = {
-    offset: number;
-    limit: number;
-    total: number;
-    logsCount: number;
-    onOffsetChange: (offset: number) => void;
-    onLimitChange: (limit: number) => void;
+  offset: number;
+  limit: number;
+  total: number;
+  logsCount: number;
+  onOffsetChange: (offset: number) => void;
+  onLimitChange: (limit: number) => void;
 };
 
 function getRangeLabel(offset: number, logsCount: number, total: number): string {
-    if (total === 0) {
-        return "0 logs"; 
-    }
+  if (total === 0) {
+    return "0 logs";
+  }
 
-    if (logsCount === 0) {
-        return `0 of ${total} logs`;
-    }
+  if (logsCount === 0) {
+    return `0 of ${total} logs`;
+  }
 
-    const start = offset + 1; 
-    const end = offset + logsCount;
-    return `Logs ${start}–${end} of ${total}`;
+  const start = offset + 1;
+  const end = offset + logsCount;
+  return `Logs ${start}–${end} of ${total}`;
 }
 
 export function AuditLogsPagination({
-    offset,
-    limit,
-    total,
-    logsCount,
-    onOffsetChange,
-    onLimitChange,
+  offset,
+  limit,
+  total,
+  logsCount,
+  onOffsetChange,
+  onLimitChange,
 }: AuditLogsPaginationProps) {
-    const canGoPrev = offset > 0;
-    const canGoNext = offset + logsCount < total;
+  const canGoPrev = offset > 0;
+  const canGoNext = offset + logsCount < total;
 
-    return (
+  return (
     <div className="flex flex-col gap-4 border-t border-brand-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-brand-text-muted">{getRangeLabel(offset, logsCount, total)}</p>
 
