@@ -224,7 +224,7 @@ func (h *AdminHandler) GetAdminAuditLogs(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	logs, err := h.adminService.GetAdminAuditLogs(r.Context(), filters)
+	logs, total, err := h.adminService.GetAdminAuditLogs(r.Context(), filters)
 	if err != nil {
 		slog.ErrorContext(r.Context(), "unable to load admin audit logs",
 			"error", err,
@@ -240,7 +240,10 @@ func (h *AdminHandler) GetAdminAuditLogs(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	util.WriteJson(w, http.StatusOK, logs)
+	util.WriteJson(w, http.StatusOK, map[string]interface{}{
+		"logs":  logs,
+		"total": total,
+	})
 }
 
 /*

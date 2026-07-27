@@ -63,6 +63,6 @@ func (r *ProfileRepository) EnsureMemberGroupForUser(ctx context.Context, userId
 		return err
 	}
 
-	_, err = r.store.EnsureMemberGroupForUser(ctx, pgUserId)
+	err = r.store.EnsureMemberGroupForUser(ctx, pgUserId)
 	return err
 }
