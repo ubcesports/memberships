@@ -33,7 +33,7 @@ export function getFallbackPrice(tier: MembershipTier) {
 
 export function purchaseLabel(tier: EligibleMembershipTier) {
   if (tier.purchase_type === "upgrade") {
-    return "Upgrade to Premium";
+    return "Upgrade to Lounge";
   }
 
   return "Choose this pass";

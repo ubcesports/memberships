@@ -13,12 +13,12 @@ import { BasePage } from "@/components/layout/base-page";
 const memberPerks = [
   {
     title: "Legion Lounge access",
-    description: "Daily lounge access, with expanded session time on Premium.",
+    description: "Daily access to the Legion Gaming Lounge",
     icon: Clock3,
   },
   {
     title: "Event ticket savings",
-    description: "Discounted UBCEA event tickets, with higher discounts on Premium.",
+    description: "Discounted UBCEA raffle & event tickets.",
     icon: TicketPercent,
   },
   {
@@ -28,7 +28,7 @@ const memberPerks = [
   },
   {
     title: "Flexible upgrades",
-    description: "Move from Regular to Premium anytime and pay only the difference.",
+    description: "Move from Basic to Lounge tier anytime and pay only the difference.",
     icon: ArrowUpRight,
   },
 ];

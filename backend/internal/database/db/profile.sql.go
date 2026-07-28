@@ -8,7 +8,6 @@ package db
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -24,8 +23,9 @@ VALUES (
 ON CONFLICT (user_id, "group") DO NOTHING
 `
 
-func (q *Queries) EnsureMemberGroupForUser(ctx context.Context, userID pgtype.UUID) (pgconn.CommandTag, error) {
-	return q.db.Exec(ctx, ensureMemberGroupForUser, userID)
+func (q *Queries) EnsureMemberGroupForUser(ctx context.Context, userID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, ensureMemberGroupForUser, userID)
+	return err
 }
 
 const getProfileByUserID = `-- name: GetProfileByUserID :one

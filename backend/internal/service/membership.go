@@ -239,31 +239,31 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 			eligibleSlugs["competitive_team"] = dto.PurchaseNew
 		}
 	} else {
-		// 3. All other users should see the day pass, regular and premium memberships
+		// 3. All other users should see the day pass, basic and lounge memberships
 		// CASES
-		// If user has day pass, return regular/premium pass which they have to pay full price for
-		// If user has regular pass, return premium pass which they pay the difference in price for
-		// If user has premium pass, return no eligible tiers
+		// If user has day pass, return basic/lounge pass which they have to pay full price for
+		// If user has basic pass, return lounge pass which they pay the difference in price for
+		// If user has lounge pass, return no eligible tiers
 
 		if currMembership != nil {
 			switch currTierSlug {
-			// If user has a current membership and its tier slug is "day" return regular/premium memberships, which would be a replacement
+			// If user has a current membership and its tier slug is "day" return basic/lounge memberships, which would be a replacement
 			case "day":
-				eligibleSlugs["regular"] = dto.PurchaseNew
-				eligibleSlugs["premium"] = dto.PurchaseNew
-			case "regular":
-				// If user has a current membership and its tier slug is "regular" return premium membership, which would be an upgrade
-				eligibleSlugs["premium"] = dto.PurchaseUpgrade
-			case "premium":
-				// If user has a current membership and its tier slug is "premium" return no eligible memberships
+				eligibleSlugs["basic"] = dto.PurchaseNew
+				eligibleSlugs["lounge"] = dto.PurchaseNew
+			case "basic":
+				// If user has a current membership and its tier slug is "basic" return lounge membership, which would be an upgrade
+				eligibleSlugs["lounge"] = dto.PurchaseUpgrade
+			case "lounge":
+				// If user has a current membership and its tier slug is "lounge" return no eligible memberships
 				return nil, nil
 			default:
 				return nil, fmt.Errorf("unsupported current membership tier slug: %s", currTierSlug)
 			}
 		} else {
 			eligibleSlugs["day"] = dto.PurchaseNew
-			eligibleSlugs["regular"] = dto.PurchaseNew
-			eligibleSlugs["premium"] = dto.PurchaseNew
+			eligibleSlugs["basic"] = dto.PurchaseNew
+			eligibleSlugs["lounge"] = dto.PurchaseNew
 		}
 	}
 
@@ -360,11 +360,11 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 			return nil, err
 		}
 
-		// Users can create an "upgrade" checkout session if they have a regular membership and want to buy premium
-		// OR they have a day pass and want to buy regular/premium
+		// Users can create an "upgrade" checkout session if they have a basic membership and want to buy lounge
+		// OR they have a day pass and want to buy basic/lounge
 		// Return ErrMembershipAlreadyExists if they don't meet the above criteria
-		if !((currTier.Slug == "regular" && reqTier.Slug == "premium") ||
-			(currTier.Slug == "day" && (reqTier.Slug == "regular" || reqTier.Slug == "premium"))) {
+		if !((currTier.Slug == "basic" && reqTier.Slug == "lounge") ||
+			(currTier.Slug == "day" && (reqTier.Slug == "basic" || reqTier.Slug == "lounge"))) {
 			return nil, ErrMembershipAlreadyExists
 		}
 	}

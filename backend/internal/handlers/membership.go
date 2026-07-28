@@ -24,8 +24,8 @@ func NewMembershipHandler(membershipService *service.MembershipService) *Members
 Returns all public membership tiers and prices.
 
 -> Day pass with student/non-student prices
--> Regular pass with student/non-student prices
--> Premium pass with student/non-student prices
+-> Basic pass with student/non-student prices
+-> Lounge pass with student/non-student prices
 
 API URL: GET /membership/tiers
 
@@ -66,14 +66,14 @@ For competitive team players:
 For regular UBC students:
 
 	Day pass with student price
-	Regular pass with student price
-	Premium pass with student price
+	Basic pass with student price
+	Lounge pass with student price
 
 For regular non-students:
 
 	Day pass with non-student price
-	Regular pass with non-student price
-	Premium pass with non-student price
+	Basic pass with non-student price
+	Lounge pass with non-student price
 
 API URL: GET /membership/tiers/eligible
 

@@ -83,7 +83,7 @@ export default function PricingPage() {
   const tierBySlug = (slug: string) => catalog?.find((tier) => tier.slug === slug);
   const eligibleBySlug = (slug: string) => eligibleTiers.find((tier) => tier.slug === slug);
 
-  const mainTiers = [tierBySlug("regular"), tierBySlug("premium")].filter(notNull);
+  const mainTiers = [tierBySlug("basic"), tierBySlug("lounge")].filter(notNull);
   const dayTier = tierBySlug("day");
   const assignedTiers = eligibleTiers.filter((tier) => RESTRICTED_TIER_SLUGS.includes(tier.slug));
 
@@ -97,7 +97,7 @@ export default function PricingPage() {
           Choose your UBCEA pass
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-brand-text-muted sm:text-lg">
-          Compare Regular and Premium membership pricing, then sign in to see the lowest price
+          Compare Basic and Lounge tier membership pricing, then sign in to see the lowest price
           available to your account.
         </p>
       </section>
