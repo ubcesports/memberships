@@ -77,7 +77,7 @@ export function AuditLogsTable({ logs, isLoading, isFetching }: AuditLogsTablePr
   return (
     <SurfacePanel className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div
-        className={`min-h-0 flex-1 overflow-auto ${isFetching ? "opacity-70 transition-opacity" : ""}`}
+        className={cn("min-h-0 flex-1 overflow-auto", isFetching && "opacity-70 transition-opacity")}
       >
         <table className="min-w-full border-collapse text-left text-sm">
           <thead>
