@@ -14,8 +14,7 @@ import { useSignOut } from "@/lib/use-sign-out.hook";
 import { formatDate, getInitials } from "@/lib/utils/formatting";
 import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
 import { useProfile } from "@/lib/profile.hook";
-import { useAllMemberships } from "@/lib/membership.hook";
-import type { Membership } from "@/lib/membership.hook";
+import { type Membership, useAllMemberships } from "@/lib/membership.hook";
 import Image from "next/image";
 
 const JASPERLABS_ACCOUNT_URL =
