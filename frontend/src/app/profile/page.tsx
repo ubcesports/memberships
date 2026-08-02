@@ -20,7 +20,9 @@ import Image from "next/image";
 const JASPERLABS_ACCOUNT_URL =
   process.env.NEXT_PUBLIC_JASPERLABS_ACCOUNT_URL || "https://auth.jasperlabs.net/dashboard";
 
-function getMembershipStatus(membership: Membership): "active" | "expired" | "cancelled" {
+type MembershipStatus = "active" | "expired" | "cancelled";
+
+function getMembershipStatus(membership: Membership): MembershipStatus {
   if (membership.cancelled_at) return "cancelled";
   if (new Date(membership.expires_at) < new Date()) return "expired";
   return "active";
