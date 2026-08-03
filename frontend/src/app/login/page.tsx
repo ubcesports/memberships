@@ -10,13 +10,11 @@ const POST_AUTH_PATH = "/onboard/check";
 
 export default function LoginPage() {
   const {
-    mutate: continueWithJasperLabs,
+    mutate: startSignInFlow,
     error,
     isPending,
   } = useMutation({
-    mutationFn: async () => {
-      await redirectToSignIn(`${window.location.origin}${POST_AUTH_PATH}`);
-    },
+    mutationFn: () => redirectToSignIn(`${window.location.origin}${POST_AUTH_PATH}`),
   });
 
   return (
@@ -27,24 +25,24 @@ export default function LoginPage() {
             <p className="text-sm font-semibold text-brand-primary">UBCEA Memberships</p>
             <h1 className="mt-3 text-2xl font-semibold text-brand-text">Log in or sign up</h1>
             <p className="mt-2 text-sm leading-6 text-brand-text-muted">
-              Continue with your JasperLabs account to access your membership profile.
+              Continue with your Zetrova account to access your membership profile.
             </p>
           </div>
 
           <div className="px-5 py-5 sm:px-6">
             <ActionButton
               className="h-12 w-full border-brand-primary bg-brand-primary text-base hover:border-brand-primary-hover hover:bg-brand-primary-hover"
-              onClick={() => continueWithJasperLabs()}
+              onClick={() => startSignInFlow()}
               loading={isPending}
               icon={<LogIn aria-hidden="true" className="size-5" />}
               loadingIcon={<Loader2 aria-hidden="true" className="size-5 animate-spin" />}
             >
-              {isPending ? "Redirecting" : "Continue with JasperLabs"}
+              {isPending ? "Redirecting" : "Continue with sign in partner"}
             </ActionButton>
 
             {error && (
               <p className="mt-4 text-sm leading-6 text-brand-text-muted">
-                Unable to start JasperLabs sign in. Try again.
+                Unable to start sign in. Try again.
               </p>
             )}
           </div>
