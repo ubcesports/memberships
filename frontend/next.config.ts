@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
         hostname: "cdn.jasperlabs.net",
         pathname: "/envoy/avatars/**",
       },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
     ],
   },
 };

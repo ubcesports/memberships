@@ -150,6 +150,7 @@ const getAllMembershipsWithTransactions = `-- name: GetAllMembershipsWithTransac
 SELECT
     m.id,
     m.tier_id,
+    mt.title AS tier_title,
     m.started_at,
     m.expires_at,
     m.cancelled_at,
@@ -158,6 +159,7 @@ SELECT
     t.status,
     t.group_at_purchase
 FROM memberships m
+JOIN membership_tiers mt ON mt.id = m.tier_id
 JOIN transactions t
     ON t.membership_id = m.id
 WHERE m.user_id = $1
@@ -167,6 +169,7 @@ ORDER BY m.started_at DESC
 type GetAllMembershipsWithTransactionsRow struct {
 	ID              pgtype.UUID
 	TierID          pgtype.UUID
+	TierTitle       string
 	StartedAt       pgtype.Timestamptz
 	ExpiresAt       pgtype.Timestamptz
 	CancelledAt     pgtype.Timestamptz
@@ -188,6 +191,7 @@ func (q *Queries) GetAllMembershipsWithTransactions(ctx context.Context, userID 
 		if err := rows.Scan(
 			&i.ID,
 			&i.TierID,
+			&i.TierTitle,
 			&i.StartedAt,
 			&i.ExpiresAt,
 			&i.CancelledAt,
@@ -210,6 +214,7 @@ const getCurrentMembershipWithTransaction = `-- name: GetCurrentMembershipWithTr
 SELECT
     m.id,
     m.tier_id,
+    mt.title AS tier_title,
     m.started_at,
     m.expires_at,
     m.cancelled_at,
@@ -218,6 +223,7 @@ SELECT
     t.status,
     t.group_at_purchase
 FROM memberships m
+JOIN membership_tiers mt ON mt.id = m.tier_id
 JOIN transactions t
     ON t.membership_id = m.id
 WHERE m.user_id = $1
@@ -231,6 +237,7 @@ LIMIT 1
 type GetCurrentMembershipWithTransactionRow struct {
 	ID              pgtype.UUID
 	TierID          pgtype.UUID
+	TierTitle       string
 	StartedAt       pgtype.Timestamptz
 	ExpiresAt       pgtype.Timestamptz
 	CancelledAt     pgtype.Timestamptz
@@ -246,6 +253,7 @@ func (q *Queries) GetCurrentMembershipWithTransaction(ctx context.Context, userI
 	err := row.Scan(
 		&i.ID,
 		&i.TierID,
+		&i.TierTitle,
 		&i.StartedAt,
 		&i.ExpiresAt,
 		&i.CancelledAt,
