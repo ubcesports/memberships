@@ -17,8 +17,8 @@ import { useProfile } from "@/lib/profile.hook";
 import { type Membership, useAllMemberships } from "@/lib/membership.hook";
 import Image from "next/image";
 
-const JASPERLABS_ACCOUNT_URL =
-  process.env.NEXT_PUBLIC_JASPERLABS_ACCOUNT_URL || "https://auth.jasperlabs.net/dashboard";
+const ZETROVA_ACCOUNT_URL =
+  process.env.NEXT_PUBLIC_ZETROVA_ACCOUNT_URL || "https://auth.zetrova.com/dashboard";
 
 type MembershipStatus = "active" | "expired" | "cancelled";
 
@@ -197,7 +197,7 @@ export default function ProfilePage() {
                     </dl>
                     <div className="grid gap-3 border-t border-brand-border px-5 py-4 sm:grid-cols-2">
                       <ActionLink
-                        href={JASPERLABS_ACCOUNT_URL}
+                        href={ZETROVA_ACCOUNT_URL}
                         icon={<ExternalLink aria-hidden="true" className="size-4" />}
                       >
                         Manage

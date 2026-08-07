@@ -46,7 +46,7 @@ services:
       BASE_URL: http://0.0.0.0:8080
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
       FRONTEND_URL: http://localhost:3000
-      OAUTH_CALLBACK_URL: http://localhost:8080/auth/oauth/jasperlabs/callback
+      OAUTH_CALLBACK_URL: http://localhost:8080/auth/oauth/zetrova/callback
     depends_on:
       db:
         condition: service_healthy
