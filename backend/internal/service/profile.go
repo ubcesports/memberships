@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"regexp"
 	"strings"
 
@@ -18,6 +17,7 @@ import (
 var (
 	ErrValidation = errors.New("Validation error")
 	ErrConflict   = errors.New("Conflict")
+	ErrNotFound   = errors.New("Not found")
 )
 
 var studentIDRegex = regexp.MustCompile(`^\d{8}$`) // Regex to ensure student id is an 8 digit number, which all ubc student ids are
@@ -73,8 +73,7 @@ func (s *ProfileService) OnboardUser(ctx context.Context, userId string, onboard
 			return fmt.Errorf("%w: student ID must be an 8 digit number", ErrValidation)
 		}
 	} else {
-		num := rand.IntN(10_000_000)          // 0 to 9999999 (7 digits)
-		studentID = fmt.Sprintf("N%07d", num) // Produce a random student id in the format "N1234567"
+		studentID = util.GenerateNonStudentID()
 	}
 
 	return s.profileRepository.OnboardUserByUserId(

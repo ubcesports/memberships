@@ -10,7 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/ubcesports/memberships/internal/database/db"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/service"
 	"github.com/ubcesports/memberships/internal/util"
@@ -195,6 +197,195 @@ func (h *AdminHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
+Returns a single user's profile.
+
+API URL: GET /admin/users/{id}
+
+Args:
+
+	id: the user's UUID, from the URL path
+
+Returns:
+
+	response body containing the profile under the "user" key (HTTP 200)
+
+Raises:
+
+	400: malformed user ID
+	401: user is not authenticated
+	403: user is not an admin
+	404: user does not exist
+	500: the user could not be loaded
+*/
+func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+	requestId := middleware.GetReqID(r.Context())
+
+	targetUserId := chi.URLParam(r, "id")
+	if _, err := util.GetValidatedUUID(targetUserId); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid user ID.", requestId)
+		return
+	}
+
+	profile, err := h.adminService.GetUserByID(r.Context(), targetUserId)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			util.WriteApiResponse(w, http.StatusNotFound, "NOT_FOUND", err.Error(), requestId)
+			return
+		}
+
+		slog.ErrorContext(r.Context(), "unable to load user",
+			"error", err,
+			"request_id", requestId,
+			"user_id", targetUserId,
+		)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to load user.", requestId)
+		return
+	}
+
+	util.WriteJson(w, http.StatusOK, map[string]dto.ProfileDTO{"user": *profile})
+}
+
+/*
+Returns every membership the user has held, newest first, each with the
+transaction that paid for it.
+
+API URL: GET /admin/users/{id}/memberships
+
+Args:
+
+	id: the user's UUID, from the URL path
+
+Returns:
+
+	response body containing an array of memberships (HTTP 200). A user who has
+	never completed a checkout has none, which is an empty array, not a 404.
+
+Raises:
+
+	400: malformed user ID
+	401: user is not authenticated
+	403: user is not an admin
+	404: user does not exist
+	500: the memberships could not be loaded
+*/
+func (h *AdminHandler) GetUserMemberships(w http.ResponseWriter, r *http.Request) {
+	requestId := middleware.GetReqID(r.Context())
+
+	targetUserId := chi.URLParam(r, "id")
+	if _, err := util.GetValidatedUUID(targetUserId); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid user ID.", requestId)
+		return
+	}
+
+	memberships, err := h.adminService.GetUserMemberships(r.Context(), targetUserId)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			util.WriteApiResponse(w, http.StatusNotFound, "NOT_FOUND", err.Error(), requestId)
+			return
+		}
+
+		slog.ErrorContext(r.Context(), "unable to load user memberships",
+			"error", err,
+			"request_id", requestId,
+			"user_id", targetUserId,
+		)
+		util.WriteApiResponse(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"Unable to load memberships.",
+			requestId,
+		)
+		return
+	}
+
+	util.WriteJson(w, http.StatusOK, memberships)
+}
+
+/*
+Updates the editable fields on a single user.
+
+API URL: PATCH /admin/users/{id}
+
+Args (JSON body, every field optional):
+
+	student_id: new student ID, only editable while the user is a student
+	is_student: new student status
+	groups_add: groups to add to the user
+	groups_remove: groups to remove from the user (member is always kept)
+	role: new role (member or admin), empty string floors the user to member
+	cancel_membership: cancels the user's active membership
+	reinstate_membership: clears the cancellation on the user's last cancelled membership
+
+Returns:
+
+	response body containing the updated profile under the "user" key (HTTP 200)
+
+Raises:
+
+	400: invalid request body or validation error
+	401: user is not authenticated
+	403: user is not an admin
+	404: target user does not exist
+	409: conflict, e.g. reinstating while another membership is active
+	500: the user could not be updated
+*/
+func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	requestId := middleware.GetReqID(r.Context())
+
+	// Get current user id
+	actorId, ok := util.CurrentUserID(r)
+	if !ok {
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestId)
+		return
+	}
+
+	targetUserId := chi.URLParam(r, "id")
+	if _, err := util.GetValidatedUUID(targetUserId); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid user ID.", requestId)
+		return
+	}
+
+	var updateUserRequest dto.AdminUpdateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&updateUserRequest); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again.", requestId)
+		return
+	}
+
+	profile, err := h.adminService.UpdateUser(
+		r.Context(),
+		actorId,
+		targetUserId,
+		requestId,
+		buildUpdateUserRequest(updateUserRequest),
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrValidation):
+			util.WriteApiResponse(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), requestId)
+
+		case errors.Is(err, service.ErrNotFound):
+			util.WriteApiResponse(w, http.StatusNotFound, "NOT_FOUND", err.Error(), requestId)
+
+		case errors.Is(err, service.ErrConflict):
+			util.WriteApiResponse(w, http.StatusConflict, "CONFLICT", err.Error(), requestId)
+
+		default:
+			slog.ErrorContext(r.Context(), "unable to update user",
+				"error", err,
+				"request_id", requestId,
+				"user_id", targetUserId,
+			)
+			util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to update user. Please try again.", requestId)
+		}
+
+		return
+	}
+
+	util.WriteJson(w, http.StatusOK, map[string]dto.ProfileDTO{"user": *profile})
+}
+
+/*
 Returns a paginated list of admin audit logs.
 
 API URL: GET /admin/audit-logs
@@ -246,6 +437,31 @@ func (h *AdminHandler) GetAdminAuditLogs(w http.ResponseWriter, r *http.Request)
 /*
 	Private functions
 */
+
+func buildUpdateUserRequest(request dto.AdminUpdateUserRequest) service.UpdateUserRequest {
+	updateUserRequest := service.UpdateUserRequest{
+		StudentID:           request.StudentID,
+		IsStudent:           request.IsStudent,
+		GroupsAdd:           make([]db.GroupType, 0, len(request.GroupsAdd)),
+		GroupsRemove:        make([]db.GroupType, 0, len(request.GroupsRemove)),
+		CancelMembership:    request.CancelMembership,
+		ReinstateMembership: request.ReinstateMembership,
+	}
+
+	if request.Role != nil {
+		role := db.RoleType(*request.Role)
+		updateUserRequest.Role = &role
+	}
+
+	for _, group := range request.GroupsAdd {
+		updateUserRequest.GroupsAdd = append(updateUserRequest.GroupsAdd, db.GroupType(group))
+	}
+	for _, group := range request.GroupsRemove {
+		updateUserRequest.GroupsRemove = append(updateUserRequest.GroupsRemove, db.GroupType(group))
+	}
+
+	return updateUserRequest
+}
 
 func parseAdminAuditLogFilters(r *http.Request) (service.AdminAuditLogFilters, error) {
 	query := r.URL.Query()
