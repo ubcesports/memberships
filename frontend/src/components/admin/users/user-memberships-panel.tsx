@@ -42,11 +42,7 @@ function TransactionSummary({ membership }: { membership: Membership }) {
   );
 }
 
-export function UserMembershipsPanel({
-  memberships,
-  onSave,
-  isSaving,
-}: UserMembershipsPanelProps) {
+export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMembershipsPanelProps) {
   const [pendingAction, setPendingAction] = useState<"cancel" | "reinstate" | null>(null);
   const { data: catalog } = useMembershipCatalog();
 
@@ -95,9 +91,7 @@ export function UserMembershipsPanel({
               pendingAction === "cancel" ? (
                 <>
                   <ActionButton
-                    onClick={() =>
-                      runAction({ cancel_membership: true }, "Membership cancelled")
-                    }
+                    onClick={() => runAction({ cancel_membership: true }, "Membership cancelled")}
                     loading={isSaving}
                     loadingIcon={<Loader2 aria-hidden="true" className="size-4 animate-spin" />}
                     className="border-amber-300/40 text-amber-100"
@@ -162,7 +156,9 @@ export function UserMembershipsPanel({
               <span className="flex flex-wrap items-center gap-2">
                 <StatusBadge tone="muted">{titleCase(current.transaction.status)}</StatusBadge>
                 {current.transaction.group_at_purchase ? (
-                  <StatusBadge className={getGroupBadgeClass(current.transaction.group_at_purchase)}>
+                  <StatusBadge
+                    className={getGroupBadgeClass(current.transaction.group_at_purchase)}
+                  >
                     {titleCase(current.transaction.group_at_purchase)}
                   </StatusBadge>
                 ) : null}
