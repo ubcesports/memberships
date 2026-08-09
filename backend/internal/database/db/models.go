@@ -284,6 +284,7 @@ type MembershipTierPrice struct {
 	CreatedAt         pgtype.Timestamptz
 	UpdatedAt         pgtype.Timestamptz
 	IsStudentRequired pgtype.Bool
+	PriceInCents      pgtype.Int8
 }
 
 type Session struct {

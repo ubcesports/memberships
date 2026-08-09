@@ -95,28 +95,30 @@ upserted_tiers AS (
         updated_at = NOW()
     RETURNING id, slug
 ),
-price_seed(slug, stripe_price_id, is_student_required) AS (
+price_seed(slug, stripe_price_id, is_student_required, price_in_cents) AS (
     VALUES
-        ('day', 'price_1TlhxGDEhs9s474KiqWxmkwk', TRUE),
-        ('day', 'price_1TlhxaDEhs9s474KjGKdv4Zl', FALSE),
-        ('basic', 'price_1Tng1SDEhs9s474KmB0chFf4', TRUE),
-        ('basic', 'price_1Tng2XDEhs9s474KeFwj2xfZ', FALSE),
-        ('lounge', 'price_1Tng1hDEhs9s474KJUoSaOy8', TRUE),
-        ('lounge', 'price_1Tng30DEhs9s474KWdiXE6iK', FALSE),
-        ('competitive_team', 'price_1Tng27DEhs9s474KStx6hYtV', NULL),
-        ('executive', 'price_1Tng1sDEhs9s474KxHto1E80', TRUE),
-        ('executive', 'price_1Tng3TDEhs9s474K0MpRQlaG', FALSE)
+        ('day', 'price_1TlhxGDEhs9s474KiqWxmkwk', TRUE, 500),
+        ('day', 'price_1TlhxaDEhs9s474KjGKdv4Zl', FALSE, 1000),
+        ('basic', 'price_1Tng1SDEhs9s474KmB0chFf4', TRUE, 1500),
+        ('basic', 'price_1Tng2XDEhs9s474KeFwj2xfZ', FALSE, 2250),
+        ('lounge', 'price_1Tng1hDEhs9s474KJUoSaOy8', TRUE, 2500),
+        ('lounge', 'price_1Tng30DEhs9s474KWdiXE6iK', FALSE, 3250),
+        ('competitive_team', 'price_1Tng27DEhs9s474KStx6hYtV', NULL, 0),
+        ('executive', 'price_1Tng1sDEhs9s474KxHto1E80', TRUE, 1500),
+        ('executive', 'price_1Tng3TDEhs9s474K0MpRQlaG', FALSE, 2250)
 )
 INSERT INTO membership_tier_prices (
     tier_id,
     stripe_price_id,
     is_student_required,
+    price_in_cents,
     updated_at
 )
 SELECT
     t.id,
     p.stripe_price_id,
     p.is_student_required,
+    p.price_in_cents,
     NOW()
 FROM price_seed p
 JOIN upserted_tiers t
@@ -124,6 +126,7 @@ JOIN upserted_tiers t
 ON CONFLICT (stripe_price_id) DO UPDATE SET
     tier_id = EXCLUDED.tier_id,
     is_student_required = EXCLUDED.is_student_required,
+    price_in_cents = EXCLUDED.price_in_cents,
     updated_at = NOW();
 
 COMMIT;

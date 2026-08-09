@@ -7,6 +7,7 @@ SELECT
     mt.slug,
     mt.stripe_product_id,
     mtp.stripe_price_id,
+    mtp.price_in_cents,
     mtp.is_student_required
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp
@@ -64,6 +65,7 @@ SELECT
     mt.stripe_product_id,
     mt.slug,
     mtp.stripe_price_id,
+    mtp.price_in_cents,
     mtp.is_student_required
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp
@@ -97,6 +99,7 @@ SELECT
     mt.slug,
     mt.stripe_product_id,
     mtp.stripe_price_id,
+    mtp.price_in_cents,
     mtp.is_student_required
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp
