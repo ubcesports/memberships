@@ -18,20 +18,16 @@ export function AuditLogsToolbar({
   return (
     <ToolbarContainer>
       <ToolbarRow>
-        <SearchField 
+        <SearchField
           label="Search by actor name"
           placeholder="Enter actor name"
           value={searchInput}
           onChange={onSearchInputChange}
         />
         <div className="flex flex-wrap gap-2">
-          <ResetButton 
-            label="Reset search"
-            onClick={onResetSearch}
-            disabled={searchInput === ""}
-          />
+          <ResetButton label="Reset search" onClick={onResetSearch} disabled={searchInput === ""} />
         </div>
       </ToolbarRow>
     </ToolbarContainer>
-  )
+  );
 }

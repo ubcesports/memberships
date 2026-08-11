@@ -3,16 +3,15 @@ import { useProfile } from "../profile.hook";
 import { useEffect } from "react";
 
 export function useRequireAdmin() {
-    const router = useRouter();
-    const { data: profile, isPending: isProfilePending } = useProfile();
-    const isAdmin = profile?.role === "admin";
-    
-    useEffect(() => {
-        if (!isProfilePending && profile && profile.role !== "admin") {
-        router.replace("/403");
-        }
-    }, [isProfilePending, profile, router]);
+  const router = useRouter();
+  const { data: profile, isPending: isProfilePending } = useProfile();
+  const isAdmin = profile?.role === "admin";
 
-    return { isAdmin, isProfilePending }
+  useEffect(() => {
+    if (!isProfilePending && profile && profile.role !== "admin") {
+      router.replace("/403");
+    }
+  }, [isProfilePending, profile, router]);
+
+  return { isAdmin, isProfilePending };
 }
-

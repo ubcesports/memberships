@@ -7,7 +7,7 @@ type AuditLogsTableProps = {
   logs: AuditLogEntry[];
   isLoading: boolean;
   isFetching: boolean;
-}
+};
 
 const columns: Column<AuditLogEntry>[] = [
   {
@@ -17,7 +17,7 @@ const columns: Column<AuditLogEntry>[] = [
       <LinkCell href={`/admin/users/${log.actor.actor_user_id}`}>
         {log.actor.actor_full_name}
       </LinkCell>
-    )
+    ),
   },
   {
     header: "Actor Avatar",
@@ -29,7 +29,7 @@ const columns: Column<AuditLogEntry>[] = [
   },
   {
     header: "Occurred At",
-    cell: (log) => formatOptionalTime(log.occured_at)
+    cell: (log) => formatOptionalTime(log.occured_at),
   },
   { header: "Action", cell: (log) => log.action },
   { header: "Description", cell: (log) => log.description },
@@ -41,27 +41,25 @@ const columns: Column<AuditLogEntry>[] = [
   },
   {
     header: "Target User",
-    cell: (log) => (
+    cell: (log) =>
       log.target_user?.actor_full_name ? (
         <LinkCell href={`/admin/users/${log.target_user.actor_user_id}`}>
           {log.target_user.actor_full_name}
         </LinkCell>
       ) : (
         <EmptyValue />
-      )
-    )
+      ),
   },
   {
     header: "Target User Avatar",
-    cell: (log) => (
+    cell: (log) =>
       log.target_user?.actor_avatar_url ? (
         <LinkCell href={`/admin/users/${log.target_user.actor_user_id}`}>
           <AvatarCell src={log.target_user.actor_avatar_url} />
         </LinkCell>
       ) : (
         <EmptyValue />
-      )
-    )
+      ),
   },
 ];
 

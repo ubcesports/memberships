@@ -15,7 +15,12 @@ type AdminTablePaginationProps = {
   onLimitChange: (limit: number) => void;
 };
 
-function getRangeLabel(offset: number, itemsCount: number, itemsName: string, total: number): string {
+function getRangeLabel(
+  offset: number,
+  itemsCount: number,
+  itemsName: string,
+  total: number,
+): string {
   if (total === 0) {
     return `0 ${itemsName}`;
   }
@@ -34,7 +39,7 @@ export function AdminTablePagination({
   limit,
   total,
   itemsCount: itemsCount,
-  itemsName, 
+  itemsName,
   onOffsetChange,
   onLimitChange,
 }: AdminTablePaginationProps) {
@@ -43,7 +48,9 @@ export function AdminTablePagination({
 
   return (
     <div className="flex flex-col gap-4 border-t border-brand-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm text-brand-text-muted">{getRangeLabel(offset, itemsCount, itemsName, total)}</p>
+      <p className="text-sm text-brand-text-muted">
+        {getRangeLabel(offset, itemsCount, itemsName, total)}
+      </p>
 
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-brand-text-subtle">

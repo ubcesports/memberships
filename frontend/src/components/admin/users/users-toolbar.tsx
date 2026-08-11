@@ -1,7 +1,12 @@
 import { Download, Loader2, RotateCcw } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
 import type { AdminUserFilters, GroupType, RoleType, SearchMode } from "@/lib/admin/admin.types";
-import { GROUP_OPTIONS, ROLE_OPTIONS, SEARCH_MODE_OPTIONS, IS_STUDENT_OPTIONS } from "@/lib/admin/admin.types";
+import {
+  GROUP_OPTIONS,
+  ROLE_OPTIONS,
+  SEARCH_MODE_OPTIONS,
+  IS_STUDENT_OPTIONS,
+} from "@/lib/admin/admin.types";
 import { ToolbarContainer } from "@/components/toolbar/toolbar-container";
 import { ToolbarRow } from "@/components/toolbar/toolbar-row";
 import { SelectField } from "@/components/toolbar/select-option";
@@ -65,14 +70,14 @@ export function UsersToolbar({
   return (
     <ToolbarContainer>
       <ToolbarRow>
-        <SelectField 
+        <SelectField
           label="Search by"
           value={searchMode}
           onChange={(event) => onSearchModeChange(event as SearchMode)}
           options={SEARCH_MODE_OPTIONS}
           ariaLabel="Search method"
         />
-        <SearchField 
+        <SearchField
           label="Search"
           value={searchInput}
           onChange={(event) => onSearchInputChange(event)}
@@ -82,13 +87,17 @@ export function UsersToolbar({
           className="min-w-0 flex-1"
         />
         <div className="flex flex-wrap gap-2">
-          <ResetButton label="Reset Search" onClick={onResetSearch} disabled={searchInput.trim().length === 0} />
+          <ResetButton
+            label="Reset Search"
+            onClick={onResetSearch}
+            disabled={searchInput.trim().length === 0}
+          />
         </div>
       </ToolbarRow>
 
       <ToolbarRow justify>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <SelectField 
+          <SelectField
             label="Group"
             value={filters.group ?? ""}
             onChange={(event) => onGroupChange(event ? (event as GroupType) : undefined)}
@@ -96,7 +105,7 @@ export function UsersToolbar({
             allLabel="All"
             ariaLabel="Filter by group"
           />
-          <SelectField 
+          <SelectField
             label="Role"
             value={filters.role ?? ""}
             onChange={(event) => onRoleChange(event ? (event as RoleType) : undefined)}
@@ -104,7 +113,7 @@ export function UsersToolbar({
             allLabel="All"
             ariaLabel="Filter by role"
           />
-          <SelectField 
+          <SelectField
             label="Is student"
             value={getIsStudentFilterValue(filters)}
             onChange={(event) => onIsStudentChange(event as IsStudentFilter)}
@@ -116,8 +125,12 @@ export function UsersToolbar({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <ResetButton label="Reset Filters" onClick={onResetFilters} disabled={!hasActiveFilters(filters)} />
-          <ActionButton 
+          <ResetButton
+            label="Reset Filters"
+            onClick={onResetFilters}
+            disabled={!hasActiveFilters(filters)}
+          />
+          <ActionButton
             onClick={onExport}
             disabled={total === 0 || isExporting}
             loading={isExporting}

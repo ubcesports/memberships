@@ -18,8 +18,8 @@ export default function AuditLogsPage() {
   const { isAdmin, isProfilePending } = useRequireAdmin();
 
   const { offset, limit, setOffset, changeLimit } = useResettablePagination(
-    debouncedSearch, 
-    DEFAULT_PAGE_SIZE
+    debouncedSearch,
+    DEFAULT_PAGE_SIZE,
   );
 
   const { data, isPending, isFetching, isPlaceholderData } = useAuditLogs(
@@ -34,13 +34,13 @@ export default function AuditLogsPage() {
   const total: number = data?.total ?? 0;
 
   return (
-    <AdminTablePage 
+    <AdminTablePage
       title="Audit Logs"
       description="View the audit logs of user actions."
-      isLoading={isProfilePending || (isAdmin && isPending && !isPlaceholderData )}
+      isLoading={isProfilePending || (isAdmin && isPending && !isPlaceholderData)}
       loadingLabel="Loading audit logs"
       toolbar={
-        <AuditLogsToolbar 
+        <AuditLogsToolbar
           searchInput={searchInput}
           onSearchInputChange={setSearchInput}
           onResetSearch={() => setSearchInput("")}
@@ -48,14 +48,14 @@ export default function AuditLogsPage() {
         />
       }
       table={
-        <AuditLogsTable 
+        <AuditLogsTable
           logs={auditLogs}
           isLoading={isPending && !isPlaceholderData}
           isFetching={isFetching}
         />
       }
       pagination={
-        <AdminTablePagination 
+        <AdminTablePagination
           offset={offset}
           limit={limit}
           total={total}
@@ -66,5 +66,5 @@ export default function AuditLogsPage() {
         />
       }
     />
-  )
+  );
 }

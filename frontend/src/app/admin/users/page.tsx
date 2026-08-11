@@ -82,8 +82,8 @@ export default function UsersPage() {
   const users = data?.users ?? [];
   const total = data?.total ?? 0;
 
-  return(
-    <AdminTablePage 
+  return (
+    <AdminTablePage
       title="Users"
       description="Search, filter, and export member records."
       isLoading={isProfilePending || (isAdmin && isPending && !isPlaceholderData)}
@@ -106,7 +106,7 @@ export default function UsersPage() {
         />
       }
       table={
-        <UsersTable 
+        <UsersTable
           users={users}
           isLoading={isPending && !isPlaceholderData}
           isFetching={isFetching}
