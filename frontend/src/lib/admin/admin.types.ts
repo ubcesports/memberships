@@ -6,6 +6,8 @@ export type GroupType = "member" | "competitive_team" | "executive" | "director"
 
 export type SearchMode = "full_name" | "email" | "student_id";
 
+export type IsStudent = "yes" | "no";
+
 export type AppliedSearch = {
   mode: SearchMode;
   value: string;
@@ -86,4 +88,9 @@ export const SEARCH_MODE_OPTIONS: { value: SearchMode; label: string }[] = [
   { value: "full_name", label: "Full name" },
   { value: "email", label: "Email" },
   { value: "student_id", label: "Student ID" },
+];
+
+export const IS_STUDENT_OPTIONS: { value: IsStudent; label: string }[] = [
+  { value: "yes", label: "Yes" },
+  { value: "no", label: "No" },
 ];
