@@ -17,6 +17,7 @@ WHERE mt.is_active = TRUE AND mt."group" = 'member';
 SELECT
     m.id,
     m.tier_id,
+    mt.title AS tier_title,
     m.started_at,
     m.expires_at,
     m.cancelled_at,
@@ -25,6 +26,7 @@ SELECT
     t.status,
     t.group_at_purchase
 FROM memberships m
+JOIN membership_tiers mt ON mt.id = m.tier_id
 JOIN transactions t
     ON t.membership_id = m.id
 WHERE m.user_id = $1
@@ -38,6 +40,7 @@ LIMIT 1;
 SELECT
     m.id,
     m.tier_id,
+    mt.title AS tier_title,
     m.started_at,
     m.expires_at,
     m.cancelled_at,
@@ -46,6 +49,7 @@ SELECT
     t.status,
     t.group_at_purchase
 FROM memberships m
+JOIN membership_tiers mt ON mt.id = m.tier_id
 JOIN transactions t
     ON t.membership_id = m.id
 WHERE m.user_id = $1
@@ -70,7 +74,14 @@ WHERE mt.is_active = TRUE
     AND EXISTS (
         SELECT 1
         FROM user_groups ug
-        WHERE ug.user_id = u.id AND ug."group" = mt."group"
+        WHERE ug.user_id = u.id
+            AND (
+                ug."group" = mt."group"
+                OR (
+                    mt."group" = 'executive'
+                    AND ug."group" IN ('director', 'board')
+                )
+            )
     )
     AND (
         mtp.is_student_required IS NULL
