@@ -3,8 +3,9 @@ services:
     image: postgres:17
     restart: always
     environment:
-      POSTGRES_USER: dev
-      POSTGRES_PASSWORD: dev
+      POSTGRES_USER: ubceadev
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ubcea_memberships
     ports:
       - 5432:5432
     volumes:
