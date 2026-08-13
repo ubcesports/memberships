@@ -52,10 +52,6 @@ func NewClient() (*Client, error) {
 	}, nil
 }
 
-func (c *Client) GetPrice(ctx context.Context, priceId string) (*stripe.Price, error) {
-	return c.api.V1Prices.Retrieve(ctx, priceId, nil)
-}
-
 func (c *Client) CreateCheckoutSession(ctx context.Context, request CheckoutSessionRequest) (*stripe.CheckoutSession, error) {
 	params := buildCheckoutSessionParams(request, c.successUrl, c.cancelUrl, time.Now())
 	params.SetIdempotencyKey(request.TransactionID)

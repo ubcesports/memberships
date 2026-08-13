@@ -274,6 +274,7 @@ SELECT
     mt.stripe_product_id,
     mt.slug,
     mtp.stripe_price_id,
+    mtp.price_in_cents,
     mtp.is_student_required
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp
@@ -307,6 +308,7 @@ type GetEligibleTiersWithPricesRow struct {
 	StripeProductID   pgtype.Text
 	Slug              pgtype.Text
 	StripePriceID     pgtype.Text
+	PriceInCents      pgtype.Int8
 	IsStudentRequired pgtype.Bool
 }
 
@@ -327,6 +329,7 @@ func (q *Queries) GetEligibleTiersWithPrices(ctx context.Context, id pgtype.UUID
 			&i.StripeProductID,
 			&i.Slug,
 			&i.StripePriceID,
+			&i.PriceInCents,
 			&i.IsStudentRequired,
 		); err != nil {
 			return nil, err
@@ -369,6 +372,7 @@ SELECT
     mt.slug,
     mt.stripe_product_id,
     mtp.stripe_price_id,
+    mtp.price_in_cents,
     mtp.is_student_required
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp
@@ -384,6 +388,7 @@ type GetPublicTiersAndPricesRow struct {
 	Slug              pgtype.Text
 	StripeProductID   pgtype.Text
 	StripePriceID     pgtype.Text
+	PriceInCents      pgtype.Int8
 	IsStudentRequired pgtype.Bool
 }
 
@@ -404,6 +409,7 @@ func (q *Queries) GetPublicTiersAndPrices(ctx context.Context) ([]GetPublicTiers
 			&i.Slug,
 			&i.StripeProductID,
 			&i.StripePriceID,
+			&i.PriceInCents,
 			&i.IsStudentRequired,
 		); err != nil {
 			return nil, err
@@ -425,6 +431,7 @@ SELECT
     mt.slug,
     mt.stripe_product_id,
     mtp.stripe_price_id,
+    mtp.price_in_cents,
     mtp.is_student_required
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp
@@ -440,6 +447,7 @@ type GetTierByTierIdRow struct {
 	Slug              pgtype.Text
 	StripeProductID   pgtype.Text
 	StripePriceID     pgtype.Text
+	PriceInCents      pgtype.Int8
 	IsStudentRequired pgtype.Bool
 }
 
@@ -454,6 +462,7 @@ func (q *Queries) GetTierByTierId(ctx context.Context, id pgtype.UUID) (GetTierB
 		&i.Slug,
 		&i.StripeProductID,
 		&i.StripePriceID,
+		&i.PriceInCents,
 		&i.IsStudentRequired,
 	)
 	return i, err
