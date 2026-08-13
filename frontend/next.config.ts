@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "cdn.jasperlabs.net",
+        hostname: "cdn.zetrova.com",
         pathname: "/envoy/avatars/**",
       },
       {
