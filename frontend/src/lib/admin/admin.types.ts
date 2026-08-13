@@ -1,5 +1,3 @@
-import { ActionResult } from "next/dist/shared/lib/app-router-types";
-
 export type RoleType = "member" | "admin";
 
 export type GroupType = "member" | "competitive_team" | "executive" | "director" | "board";

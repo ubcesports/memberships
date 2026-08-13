@@ -1,7 +1,6 @@
 import { AuditLogEntry } from "@/lib/admin/admin.types";
 import { Column, DataTable } from "../admin-data-table";
 import { AvatarCell, EmptyValue, formatOptionalTime, LinkCell } from "../admin-table-cells";
-import { formatTime } from "@/lib/utils/formatting";
 
 type AuditLogsTableProps = {
   logs: AuditLogEntry[];

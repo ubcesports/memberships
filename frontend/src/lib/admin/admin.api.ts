@@ -4,7 +4,6 @@ import type {
   AdminPagination,
   AppliedSearch,
   UsersResponse,
-  AuditLogEntry,
   AuditLogResponse,
 } from "./admin.types";
 

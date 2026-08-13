@@ -1,4 +1,4 @@
-import { Download, Loader2, RotateCcw } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
 import type { AdminUserFilters, GroupType, RoleType, SearchMode } from "@/lib/admin/admin.types";
 import {
