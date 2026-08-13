@@ -10,6 +10,9 @@ import { useResettablePagination } from "@/lib/utils/pagination.hook";
 import { useRequireAdmin } from "@/lib/admin/require.admin";
 import { AdminTablePage } from "../admin-table-page";
 import { AdminTablePagination } from "@/components/admin/admin-table-pagination";
+import { toast } from "sonner";
+import { downloadCSVBlob, exportAuditLogsCSV } from "@/lib/admin/admin.api";
+import { useMutation } from "@tanstack/react-query";
 
 export default function AuditLogsPage() {
   const [searchInput, setSearchInput] = useState<string>("");
@@ -30,6 +33,14 @@ export default function AuditLogsPage() {
     },
   );
 
+  const { mutate: exportAuditLogs, isPending: isExporting } = useMutation({
+    mutationFn: () => exportAuditLogsCSV(debouncedSearch),
+    onSuccess: (blob) => {
+      downloadCSVBlob(blob);
+      toast.success("Users exported");
+    },
+  });
+
   const auditLogs: AuditLogEntry[] = data?.logs ?? [];
   const total: number = data?.total ?? 0;
 
@@ -45,6 +56,8 @@ export default function AuditLogsPage() {
           onSearchInputChange={setSearchInput}
           onResetSearch={() => setSearchInput("")}
           total={total}
+          isExporting={isExporting}
+          onExport={exportAuditLogs}
         />
       }
       table={

@@ -13,9 +13,6 @@ import { SelectField } from "@/components/toolbar/select-option";
 import { SearchField } from "@/components/toolbar/search-field";
 import { ResetButton } from "@/components/toolbar/reset-button";
 
-const FIELD_CLASS_NAME =
-  "h-10 border border-brand-border bg-brand-surface px-3 text-sm text-brand-text";
-
 type IsStudentFilter = "all" | "yes" | "no";
 
 type UsersToolbarProps = {

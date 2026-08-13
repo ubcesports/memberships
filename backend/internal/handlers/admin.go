@@ -247,6 +247,110 @@ func (h *AdminHandler) GetAdminAuditLogs(w http.ResponseWriter, r *http.Request)
 }
 
 /*
+Exports every audit log matching the supplied filters as CSV.
+
+API URL: GET /admin/audit-logs/export
+
+Args (query params):
+
+	actor_name: optional case-insensitive actor name substring
+
+Returns:
+
+	audit-logs.csv: CSV file containing all matching audit logs (HTTP 200)
+
+Raises:
+
+	400: invalid filter value
+	401: user is not authenticated
+	403: user is not an admin
+	500: audit logs could not be exported
+*/
+func (h *AdminHandler) ExportAuditLogsCSV(w http.ResponseWriter, r *http.Request) {
+	requestId := middleware.GetReqID(r.Context())
+
+	// Get current user id
+	userId, ok := util.CurrentUserID(r)
+	if !ok {
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestId)
+		return
+	}
+
+	filters, err := parseAdminAuditLogFilters(r)
+	if err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "BAD_REQUEST", "Filters to get users could not be parsed.", requestId)
+		return
+	}
+
+	logs, err := h.adminService.ExportAuditLogs(r.Context(), filters, userId, requestId)
+	if err != nil {
+		slog.ErrorContext(r.Context(), "unable to export users",
+			"error", err,
+			"request_id", requestId,
+		)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to export users.", requestId)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="users.csv"`)
+
+	writer := csv.NewWriter(w)
+	if err := writer.Write([]string{
+		"Actor User ID",
+		"Actor",
+		"Avatar URL",
+		"Occurred At",
+		"Action",
+		"Description",
+		"Outcome",
+		"Request ID",
+		"Target User",
+		"Target User Avatar URL",
+	}); err != nil {
+		slog.ErrorContext(r.Context(), "unable to write CSV header",
+			"error", err,
+			"request_id", requestId,
+		)
+		return
+	}
+
+	for _, log := range logs {
+		description := log.Description
+		if description == nil {
+			description = new(string)
+		}
+		if err := writer.Write([]string{
+			log.Actor.ActorUserId,
+			log.Actor.ActorFullName,
+			safeCSVCell(log.Actor.ActorAvatarURL),
+			log.OccuredAt.Format(time.RFC3339),
+			log.Action,
+			safeCSVCell(*description),
+			string(log.Outcome),
+			log.RequestId,
+			safeCSVCell(log.TargetUser.ActorFullName),
+			safeCSVCell(log.TargetUser.ActorAvatarURL),
+		}); err != nil {
+			slog.ErrorContext(r.Context(), "unable to write CSV row",
+				"error", err,
+				"request_id", requestId,
+			)
+			return
+		}
+	}
+
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		slog.ErrorContext(r.Context(), "unable to flush CSV response",
+			"error", err,
+			"request_id", requestId,
+		)
+		return
+	}
+}
+
+/*
 	Private functions
 */
 

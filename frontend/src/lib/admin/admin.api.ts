@@ -97,6 +97,19 @@ export async function fetchAuditLogs(
   return response.data;
 }
 
+export async function exportAuditLogsCSV(
+  actorName?: string,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const response = await apiClient.get<Blob>("/admin/audit-logs/export", {
+    params: buildAdminAuditLogParams(actorName),
+    responseType: "blob",
+    signal,
+  });
+
+  return response.data;
+}
+
 export function downloadCSVBlob(blob: Blob, filename = "users.csv") {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
