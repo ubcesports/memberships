@@ -97,10 +97,7 @@ export async function fetchAuditLogs(
   return response.data;
 }
 
-export async function exportAuditLogsCSV(
-  actorName?: string,
-  signal?: AbortSignal,
-): Promise<Blob> {
+export async function exportAuditLogsCSV(actorName?: string, signal?: AbortSignal): Promise<Blob> {
   const response = await apiClient.get<Blob>("/admin/audit-logs/export", {
     params: buildAdminAuditLogParams(actorName),
     responseType: "blob",
