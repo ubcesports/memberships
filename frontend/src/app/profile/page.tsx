@@ -19,7 +19,7 @@ import { useAllMemberships } from "@/lib/membership.hook";
 import Image from "next/image";
 
 const ZETROVA_ACCOUNT_URL =
-  process.env.NEXT_PUBLIC_ZETROVA_ACCOUNT_URL || "https://auth.zetrova.com/dashboard";
+  process.env.NEXT_PUBLIC_ZETROVA_ACCOUNT_URL || "https://id.zetrova.com/dashboard";
 
 export default function ProfilePage() {
   const { data: profile, isPending } = useProfile();
