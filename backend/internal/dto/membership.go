@@ -36,6 +36,7 @@ type MembershipTierPriceDTO struct {
 type MembershipDTO struct {
 	ID          string         `json:"id"`
 	TierId      string         `json:"tier_id"`
+	TierTitle   string         `json:"tier_title"`
 	StartedAt   time.Time      `json:"started_at"`
 	ExpiresAt   time.Time      `json:"expires_at"`
 	CancelledAt *time.Time     `json:"cancelled_at"`

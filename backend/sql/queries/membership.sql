@@ -7,6 +7,7 @@ SELECT
     mt.slug,
     mt.stripe_product_id,
     mtp.stripe_price_id,
+    mtp.price_in_cents,
     mtp.is_student_required
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp
@@ -17,6 +18,7 @@ WHERE mt.is_active = TRUE AND mt."group" = 'member';
 SELECT
     m.id,
     m.tier_id,
+    mt.title AS tier_title,
     m.started_at,
     m.expires_at,
     m.cancelled_at,
@@ -25,6 +27,7 @@ SELECT
     t.status,
     t.group_at_purchase
 FROM memberships m
+JOIN membership_tiers mt ON mt.id = m.tier_id
 JOIN transactions t
     ON t.membership_id = m.id
 WHERE m.user_id = $1
@@ -47,6 +50,7 @@ SELECT
     t.status,
     t.group_at_purchase
 FROM memberships m
+JOIN membership_tiers mt ON mt.id = m.tier_id
 JOIN transactions t
     ON t.membership_id = m.id
 LEFT JOIN membership_tiers mt
@@ -63,6 +67,7 @@ SELECT
     mt.stripe_product_id,
     mt.slug,
     mtp.stripe_price_id,
+    mtp.price_in_cents,
     mtp.is_student_required
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp
@@ -96,6 +101,7 @@ SELECT
     mt.slug,
     mt.stripe_product_id,
     mtp.stripe_price_id,
+    mtp.price_in_cents,
     mtp.is_student_required
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp

@@ -7,7 +7,7 @@ type OAuthAuthorizeResponse = {
 
 export async function redirectToSignIn(returnTo: string) {
   const response = await axios.get<OAuthAuthorizeResponse>(
-    `${API_BASE}/auth/oauth/jasperlabs/authorize`,
+    `${API_BASE}/auth/oauth/zetrova/authorize`,
     {
       params: {
         redirect_uri: returnTo,

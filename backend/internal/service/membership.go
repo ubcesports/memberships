@@ -54,11 +54,8 @@ func (s *MembershipService) GetPublicTiersAndPrices(ctx context.Context) ([]dto.
 
 	for _, tier := range tiers {
 		tierId := tier.ID.String()
-
-		// Get price from stripe price id
-		price, err := s.stripeClient.GetPrice(ctx, tier.StripePriceID.String)
-		if err != nil {
-			return nil, err
+		if !tier.PriceInCents.Valid {
+			return nil, fmt.Errorf("membership tier price %s has no database price", tier.StripePriceID.String)
 		}
 
 		// Set up price dto
@@ -70,7 +67,7 @@ func (s *MembershipService) GetPublicTiersAndPrices(ctx context.Context) ([]dto.
 		}
 
 		priceDto := dto.MembershipTierPriceDTO{
-			Price:             float64(price.UnitAmount) / 100, // Turn unit amount which is in cents, into readable format with 2 numbers after the decimal
+			Price:             priceFromCents(tier.PriceInCents.Int64),
 			PriceId:           tier.StripePriceID.String,
 			IsStudentRequired: isStudentRequired,
 		}
@@ -107,12 +104,18 @@ func (s *MembershipService) GetCurrentMembershipWithTransaction(ctx context.Cont
 		return nil, err
 	}
 
+	var cancelledAt *time.Time
+	if membership.CancelledAt.Valid {
+		cancelledAt = &membership.CancelledAt.Time
+	}
+
 	return &dto.MembershipDTO{
 		ID:          membership.ID.String(),
 		TierId:      membership.TierID.String(),
+		TierTitle:   membership.TierTitle,
 		StartedAt:   membership.StartedAt.Time,
 		ExpiresAt:   membership.ExpiresAt.Time,
-		CancelledAt: &membership.CancelledAt.Time,
+		CancelledAt: cancelledAt,
 		Transaction: dto.TransactionDTO{
 			ID:              membership.TransactionID.String(),
 			AmountPaid:      fmt.Sprintf("%.2f", float64(membership.AmountPaidCents.Int64)/100),
@@ -135,12 +138,18 @@ func (s *MembershipService) GetAllMembershipsWithTransactions(ctx context.Contex
 
 	returnMemberships := make([]dto.MembershipDTO, 0, len(memberships))
 	for _, membership := range memberships {
+		var cancelledAt *time.Time
+		if membership.CancelledAt.Valid {
+			cancelledAt = &membership.CancelledAt.Time
+		}
+
 		membershipDto := dto.MembershipDTO{
 			ID:          membership.ID.String(),
 			TierId:      membership.TierID.String(),
+			TierTitle:   membership.TierTitle,
 			StartedAt:   membership.StartedAt.Time,
 			ExpiresAt:   membership.ExpiresAt.Time,
-			CancelledAt: &membership.CancelledAt.Time,
+			CancelledAt: cancelledAt,
 			Transaction: dto.TransactionDTO{
 				ID:              membership.TransactionID.String(),
 				AmountPaid:      fmt.Sprintf("%.2f", float64(membership.AmountPaidCents.Int64)/100),
@@ -276,18 +285,15 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 		if tier.IsStudentRequired.Valid && tier.IsStudentRequired.Bool != user.IsStudent {
 			continue
 		}
+		if !tier.PriceInCents.Valid {
+			return nil, fmt.Errorf("membership tier price %s has no database price", tier.StripePriceID.String)
+		}
 
 		switch purchaseType {
 		case dto.PurchaseNew:
-			// Get price from stripe price id
-			price, err := s.stripeClient.GetPrice(ctx, tier.StripePriceID.String)
-			if err != nil {
-				return nil, err
-			}
-
 			// Set up price dto
 			priceDto := dto.MembershipTierPriceDTO{
-				Price:             float64(price.UnitAmount) / 100, // Turn unit amount which is in cents, into readable format with 2 numbers after the decimal
+				Price:             priceFromCents(tier.PriceInCents.Int64),
 				PriceId:           tier.StripePriceID.String,
 				IsStudentRequired: nil, // Leave nil as this is not really required in this context.
 			}
@@ -298,12 +304,6 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 				return nil, fmt.Errorf("cannot calculate upgrade price without current membership")
 			}
 
-			// Get price from stripe price id
-			tierPrice, err := s.stripeClient.GetPrice(ctx, tier.StripePriceID.String)
-			if err != nil {
-				return nil, err
-			}
-
 			// Calculate upgrade price to pay
 			amountPaidFloat, err := strconv.ParseFloat(currMembership.Transaction.AmountPaid, 64)
 			if err != nil {
@@ -311,7 +311,7 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 			}
 
 			amountPaidInCents := int64(math.Round(amountPaidFloat * 100))
-			priceToPay := tierPrice.UnitAmount - amountPaidInCents
+			priceToPay := tier.PriceInCents.Int64 - amountPaidInCents
 			if priceToPay < 0 {
 				priceToPay = 0 // Ensure negative price cannot be paid
 			}
@@ -621,6 +621,10 @@ func isPurchaseClosed(now time.Time) (bool, error) {
 	closedUntil := time.Date(localNow.Year(), time.May, 1, 0, 0, 0, 0, location)
 
 	return !localNow.Before(closedFrom) && localNow.Before(closedUntil), nil
+}
+
+func priceFromCents(priceInCents int64) float64 {
+	return float64(priceInCents) / 100
 }
 
 // returns the highest priority group a user belongs to at the time of membership purchase.
