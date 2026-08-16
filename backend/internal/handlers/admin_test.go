@@ -94,7 +94,7 @@ func TestBuildUpdateUserRequestMapsBodyToServiceTypes(t *testing.T) {
 	if len(request.GroupsRemove) != 2 || request.GroupsRemove[1] != db.GroupTypeExecutive {
 		t.Fatalf("unexpected groups to remove: %v", request.GroupsRemove)
 	}
-	if !request.CancelMembership || request.ReinstateMembership {
+	if !request.CancelMembership {
 		t.Fatalf("unexpected membership flags: %#v", request)
 	}
 }

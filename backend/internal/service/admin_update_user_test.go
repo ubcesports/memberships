@@ -37,17 +37,12 @@ type fakeAdminStore struct {
 
 	memberships             []db.GetAllMembershipsWithTransactionsRow
 	hasActiveMembership     bool
-	cancelledMembership     db.GetMostRecentCancelledMembershipRow
-	cancelledMembershipErr  error
-	reinstateRowsAffected   int64
-	reinstateErr            error
 	updateStudentInfoErr    error
 	studentInfoUpdates      []studentInfoUpdate
 	roleUpdates             []db.RoleType
 	addedGroups             []db.GroupType
 	removedGroups           []db.GroupType
 	cancelledMembershipUser []string
-	reinstatedMemberships   []string
 
 	auditLogs []db.CreateAdminAuditLogParams
 }
@@ -116,21 +111,6 @@ func (f *fakeAdminStore) HasActiveMembership(context.Context, string) (bool, err
 func (f *fakeAdminStore) CancelActiveMembershipsByUserId(_ context.Context, userId string, _ time.Time) error {
 	f.cancelledMembershipUser = append(f.cancelledMembershipUser, userId)
 	return nil
-}
-
-func (f *fakeAdminStore) GetMostRecentCancelledMembership(context.Context, string) (db.GetMostRecentCancelledMembershipRow, error) {
-	if f.cancelledMembershipErr != nil {
-		return db.GetMostRecentCancelledMembershipRow{}, f.cancelledMembershipErr
-	}
-	return f.cancelledMembership, nil
-}
-
-func (f *fakeAdminStore) ReinstateMembership(_ context.Context, membershipId string) (int64, error) {
-	if f.reinstateErr != nil {
-		return 0, f.reinstateErr
-	}
-	f.reinstatedMemberships = append(f.reinstatedMemberships, membershipId)
-	return f.reinstateRowsAffected, nil
 }
 
 func (f *fakeAdminStore) WithTx(ctx context.Context, fn func(repository.AdminStore) error) error {
@@ -482,79 +462,6 @@ func TestUpdateUserCancelsMembership(t *testing.T) {
 	assertAuditActions(t, store, db.AdminAuditOutcomeTypeSuccess, actionMembershipCancelled)
 }
 
-func TestUpdateUserReinstateWithoutCancelledMembership(t *testing.T) {
-	store := newFakeAdminStore(t, true, "12345678", db.RoleTypeMember, "member")
-	store.cancelledMembershipErr = pgx.ErrNoRows
-
-	err := updateUser(t, store, UpdateUserRequest{ReinstateMembership: true})
-
-	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("expected validation error, got %v", err)
-	}
-	assertAuditActions(t, store, db.AdminAuditOutcomeTypeFailed, actionMembershipReinstated)
-}
-
-func TestUpdateUserReinstateExpiredMembership(t *testing.T) {
-	store := newFakeAdminStore(t, true, "12345678", db.RoleTypeMember, "member")
-	store.cancelledMembership = cancelledMembership(t, time.Now().Add(-24*time.Hour))
-
-	err := updateUser(t, store, UpdateUserRequest{ReinstateMembership: true})
-
-	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("expected validation error, got %v", err)
-	}
-	if len(store.reinstatedMemberships) != 0 {
-		t.Fatalf("expected no reinstatement, got %v", store.reinstatedMemberships)
-	}
-	assertAuditActions(t, store, db.AdminAuditOutcomeTypeFailed, actionMembershipReinstated)
-}
-
-func TestUpdateUserReinstateWithActiveMembershipConflicts(t *testing.T) {
-	store := newFakeAdminStore(t, true, "12345678", db.RoleTypeMember, "member")
-	store.cancelledMembership = cancelledMembership(t, time.Now().Add(24*time.Hour))
-	store.hasActiveMembership = true
-
-	err := updateUser(t, store, UpdateUserRequest{ReinstateMembership: true})
-
-	if !errors.Is(err, ErrConflict) {
-		t.Fatalf("expected conflict error, got %v", err)
-	}
-	if len(store.reinstatedMemberships) != 0 {
-		t.Fatalf("expected no reinstatement, got %v", store.reinstatedMemberships)
-	}
-	assertAuditActions(t, store, db.AdminAuditOutcomeTypeFailed, actionMembershipReinstated)
-}
-
-func TestUpdateUserReinstatesCancelledMembership(t *testing.T) {
-	store := newFakeAdminStore(t, true, "12345678", db.RoleTypeMember, "member")
-	store.cancelledMembership = cancelledMembership(t, time.Now().Add(24*time.Hour))
-	store.reinstateRowsAffected = 1
-
-	if err := updateUser(t, store, UpdateUserRequest{ReinstateMembership: true}); err != nil {
-		t.Fatalf("expected reinstatement to succeed, got %v", err)
-	}
-
-	if len(store.reinstatedMemberships) != 1 {
-		t.Fatalf("expected one reinstatement, got %v", store.reinstatedMemberships)
-	}
-	assertAuditActions(t, store, db.AdminAuditOutcomeTypeSuccess, actionMembershipReinstated)
-}
-
-func TestUpdateUserRejectsCancelAndReinstateTogether(t *testing.T) {
-	store := newFakeAdminStore(t, true, "12345678", db.RoleTypeMember, "member")
-	store.hasActiveMembership = true
-
-	err := updateUser(t, store, UpdateUserRequest{CancelMembership: true, ReinstateMembership: true})
-
-	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("expected validation error, got %v", err)
-	}
-	if len(store.cancelledMembershipUser) != 0 {
-		t.Fatalf("expected no cancellation, got %v", store.cancelledMembershipUser)
-	}
-	assertAuditActions(t, store, db.AdminAuditOutcomeTypeFailed, actionUserUpdated)
-}
-
 /*
 	Audit logging
 */
@@ -613,19 +520,4 @@ func TestUpdateUserReturnsNotFoundForUnknownUser(t *testing.T) {
 		t.Fatalf("expected not found error, got %v", err)
 	}
 	assertAuditActions(t, store, db.AdminAuditOutcomeTypeFailed, actionUserUpdated)
-}
-
-func cancelledMembership(t *testing.T, expiresAt time.Time) db.GetMostRecentCancelledMembershipRow {
-	t.Helper()
-
-	var membershipID pgtype.UUID
-	if err := membershipID.Scan("9a8b7c6d-5e4f-4a3b-8c1d-2e3f4a5b6c7d"); err != nil {
-		t.Fatalf("unable to build test membership ID: %v", err)
-	}
-
-	return db.GetMostRecentCancelledMembershipRow{
-		ID:          membershipID,
-		ExpiresAt:   pgtype.Timestamptz{Time: expiresAt, Valid: true},
-		CancelledAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Hour), Valid: true},
-	}
 }

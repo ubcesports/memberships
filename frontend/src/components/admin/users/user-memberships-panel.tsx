@@ -1,7 +1,7 @@
 "use client";
 
-import { Loader2, RotateCcw, Ban } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Loader2, Ban } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/action-button";
 import { DetailRow } from "@/components/detail-row";
@@ -43,7 +43,7 @@ function TransactionSummary({ membership }: { membership: Membership }) {
 }
 
 export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMembershipsPanelProps) {
-  const [pendingAction, setPendingAction] = useState<"cancel" | "reinstate" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"cancel" | null>(null);
   const { data: catalog } = useMembershipCatalog();
 
   const tierTitleById = useMemo(() => {
@@ -69,11 +69,6 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
       (membership) => !membership.cancelled_at && new Date(membership.expires_at) > new Date(),
     ) ?? null;
   const past = memberships.filter((membership) => membership.id !== current?.id);
-
-  // Only a cancelled membership that has not run out can be put back.
-  const reinstatable = memberships.find(
-    (membership) => membership.cancelled_at && new Date(membership.expires_at) > new Date(),
-  );
 
   const runAction = async (body: UpdateUserRequest, message: string) => {
     try {
@@ -132,7 +127,9 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
           {tx.metadata ? (
             <div className="col-span-2">
               <div className="font-medium text-brand-text">Metadata</div>
-              <pre className="whitespace-pre-wrap break-words text-xs">{JSON.stringify(tx.metadata)}</pre>
+              <pre className="whitespace-pre-wrap break-words text-xs">
+                {JSON.stringify(tx.metadata)}
+              </pre>
             </div>
           ) : null}
         </div>
@@ -176,33 +173,6 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
                 </ActionButton>
               )
             ) : null}
-
-            {!current && reinstatable ? (
-              pendingAction === "reinstate" ? (
-                <>
-                  <ActionButton
-                    onClick={() =>
-                      runAction({ reinstate_membership: true }, "Membership reinstated")
-                    }
-                    loading={isSaving}
-                    loadingIcon={<Loader2 aria-hidden="true" className="size-4 animate-spin" />}
-                    className="border-green-400/40 text-green-100"
-                  >
-                    Confirm reinstate
-                  </ActionButton>
-                  <ActionButton onClick={() => setPendingAction(null)} disabled={isSaving}>
-                    Keep
-                  </ActionButton>
-                </>
-              ) : (
-                <ActionButton
-                  onClick={() => setPendingAction("reinstate")}
-                  icon={<RotateCcw aria-hidden="true" className="size-4" />}
-                >
-                  Reinstate membership
-                </ActionButton>
-              )
-            ) : null}
           </div>
         </div>
 
@@ -239,9 +209,7 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
           </>
         ) : (
           <p className="px-5 py-6 text-sm text-brand-text-muted">
-            {reinstatable
-              ? "This user's membership is cancelled but has not expired yet."
-              : "This user has no active membership."}
+            This user has no active membership.
           </p>
         )}
       </SurfacePanel>
@@ -278,12 +246,11 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
                   const state = getMembershipState(membership);
 
                   return (
-                    <>
-                      <tr
-                        key={membership.id}
-                        className="border-b border-brand-border/70 text-sm last:border-b-0"
-                      >
-                        <td className="px-4 py-3 text-brand-text">{tierTitleForMembership(membership)}</td>
+                    <Fragment key={membership.id}>
+                      <tr className="border-b border-brand-border/70 text-sm last:border-b-0">
+                        <td className="px-4 py-3 text-brand-text">
+                          {tierTitleForMembership(membership)}
+                        </td>
                         <td className="px-4 py-3">
                           <StatusBadge tone={STATE_TONE[state]}>{titleCase(state)}</StatusBadge>
                         </td>
@@ -316,7 +283,7 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
                           </td>
                         </tr>
                       ) : null}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>

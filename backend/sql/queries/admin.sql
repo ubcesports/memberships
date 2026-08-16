@@ -173,23 +173,6 @@ SELECT EXISTS (
       AND cancelled_at IS NULL
 );
 
--- name: GetMostRecentCancelledMembership :one
-SELECT id, expires_at, cancelled_at
-FROM memberships
-WHERE user_id = $1
-  AND cancelled_at IS NOT NULL
-ORDER BY cancelled_at DESC
-LIMIT 1;
-
--- name: ReinstateMembership :execrows
-UPDATE memberships
-SET
-    cancelled_at = NULL,
-    updated_at = NOW()
-WHERE id = $1
-  AND cancelled_at IS NOT NULL
-  AND expires_at > NOW();
-
 -- name: CreateAdminAuditLog :exec
 INSERT INTO admin_audit_logs (
     actor_user_id,

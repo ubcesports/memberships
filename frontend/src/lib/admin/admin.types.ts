@@ -75,7 +75,6 @@ export type UpdateUserRequest = {
   groups_remove?: GroupType[];
   role?: RoleType;
   cancel_membership?: boolean;
-  reinstate_membership?: boolean;
 };
 
 export type AdminPagination = {

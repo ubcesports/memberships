@@ -285,28 +285,6 @@ func (q *Queries) GetAdminUserByID(ctx context.Context, id pgtype.UUID) (GetAdmi
 	return i, err
 }
 
-const getMostRecentCancelledMembership = `-- name: GetMostRecentCancelledMembership :one
-SELECT id, expires_at, cancelled_at
-FROM memberships
-WHERE user_id = $1
-  AND cancelled_at IS NOT NULL
-ORDER BY cancelled_at DESC
-LIMIT 1
-`
-
-type GetMostRecentCancelledMembershipRow struct {
-	ID          pgtype.UUID
-	ExpiresAt   pgtype.Timestamptz
-	CancelledAt pgtype.Timestamptz
-}
-
-func (q *Queries) GetMostRecentCancelledMembership(ctx context.Context, userID pgtype.UUID) (GetMostRecentCancelledMembershipRow, error) {
-	row := q.db.QueryRow(ctx, getMostRecentCancelledMembership, userID)
-	var i GetMostRecentCancelledMembershipRow
-	err := row.Scan(&i.ID, &i.ExpiresAt, &i.CancelledAt)
-	return i, err
-}
-
 const getUsersAdmin = `-- name: GetUsersAdmin :many
 WITH args AS (
     SELECT
@@ -458,24 +436,6 @@ func (q *Queries) HasActiveMembershipForUser(ctx context.Context, userID pgtype.
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
-}
-
-const reinstateMembership = `-- name: ReinstateMembership :execrows
-UPDATE memberships
-SET
-    cancelled_at = NULL,
-    updated_at = NOW()
-WHERE id = $1
-  AND cancelled_at IS NOT NULL
-  AND expires_at > NOW()
-`
-
-func (q *Queries) ReinstateMembership(ctx context.Context, id pgtype.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, reinstateMembership, id)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
 }
 
 const removeUserGroup = `-- name: RemoveUserGroup :exec

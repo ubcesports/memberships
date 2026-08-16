@@ -165,8 +165,6 @@ FROM memberships m
 JOIN membership_tiers mt ON mt.id = m.tier_id
 JOIN transactions t
     ON t.membership_id = m.id
-LEFT JOIN membership_tiers mt
-    ON mt.id = m.tier_id
 WHERE m.user_id = $1
 ORDER BY m.started_at DESC
 `

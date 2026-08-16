@@ -315,7 +315,6 @@ Args (JSON body, every field optional):
 	groups_remove: groups to remove from the user (member is always kept)
 	role: new role (member or admin), empty string floors the user to member
 	cancel_membership: cancels the user's active membership
-	reinstate_membership: clears the cancellation on the user's last cancelled membership
 
 Returns:
 
@@ -440,12 +439,11 @@ func (h *AdminHandler) GetAdminAuditLogs(w http.ResponseWriter, r *http.Request)
 
 func buildUpdateUserRequest(request dto.AdminUpdateUserRequest) service.UpdateUserRequest {
 	updateUserRequest := service.UpdateUserRequest{
-		StudentID:           request.StudentID,
-		IsStudent:           request.IsStudent,
-		GroupsAdd:           make([]db.GroupType, 0, len(request.GroupsAdd)),
-		GroupsRemove:        make([]db.GroupType, 0, len(request.GroupsRemove)),
-		CancelMembership:    request.CancelMembership,
-		ReinstateMembership: request.ReinstateMembership,
+		StudentID:        request.StudentID,
+		IsStudent:        request.IsStudent,
+		GroupsAdd:        make([]db.GroupType, 0, len(request.GroupsAdd)),
+		GroupsRemove:     make([]db.GroupType, 0, len(request.GroupsRemove)),
+		CancelMembership: request.CancelMembership,
 	}
 
 	if request.Role != nil {

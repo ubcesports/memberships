@@ -48,13 +48,12 @@ type AdminAuditLogInput struct {
 // UpdateUserRequest describes the edits an admin wants to apply to a user.
 // Every field is optional; only the ones that are set are acted on.
 type UpdateUserRequest struct {
-	StudentID           *string
-	IsStudent           *bool
-	GroupsAdd           []db.GroupType
-	GroupsRemove        []db.GroupType
-	Role                *db.RoleType
-	CancelMembership    bool
-	ReinstateMembership bool
+	StudentID        *string
+	IsStudent        *bool
+	GroupsAdd        []db.GroupType
+	GroupsRemove     []db.GroupType
+	Role             *db.RoleType
+	CancelMembership bool
 }
 
 // Audit log actions emitted by UpdateUser.
@@ -66,7 +65,6 @@ const (
 	actionGroupAdded           = "user.group.added"
 	actionGroupRemoved         = "user.group.removed"
 	actionMembershipCancelled  = "user.membership.cancelled"
-	actionMembershipReinstated = "user.membership.reinstated"
 )
 
 // Number of times a random non-student ID is regenerated before giving up.
@@ -385,14 +383,6 @@ func (s *AdminService) applyUserUpdates(
 	user db.GetAdminUserByIDRow,
 	req UpdateUserRequest,
 ) ([]pendingAuditLog, error) {
-	if req.CancelMembership && req.ReinstateMembership {
-		return nil, auditable(
-			actionUserUpdated,
-			"Failed to update user: cannot cancel and reinstate a membership at once",
-			fmt.Errorf("%w: a membership cannot be cancelled and reinstated in the same request", ErrValidation),
-		)
-	}
-
 	entries := make([]pendingAuditLog, 0)
 
 	studentEntries, err := s.applyStudentUpdate(ctx, store, user, req)
@@ -578,55 +568,7 @@ func (s *AdminService) applyMembershipUpdates(
 		}}, nil
 	}
 
-	if !req.ReinstateMembership {
-		return nil, nil
-	}
-
-	membership, err := store.GetMostRecentCancelledMembership(ctx, userID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			err = fmt.Errorf("%w: user has no cancelled membership to reinstate", ErrValidation)
-			return nil, auditable(actionMembershipReinstated, "Failed to reinstate membership: nothing to reinstate", err)
-		}
-		return nil, auditable(actionMembershipReinstated, "Failed to reinstate membership", err)
-	}
-
-	if !membership.ExpiresAt.Valid || !membership.ExpiresAt.Time.After(time.Now()) {
-		err := fmt.Errorf("%w: membership has expired", ErrValidation)
-		return nil, auditable(actionMembershipReinstated, "Failed to reinstate membership: membership has expired", err)
-	}
-
-	hasActive, err := store.HasActiveMembership(ctx, userID)
-	if err != nil {
-		return nil, auditable(actionMembershipReinstated, "Failed to reinstate membership", err)
-	}
-	if hasActive {
-		err := fmt.Errorf("%w: user already has an active membership", ErrConflict)
-		return nil, auditable(
-			actionMembershipReinstated,
-			"Failed to reinstate membership: user already has an active membership",
-			err,
-		)
-	}
-
-	rows, err := store.ReinstateMembership(ctx, membership.ID.String())
-	if err != nil {
-		// The one-active-membership index is the authority here; losing a race
-		// against a new purchase surfaces as a conflict rather than a 500.
-		if isUniqueViolation(err) {
-			err = fmt.Errorf("%w: user already has an active membership", ErrConflict)
-		}
-		return nil, auditable(actionMembershipReinstated, "Failed to reinstate membership", err)
-	}
-	if rows == 0 {
-		err := fmt.Errorf("%w: membership can no longer be reinstated", ErrConflict)
-		return nil, auditable(actionMembershipReinstated, "Failed to reinstate membership", err)
-	}
-
-	return []pendingAuditLog{{
-		action:      actionMembershipReinstated,
-		description: fmt.Sprintf("Reinstated membership expiring %s", membership.ExpiresAt.Time.Format(time.RFC3339)),
-	}}, nil
+	return nil, nil
 }
 
 // studentUpdate is the resolved outcome of the student ID and student status

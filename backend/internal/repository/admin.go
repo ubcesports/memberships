@@ -30,8 +30,6 @@ type AdminStore interface {
 	GetUserMemberships(ctx context.Context, userId string) ([]db.GetAllMembershipsWithTransactionsRow, error)
 	HasActiveMembership(ctx context.Context, userId string) (bool, error)
 	CancelActiveMembershipsByUserId(ctx context.Context, userId string, occurredAt time.Time) error
-	GetMostRecentCancelledMembership(ctx context.Context, userId string) (db.GetMostRecentCancelledMembershipRow, error)
-	ReinstateMembership(ctx context.Context, membershipId string) (int64, error)
 	WithTx(ctx context.Context, fn func(AdminStore) error) error
 }
 
@@ -232,31 +230,6 @@ func (r *AdminRepository) CancelActiveMembershipsByUserId(
 		return fmt.Errorf("cancel active memberships: %w", err)
 	}
 	return nil
-}
-
-func (r *AdminRepository) GetMostRecentCancelledMembership(
-	ctx context.Context,
-	userId string,
-) (db.GetMostRecentCancelledMembershipRow, error) {
-	pgUserId, err := util.GetValidatedUUID(userId)
-	if err != nil {
-		return db.GetMostRecentCancelledMembershipRow{}, err
-	}
-
-	// pgx.ErrNoRows is returned unwrapped so callers can tell "no cancelled
-	// membership" apart from a genuine query failure.
-	return r.store.GetMostRecentCancelledMembership(ctx, pgUserId)
-}
-
-// ReinstateMembership clears cancelled_at on a membership that has not expired
-// yet, returning the number of rows it updated.
-func (r *AdminRepository) ReinstateMembership(ctx context.Context, membershipId string) (int64, error) {
-	pgMembershipId, err := util.GetValidatedUUID(membershipId)
-	if err != nil {
-		return 0, err
-	}
-
-	return r.store.ReinstateMembership(ctx, pgMembershipId)
 }
 
 // executes fn within a database transaction.
