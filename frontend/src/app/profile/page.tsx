@@ -6,6 +6,7 @@ import { ActionButton } from "@/components/action-button";
 import { ActionLink } from "@/components/action-link";
 import { DetailRow } from "@/components/detail-row";
 import { BasePage } from "@/components/layout/base-page";
+import { MembershipHistoryItem } from "@/components/membership/membership-history-item";
 import { StatusBadge } from "@/components/status-badge";
 import { SummaryTile } from "@/components/summary-tile";
 import { SurfacePanel } from "@/components/surface-panel";
@@ -14,33 +15,11 @@ import { useSignOut } from "@/lib/use-sign-out.hook";
 import { formatDate, getInitials } from "@/lib/utils/formatting";
 import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
 import { useProfile } from "@/lib/profile.hook";
-import { type Membership, useAllMemberships } from "@/lib/membership.hook";
+import { useAllMemberships } from "@/lib/membership.hook";
 import Image from "next/image";
 
 const ZETROVA_ACCOUNT_URL =
   process.env.NEXT_PUBLIC_ZETROVA_ACCOUNT_URL || "https://auth.zetrova.com/dashboard";
-
-type MembershipStatus = "active" | "expired" | "cancelled";
-
-function getMembershipStatus(membership: Membership): MembershipStatus {
-  if (membership.cancelled_at) return "cancelled";
-  if (new Date(membership.expires_at) < new Date()) return "expired";
-  return "active";
-}
-
-const MEMBERSHIP_STATUS_TONE = {
-  active: "success",
-  expired: "muted",
-  cancelled: "muted",
-} as const;
-
-const TRANSACTION_STATUS_TONE = {
-  completed: "success",
-  pending: "warning",
-  failed: "muted",
-  refunded: "muted",
-  expired: "muted",
-} as const;
 
 export default function ProfilePage() {
   const { data: profile, isPending } = useProfile();
@@ -64,6 +43,12 @@ export default function ProfilePage() {
 
   const displayName = profile?.name ?? profile?.email ?? "Profile";
 
+  const studentBadge = profile?.isStudent ? (
+    <StatusBadge tone="success">Student</StatusBadge>
+  ) : (
+    <StatusBadge tone="muted">Non-student</StatusBadge>
+  );
+
   return (
     <BasePage>
       <div className="flex flex-1 items-center py-12">
@@ -71,7 +56,7 @@ export default function ProfilePage() {
           <div className="mt-10 border border-brand-border bg-brand-surface/80 shadow-2xl shadow-black/25">
             <div className="flex flex-col gap-4 border-b border-brand-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div>
-                <h2 className="text-lg font-semibold text-brand-text">UBCEA Membership</h2>
+                <h2 className="text-lg font-semibold text-brand-text">UBCEA Account</h2>
                 <p className="mt-1 text-sm text-brand-text-subtle">
                   Your profile and account status.
                 </p>
@@ -152,20 +137,10 @@ export default function ProfilePage() {
                         }
                         tone="default"
                       />
-                      <SummaryTile
-                        label="Student status"
-                        value={profile.isStudent ? "Student" : "Non-student"}
-                        detail={
-                          profile.isStudent
-                            ? "Student pricing and eligibility can apply."
-                            : "Registered as a community member."
-                        }
-                        tone={profile.isStudent ? "success" : "muted"}
-                      />
                     </div>
                   </SurfacePanel>
 
-                  <SurfacePanel>
+                  <SurfacePanel className="flex flex-col">
                     <div className="px-5 py-4">
                       <h3 className="text-base font-semibold text-brand-text">Account Details</h3>
                     </div>
@@ -173,13 +148,7 @@ export default function ProfilePage() {
                       <DetailRow label="Email">
                         <span className="break-words">{profile.email}</span>
                       </DetailRow>
-                      <DetailRow label="Email verified">
-                        {profile.emailVerifiedAt ? (
-                          <StatusBadge tone="success">Verified</StatusBadge>
-                        ) : (
-                          <StatusBadge tone="muted">Not verified</StatusBadge>
-                        )}
-                      </DetailRow>
+                      <DetailRow label="Student status">{studentBadge}</DetailRow>
                       <DetailRow label="Student ID">
                         {profile.studentId ? (
                           <span className="break-words font-mono">{profile.studentId}</span>
@@ -187,15 +156,8 @@ export default function ProfilePage() {
                           <StatusBadge tone="muted">Not provided</StatusBadge>
                         )}
                       </DetailRow>
-                      <DetailRow label="Onboarding">
-                        <StatusBadge tone={profile.onboardingCompletedAt ? "success" : "warning"}>
-                          {profile.onboardingCompletedAt
-                            ? `Completed ${formatDate(profile.onboardingCompletedAt)}`
-                            : "Pending"}
-                        </StatusBadge>
-                      </DetailRow>
                     </dl>
-                    <div className="grid gap-3 border-t border-brand-border px-5 py-4 sm:grid-cols-2">
+                    <div className="mt-auto grid gap-3 border-t border-brand-border px-5 py-4 sm:grid-cols-2">
                       <ActionLink
                         href={ZETROVA_ACCOUNT_URL}
                         icon={<ExternalLink aria-hidden="true" className="size-4" />}
@@ -216,7 +178,12 @@ export default function ProfilePage() {
 
                 <SurfacePanel className="mt-6">
                   <div className="px-5 py-4">
-                    <h3 className="text-base font-semibold text-brand-text">Membership History</h3>
+                    <h3
+                      id="membership"
+                      className="scroll-mt-28 text-base font-semibold text-brand-text"
+                    >
+                      Membership History
+                    </h3>
                   </div>
 
                   {membershipsPending ? (
@@ -230,52 +197,9 @@ export default function ProfilePage() {
                     </p>
                   ) : (
                     <ul className="divide-y divide-brand-border border-t border-brand-border">
-                      {memberships.map((membership) => {
-                        const status = getMembershipStatus(membership);
-                        const tierName = membership.tier_title;
-
-                        return (
-                          <li
-                            key={membership.id}
-                            className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2 px-5 py-4"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-medium text-brand-text">
-                                {tierName}
-                              </span>
-                              <StatusBadge tone={MEMBERSHIP_STATUS_TONE[status]}>
-                                {titleCase(status)}
-                              </StatusBadge>
-                            </div>
-
-                            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-brand-text-muted">
-                              <span>
-                                Started{" "}
-                                <span className="text-brand-text">
-                                  {formatDate(membership.started_at)}
-                                </span>
-                              </span>
-                              <span>
-                                {membership.cancelled_at ? "Cancelled" : "Expires"}{" "}
-                                <span className="text-brand-text">
-                                  {formatDate(membership.cancelled_at ?? membership.expires_at)}
-                                </span>
-                              </span>
-                              <span>
-                                <StatusBadge
-                                  tone={TRANSACTION_STATUS_TONE[membership.transaction.status]}
-                                >
-                                  {titleCase(membership.transaction.status)}
-                                </StatusBadge>
-                              </span>
-                              <span>
-                                ${membership.transaction.amount_paid} ·{" "}
-                                {titleCase(membership.transaction.group_at_purchase)}
-                              </span>
-                            </div>
-                          </li>
-                        );
-                      })}
+                      {memberships.map((membership) => (
+                        <MembershipHistoryItem key={membership.id} membership={membership} />
+                      ))}
                     </ul>
                   )}
                 </SurfacePanel>

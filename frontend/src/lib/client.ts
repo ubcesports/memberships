@@ -18,6 +18,10 @@ const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiErrorResponse | Blob>) => {
+    if (axios.isCancel(error)) {
+      return Promise.reject(error);
+    }
+
     const status = error.response?.status;
     const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
 
