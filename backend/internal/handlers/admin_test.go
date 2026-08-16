@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/ubcesports/memberships/internal/database/db"
+	"github.com/ubcesports/memberships/internal/dto"
 )
 
 func TestParseAdminFiltersForExportIgnoresPagination(t *testing.T) {
@@ -59,6 +62,48 @@ func TestParseAdminAuditLogFiltersRejectsInvalidPagination(t *testing.T) {
 		if _, err := parseAdminAuditLogFilters(req); err == nil {
 			t.Fatalf("expected invalid pagination error for %s", target)
 		}
+	}
+}
+
+func TestBuildUpdateUserRequestMapsBodyToServiceTypes(t *testing.T) {
+	studentID := "12345678"
+	isStudent := true
+	role := dto.RoleAdmin
+
+	request := buildUpdateUserRequest(dto.AdminUpdateUserRequest{
+		StudentID:        &studentID,
+		IsStudent:        &isStudent,
+		GroupsAdd:        []dto.GroupType{dto.GroupBoard},
+		GroupsRemove:     []dto.GroupType{dto.GroupMember, dto.GroupExecutive},
+		Role:             &role,
+		CancelMembership: true,
+	})
+
+	if request.StudentID == nil || *request.StudentID != "12345678" {
+		t.Fatalf("expected student ID to be carried over, got %#v", request.StudentID)
+	}
+	if request.IsStudent == nil || !*request.IsStudent {
+		t.Fatalf("expected is_student=true, got %#v", request.IsStudent)
+	}
+	if request.Role == nil || *request.Role != db.RoleTypeAdmin {
+		t.Fatalf("expected admin role, got %#v", request.Role)
+	}
+	if len(request.GroupsAdd) != 1 || request.GroupsAdd[0] != db.GroupTypeBoard {
+		t.Fatalf("unexpected groups to add: %v", request.GroupsAdd)
+	}
+	if len(request.GroupsRemove) != 2 || request.GroupsRemove[1] != db.GroupTypeExecutive {
+		t.Fatalf("unexpected groups to remove: %v", request.GroupsRemove)
+	}
+	if !request.CancelMembership {
+		t.Fatalf("unexpected membership flags: %#v", request)
+	}
+}
+
+func TestBuildUpdateUserRequestLeavesAbsentRoleNil(t *testing.T) {
+	request := buildUpdateUserRequest(dto.AdminUpdateUserRequest{})
+
+	if request.Role != nil {
+		t.Fatalf("expected an absent role to stay nil, got %#v", request.Role)
 	}
 }
 

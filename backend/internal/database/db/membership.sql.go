@@ -16,7 +16,10 @@ UPDATE memberships
 SET
     cancelled_at = $2,
     updated_at = $2
-WHERE user_id = $1 AND cancelled_at IS NULL
+WHERE user_id = $1
+    AND cancelled_at IS NULL
+    AND started_at <= NOW()
+    AND expires_at > NOW()
 `
 
 type CancelActiveMembershipsByUserIdParams struct {

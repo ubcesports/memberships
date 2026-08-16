@@ -23,7 +23,7 @@ func RequireAuth(auth *limen.Limen) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session, err := auth.GetSession(r)
 			if err != nil || session == nil {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 				return
 			}
 
@@ -52,7 +52,7 @@ func RequireRole(roles ...string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session := SessionFromContext(r.Context())
 			if session == nil {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 				return
 			}
 			role, _ := session.User.Raw()["role"].(string)
@@ -71,7 +71,7 @@ func RequireOnboarded(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session := SessionFromContext(r.Context())
 		if session == nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 			return
 		}
 		if !isUserOnboarded(session.User) {

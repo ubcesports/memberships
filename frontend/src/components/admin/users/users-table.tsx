@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { StatusBadge } from "@/components/status-badge";
 import { SurfacePanel } from "@/components/surface-panel";
 import type { User } from "@/lib/admin/admin.types";
@@ -99,9 +100,22 @@ export function UsersTable({ users, isLoading, isFetching }: UsersTableProps) {
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.id} className="border-b border-brand-border/70 last:border-b-0">
+              <tr
+                key={user.id}
+                className="relative border-b border-brand-border/70 transition last:border-b-0 hover:bg-white/[0.03]"
+              >
                 <td className="whitespace-nowrap px-4 py-3 font-medium text-brand-text">
-                  {user.full_name}
+                  {/*
+                    The overlay stretches this single anchor across the whole row,
+                    so the row is clickable while keeping real link behaviour:
+                    keyboard focus, middle click, and copy link address.
+                  */}
+                  <Link
+                    href={`/admin/users/${user.id}`}
+                    className="after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-2 focus-visible:outline-brand-primary"
+                  >
+                    {user.full_name}
+                  </Link>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-brand-text-muted">{user.email}</td>
                 <td className="whitespace-nowrap px-4 py-3 font-mono text-brand-text-muted">

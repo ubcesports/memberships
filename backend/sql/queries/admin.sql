@@ -109,6 +109,70 @@ AND (
     )
 );
 
+-- name: GetAdminUserByID :one
+SELECT
+    u.id,
+    u.email,
+    u.student_id,
+    u.role,
+    u.created_at,
+    u.updated_at,
+    u.full_name,
+    u.email_verified_at,
+    u.is_student,
+    u.onboarding_completed_at,
+    u.avatar_url,
+    COALESCE(g.groups, '{}'::text[])::text[] AS groups
+FROM users u
+LEFT JOIN LATERAL (
+    SELECT array_agg(
+        ug."group"::text
+        ORDER BY ug.assigned_at, ug."group"
+    ) AS groups
+    FROM user_groups ug
+    WHERE ug.user_id = u.id
+) g ON true
+WHERE u.id = $1;
+
+-- name: UpdateUserStudentInfo :exec
+UPDATE users
+SET
+    is_student = $2,
+    student_id = $3,
+    updated_at = NOW()
+WHERE id = $1;
+
+-- name: StudentIDExists :one
+SELECT EXISTS (
+    SELECT 1
+    FROM users
+    WHERE student_id = $1
+);
+
+-- name: UpdateUserRole :exec
+UPDATE users
+SET
+    role = $2,
+    updated_at = NOW()
+WHERE id = $1;
+
+-- name: AddUserGroup :exec
+INSERT INTO user_groups (user_id, "group")
+VALUES ($1, $2)
+ON CONFLICT (user_id, "group") DO NOTHING;
+
+-- name: RemoveUserGroup :exec
+DELETE FROM user_groups
+WHERE user_id = $1 AND "group" = $2;
+
+-- name: HasActiveMembershipForUser :one
+SELECT EXISTS (
+    SELECT 1
+    FROM memberships
+    WHERE user_id = $1
+      AND cancelled_at IS NULL
+);
+
 -- name: CreateAdminAuditLog :exec
 INSERT INTO admin_audit_logs (
     actor_user_id,
