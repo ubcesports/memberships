@@ -42,6 +42,56 @@ function TransactionSummary({ membership }: { membership: Membership }) {
   );
 }
 
+function TransactionDetails({ membership }: { membership: Membership }) {
+  const tx = membership.transaction;
+
+  return (
+    <div className="px-5 py-4 text-sm text-brand-text-muted">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <div className="font-medium text-brand-text">Transaction ID</div>
+          <div>{tx.id ?? "—"}</div>
+        </div>
+        <div>
+          <div className="font-medium text-brand-text">Status</div>
+          <div>{titleCase(tx.status ?? "unknown")}</div>
+        </div>
+        <div>
+          <div className="font-medium text-brand-text">Amount</div>
+          <div>
+            {tx.currency ? `${tx.currency.toUpperCase()} ` : ""}
+            {tx.amount_paid ?? "—"}
+          </div>
+        </div>
+        <div>
+          <div className="font-medium text-brand-text">Customer</div>
+          <div>{tx.customer_id ?? "—"}</div>
+        </div>
+        <div>
+          <div className="font-medium text-brand-text">Payment intent</div>
+          <div>{tx.payment_intent ?? "—"}</div>
+        </div>
+        <div>
+          <div className="font-medium text-brand-text">Charge</div>
+          <div>{tx.charge_id ?? "—"}</div>
+        </div>
+        <div className="col-span-2">
+          <div className="font-medium text-brand-text">Created</div>
+          <div>{tx.created_at ? formatDate(tx.created_at) : "—"}</div>
+        </div>
+        {tx.metadata ? (
+          <div className="col-span-2">
+            <div className="font-medium text-brand-text">Metadata</div>
+            <pre className="whitespace-pre-wrap break-words text-xs">
+              {JSON.stringify(tx.metadata)}
+            </pre>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMembershipsPanelProps) {
   const [pendingAction, setPendingAction] = useState<"cancel" | null>(null);
   const { data: catalog } = useMembershipCatalog();
@@ -58,8 +108,7 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
 
   const tierTitleForMembership = (membership: Membership) => {
     // Prefer server-provided title when available (joined on membership_tiers).
-    const serverTitle = (membership as any).tier_title as string | undefined;
-    if (serverTitle) return serverTitle;
+    if (membership.tier_title) return membership.tier_title;
 
     return tierTitle(membership.tier_id);
   };
@@ -86,56 +135,6 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
   const toggleExpanded = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   };
-
-  function TransactionDetails({ membership }: { membership: Membership }) {
-    const tx: any = membership.transaction as any;
-
-    return (
-      <div className="px-5 py-4 text-sm text-brand-text-muted">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <div className="font-medium text-brand-text">Transaction ID</div>
-            <div>{tx.id ?? "—"}</div>
-          </div>
-          <div>
-            <div className="font-medium text-brand-text">Status</div>
-            <div>{titleCase(tx.status ?? "unknown")}</div>
-          </div>
-          <div>
-            <div className="font-medium text-brand-text">Amount</div>
-            <div>
-              {tx.currency ? `${tx.currency.toUpperCase()} ` : ""}
-              {tx.amount_paid ?? "—"}
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-brand-text">Customer</div>
-            <div>{tx.customer_id ?? "—"}</div>
-          </div>
-          <div>
-            <div className="font-medium text-brand-text">Payment intent</div>
-            <div>{tx.payment_intent ?? "—"}</div>
-          </div>
-          <div>
-            <div className="font-medium text-brand-text">Charge</div>
-            <div>{tx.charge_id ?? "—"}</div>
-          </div>
-          <div className="col-span-2">
-            <div className="font-medium text-brand-text">Created</div>
-            <div>{tx.created_at ? formatDate(tx.created_at) : "—"}</div>
-          </div>
-          {tx.metadata ? (
-            <div className="col-span-2">
-              <div className="font-medium text-brand-text">Metadata</div>
-              <pre className="whitespace-pre-wrap break-words text-xs">
-                {JSON.stringify(tx.metadata)}
-              </pre>
-            </div>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-4">
