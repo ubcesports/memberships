@@ -6,7 +6,7 @@ import { useState } from "react";
 import { AuditLogsToolbar } from "@/components/admin/audit-logs/audit-logs-toolbar";
 import { AuditLogsTable } from "@/components/admin/audit-logs/audit-logs-table";
 import { useDebouncedValue } from "@/lib/use-debounced-value.hook";
-import { useResettablePagination } from "@/lib/utils/pagination.hook";
+import { usePagination } from "@/lib/utils/pagination.hook";
 import { useRequireAdmin } from "@/lib/admin/require.admin";
 import { AdminTablePage } from "../admin-table-page";
 import { AdminTablePagination } from "@/components/admin/admin-table-pagination";
@@ -20,7 +20,7 @@ export default function AuditLogsPage() {
 
   const { isAdmin, isProfilePending } = useRequireAdmin();
 
-  const { offset, limit, setOffset, changeLimit } = useResettablePagination(
+  const { offset, limit, setOffset, changeLimit } = usePagination(
     debouncedSearch,
     DEFAULT_PAGE_SIZE,
   );

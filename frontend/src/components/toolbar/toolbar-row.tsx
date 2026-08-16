@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils/cn";
+
 type ToolbarRowProps = {
   children: React.ReactNode;
   justify?: boolean;
@@ -6,9 +8,12 @@ type ToolbarRowProps = {
 export function ToolbarRow({ children, justify = false }: ToolbarRowProps) {
   return (
     <div
-      className={`flex flex-col gap-3 ${
-        justify ? "xl:flex-row xl:items-end xl:justify-between" : "lg:flex-row lg:items-end"
-      }`}
+      className={cn(
+        "flex flex-col gap-3", 
+        justify 
+          ? "xl:flex-row xl:items-end xl:justify-between"
+          : "lg:flex-row lg:items-end"
+      )}
     >
       {children}
     </div>

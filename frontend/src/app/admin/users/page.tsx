@@ -19,7 +19,7 @@ import { useDebouncedValue } from "@/lib/use-debounced-value.hook";
 import { AdminTablePagination } from "@/components/admin/admin-table-pagination";
 import { AdminTablePage } from "../admin-table-page";
 import { useRequireAdmin } from "@/lib/admin/require.admin";
-import { useResettablePagination } from "@/lib/utils/pagination.hook";
+import { usePagination } from "@/lib/utils/pagination.hook";
 
 export default function UsersPage() {
   const { isAdmin, isProfilePending } = useRequireAdmin();
@@ -34,7 +34,7 @@ export default function UsersPage() {
   const [filters, setFilters] = useState<AdminUserFilters>({});
 
   const searchAnchor = `${searchMode}|${debouncedSearch}`;
-  const { offset, limit, setOffset, changeLimit, resetOffset } = useResettablePagination(
+  const { offset, limit, setOffset, changeLimit, resetOffset } = usePagination(
     searchAnchor,
     DEFAULT_PAGE_SIZE,
   );

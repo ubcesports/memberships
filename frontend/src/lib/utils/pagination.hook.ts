@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export function useResettablePagination(anchorKey: string, initialLimit: number) {
+export function usePagination(anchorKey: string, initialLimit: number) {
   const [limit, setLimit] = useState(initialLimit);
   const [pagination, setPagination] = useState({ offset: 0, anchor: "" });
 
