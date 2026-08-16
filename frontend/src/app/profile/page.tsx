@@ -43,6 +43,12 @@ export default function ProfilePage() {
 
   const displayName = profile?.name ?? profile?.email ?? "Profile";
 
+  const studentBadge = profile?.isStudent ? (
+    <StatusBadge tone="success">Student</StatusBadge>
+  ) : (
+    <StatusBadge tone="muted">Non-student</StatusBadge>
+  );
+
   return (
     <BasePage>
       <div className="flex flex-1 items-center py-12">
@@ -142,11 +148,7 @@ export default function ProfilePage() {
                       <DetailRow label="Email">
                         <span className="break-words">{profile.email}</span>
                       </DetailRow>
-                      <DetailRow label="Student status">
-                        <StatusBadge tone={profile.isStudent ? "success" : "muted"}>
-                          {profile.isStudent ? "Student" : "Non-student"}
-                        </StatusBadge>
-                      </DetailRow>
+                      <DetailRow label="Student status">{studentBadge}</DetailRow>
                       <DetailRow label="Student ID">
                         {profile.studentId ? (
                           <span className="break-words font-mono">{profile.studentId}</span>
