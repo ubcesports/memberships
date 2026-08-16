@@ -46,11 +46,18 @@ export type MembershipTransaction = {
   amount_paid: string;
   status: TransactionStatusType;
   group_at_purchase: GroupType;
+  currency?: string;
+  customer_id?: string;
+  payment_intent?: string;
+  charge_id?: string;
+  created_at?: string;
+  metadata?: Record<string, unknown> | null;
 };
 
 export type Membership = {
   id: string;
   tier_id: string;
+  tier_title?: string;
   started_at: string;
   expires_at: string;
   cancelled_at: string | null;

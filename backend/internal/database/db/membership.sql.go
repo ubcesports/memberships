@@ -16,7 +16,10 @@ UPDATE memberships
 SET
     cancelled_at = $2,
     updated_at = $2
-WHERE user_id = $1 AND cancelled_at IS NULL
+WHERE user_id = $1
+    AND cancelled_at IS NULL
+    AND started_at <= NOW()
+    AND expires_at > NOW()
 `
 
 type CancelActiveMembershipsByUserIdParams struct {
@@ -150,6 +153,7 @@ const getAllMembershipsWithTransactions = `-- name: GetAllMembershipsWithTransac
 SELECT
     m.id,
     m.tier_id,
+    mt.title AS tier_title,
     m.started_at,
     m.expires_at,
     m.cancelled_at,
@@ -160,6 +164,8 @@ SELECT
 FROM memberships m
 JOIN transactions t
     ON t.membership_id = m.id
+LEFT JOIN membership_tiers mt
+    ON mt.id = m.tier_id
 WHERE m.user_id = $1
 ORDER BY m.started_at DESC
 `
@@ -167,6 +173,7 @@ ORDER BY m.started_at DESC
 type GetAllMembershipsWithTransactionsRow struct {
 	ID              pgtype.UUID
 	TierID          pgtype.UUID
+	TierTitle       pgtype.Text
 	StartedAt       pgtype.Timestamptz
 	ExpiresAt       pgtype.Timestamptz
 	CancelledAt     pgtype.Timestamptz
@@ -188,6 +195,7 @@ func (q *Queries) GetAllMembershipsWithTransactions(ctx context.Context, userID 
 		if err := rows.Scan(
 			&i.ID,
 			&i.TierID,
+			&i.TierTitle,
 			&i.StartedAt,
 			&i.ExpiresAt,
 			&i.CancelledAt,

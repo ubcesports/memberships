@@ -38,6 +38,7 @@ LIMIT 1;
 SELECT
     m.id,
     m.tier_id,
+    mt.title AS tier_title,
     m.started_at,
     m.expires_at,
     m.cancelled_at,
@@ -48,6 +49,8 @@ SELECT
 FROM memberships m
 JOIN transactions t
     ON t.membership_id = m.id
+LEFT JOIN membership_tiers mt
+    ON mt.id = m.tier_id
 WHERE m.user_id = $1
 ORDER BY m.started_at DESC;
 
@@ -197,4 +200,7 @@ UPDATE memberships
 SET
     cancelled_at = $2,
     updated_at = $2
-WHERE user_id = $1 AND cancelled_at IS NULL;
+WHERE user_id = $1
+    AND cancelled_at IS NULL
+    AND started_at <= NOW()
+    AND expires_at > NOW();
