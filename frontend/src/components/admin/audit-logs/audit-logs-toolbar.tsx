@@ -24,7 +24,7 @@ export function AuditLogsToolbar({
 }: AuditLogsToolbarProps) {
   return (
     <ToolbarContainer>
-      <ToolbarRow>
+      <ToolbarRow justify>
         <SearchField
           label="Search by actor name"
           placeholder="Enter actor name"
