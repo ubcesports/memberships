@@ -1,5 +1,11 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchUser, fetchUserMemberships, fetchUsers, updateUser, fetchAuditLogs } from "./admin.api";
+import {
+  fetchUser,
+  fetchUserMemberships,
+  fetchUsers,
+  updateUser,
+  fetchAuditLogs,
+} from "./admin.api";
 import type {
   AdminUserFilters,
   AdminPagination,

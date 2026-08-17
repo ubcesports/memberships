@@ -20,7 +20,9 @@ export function SearchField({
   className,
 }: SearchFieldProps) {
   return (
-    <label className={cn("flex min-w-40 flex-col gap-1.5 text-sm text-brand-text-subtle", className)}>
+    <label
+      className={cn("flex min-w-40 flex-col gap-1.5 text-sm text-brand-text-subtle", className)}
+    >
       <span>{label}</span>
       <input
         type={type}
