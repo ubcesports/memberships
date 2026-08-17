@@ -18,6 +18,10 @@ const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiErrorResponse | Blob>) => {
+    if (axios.isCancel(error)) {
+      return Promise.reject(error);
+    }
+
     const status = error.response?.status;
     const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
 
@@ -36,12 +40,17 @@ apiClient.interceptors.response.use(
 
     const apiError = data instanceof Blob ? undefined : data;
     const code = apiError?.code;
-    const message = apiError?.message || "Something went wrong. Please try again.";
     const requestId = apiError?.request_id;
 
-    toast.error(message, {
-      description: requestId ? `Request ID: ${requestId}` : undefined,
-    });
+    // Only show a toast when the backend gave us an actual message to show.
+    // A response that doesn't match the expected {code, message} shape (e.g.
+    // a plain-text error, or no response at all) has nothing useful to say,
+    // so stay quiet rather than show a generic "something went wrong".
+    if (apiError?.message) {
+      toast.error(apiError.message, {
+        description: requestId ? `Request ID: ${requestId}` : undefined,
+      });
+    }
 
     if (status === 401) {
       if (currentPath !== "/login") {

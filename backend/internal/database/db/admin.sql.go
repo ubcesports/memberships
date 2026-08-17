@@ -11,6 +11,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addUserGroup = `-- name: AddUserGroup :exec
+INSERT INTO user_groups (user_id, "group")
+VALUES ($1, $2)
+ON CONFLICT (user_id, "group") DO NOTHING
+`
+
+type AddUserGroupParams struct {
+	UserID pgtype.UUID
+	Group  GroupType
+}
+
+func (q *Queries) AddUserGroup(ctx context.Context, arg AddUserGroupParams) error {
+	_, err := q.db.Exec(ctx, addUserGroup, arg.UserID, arg.Group)
+	return err
+}
+
 const countAdminAuditLogs = `-- name: CountAdminAuditLogs :one
 SELECT COUNT(*)
 FROM admin_audit_logs aal
@@ -226,6 +242,67 @@ func (q *Queries) GetAdminAuditLogs(ctx context.Context, arg GetAdminAuditLogsPa
 	return items, nil
 }
 
+const getAdminUserByID = `-- name: GetAdminUserByID :one
+SELECT
+    u.id,
+    u.email,
+    u.student_id,
+    u.role,
+    u.created_at,
+    u.updated_at,
+    u.full_name,
+    u.email_verified_at,
+    u.is_student,
+    u.onboarding_completed_at,
+    u.avatar_url,
+    COALESCE(g.groups, '{}'::text[])::text[] AS groups
+FROM users u
+LEFT JOIN LATERAL (
+    SELECT array_agg(
+        ug."group"::text
+        ORDER BY ug.assigned_at, ug."group"
+    ) AS groups
+    FROM user_groups ug
+    WHERE ug.user_id = u.id
+) g ON true
+WHERE u.id = $1
+`
+
+type GetAdminUserByIDRow struct {
+	ID                    pgtype.UUID
+	Email                 string
+	StudentID             pgtype.Text
+	Role                  RoleType
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	FullName              string
+	EmailVerifiedAt       pgtype.Timestamptz
+	IsStudent             bool
+	OnboardingCompletedAt pgtype.Timestamptz
+	AvatarUrl             pgtype.Text
+	Groups                []string
+}
+
+func (q *Queries) GetAdminUserByID(ctx context.Context, id pgtype.UUID) (GetAdminUserByIDRow, error) {
+	row := q.db.QueryRow(ctx, getAdminUserByID, id)
+	var i GetAdminUserByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.StudentID,
+		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.FullName,
+		&i.EmailVerifiedAt,
+		&i.IsStudent,
+		&i.OnboardingCompletedAt,
+		&i.AvatarUrl,
+		&i.Groups,
+	)
+	return i, err
+}
+
 const getUsersAdmin = `-- name: GetUsersAdmin :many
 WITH args AS (
     SELECT
@@ -361,4 +438,88 @@ func (q *Queries) GetUsersAdmin(ctx context.Context, arg GetUsersAdminParams) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const hasActiveMembershipForUser = `-- name: HasActiveMembershipForUser :one
+SELECT EXISTS (
+    SELECT 1
+    FROM memberships
+    WHERE user_id = $1
+      AND cancelled_at IS NULL
+)
+`
+
+func (q *Queries) HasActiveMembershipForUser(ctx context.Context, userID pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasActiveMembershipForUser, userID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const removeUserGroup = `-- name: RemoveUserGroup :exec
+DELETE FROM user_groups
+WHERE user_id = $1 AND "group" = $2
+`
+
+type RemoveUserGroupParams struct {
+	UserID pgtype.UUID
+	Group  GroupType
+}
+
+func (q *Queries) RemoveUserGroup(ctx context.Context, arg RemoveUserGroupParams) error {
+	_, err := q.db.Exec(ctx, removeUserGroup, arg.UserID, arg.Group)
+	return err
+}
+
+const studentIDExists = `-- name: StudentIDExists :one
+SELECT EXISTS (
+    SELECT 1
+    FROM users
+    WHERE student_id = $1
+)
+`
+
+func (q *Queries) StudentIDExists(ctx context.Context, studentID pgtype.Text) (bool, error) {
+	row := q.db.QueryRow(ctx, studentIDExists, studentID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const updateUserRole = `-- name: UpdateUserRole :exec
+UPDATE users
+SET
+    role = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateUserRoleParams struct {
+	ID   pgtype.UUID
+	Role RoleType
+}
+
+func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error {
+	_, err := q.db.Exec(ctx, updateUserRole, arg.ID, arg.Role)
+	return err
+}
+
+const updateUserStudentInfo = `-- name: UpdateUserStudentInfo :exec
+UPDATE users
+SET
+    is_student = $2,
+    student_id = $3,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateUserStudentInfoParams struct {
+	ID        pgtype.UUID
+	IsStudent bool
+	StudentID pgtype.Text
+}
+
+func (q *Queries) UpdateUserStudentInfo(ctx context.Context, arg UpdateUserStudentInfoParams) error {
+	_, err := q.db.Exec(ctx, updateUserStudentInfo, arg.ID, arg.IsStudent, arg.StudentID)
+	return err
 }

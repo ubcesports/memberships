@@ -25,14 +25,15 @@ func NewLimen(db *sql.DB) (*limen.Limen, error) {
 	schema := limen.NewDefaultSchemaConfig(
 		limen.WithSchemaIDGenerator(&uuidGenerator{}),
 	)
-	jasperLabsProvider := oauthgeneric.New(
-		oauthgeneric.WithName("jasperlabs"),
+
+	zetrovaProvider := oauthgeneric.New(
+		oauthgeneric.WithName("zetrova"),
 		oauthgeneric.WithClientID(os.Getenv("OAUTH_CLIENT_ID")),
 		oauthgeneric.WithClientSecret(os.Getenv("OAUTH_CLIENT_SECRET")),
 		oauthgeneric.WithRedirectURL(os.Getenv("OAUTH_CALLBACK_URL")),
 		oauthgeneric.WithScopes("openid", "profile", "email"),
 
-		oauthgeneric.WithDiscoveryURL("https://auth.jasperlabs.net/.well-known/openid-configuration"),
+		oauthgeneric.WithDiscoveryURL("https://id.zetrova.com/.well-known/openid-configuration"),
 
 		oauthgeneric.WithMapUserInfo(func(raw map[string]any) (*oauth.ProviderUserInfo, error) {
 			id, _ := raw["sub"].(string)
@@ -62,13 +63,13 @@ func NewLimen(db *sql.DB) (*limen.Limen, error) {
 		Schema: schema,
 		Plugins: []limen.Plugin{
 			oauth.New(
-				oauth.WithProviders(jasperLabsProvider),
+				oauth.WithProviders(zetrovaProvider),
 				oauth.WithGetUserInfo(func(ctx context.Context, provider string, token *oauth.TokenResponse) (*oauth.ProviderUserInfo, error) {
-					info, err := jasperLabsProvider.GetUserInfo(ctx, token)
+					info, err := zetrovaProvider.GetUserInfo(ctx, token)
 					if err != nil {
 						return nil, err
 					}
-					if provider == "jasperlabs" && info != nil {
+					if provider == "zetrova" && info != nil {
 						if err := syncOAuthUserProfile(ctx, db, provider, info); err != nil {
 							return nil, err
 						}

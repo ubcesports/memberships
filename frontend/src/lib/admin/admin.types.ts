@@ -60,6 +60,48 @@ export type UsersResponse = {
   total: number;
 };
 
+export type UserResponse = {
+  user: User;
+};
+
+export type TransactionStatusType = "pending" | "completed" | "failed" | "refunded" | "expired";
+
+export type MembershipTransaction = {
+  id: string;
+  amount_paid: string;
+  status: TransactionStatusType;
+  group_at_purchase: GroupType;
+  currency?: string;
+  customer_id?: string;
+  payment_intent?: string;
+  charge_id?: string;
+  created_at?: string;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type Membership = {
+  id: string;
+  tier_id: string;
+  tier_title?: string;
+  started_at: string;
+  expires_at: string;
+  cancelled_at: string | null;
+  transaction: MembershipTransaction;
+};
+
+/*
+  Every field is optional. An absent field is left untouched, so only send the
+  ones the admin actually changed.
+*/
+export type UpdateUserRequest = {
+  student_id?: string;
+  is_student?: boolean;
+  groups_add?: GroupType[];
+  groups_remove?: GroupType[];
+  role?: RoleType;
+  cancel_membership?: boolean;
+};
+
 export type AdminPagination = {
   limit: number;
   offset: number;

@@ -92,7 +92,7 @@ func TestCORSMiddlewareHandlesPreflight(t *testing.T) {
 		t.Fatal("next handler should not run for preflight requests")
 	}))
 
-	req := httptest.NewRequest(http.MethodOptions, "/oauth/jasperlabs/authorize", nil)
+	req := httptest.NewRequest(http.MethodOptions, "/oauth/zetrova/authorize", nil)
 	req.Header.Set("Origin", "http://localhost:3000")
 	req.Header.Set("Access-Control-Request-Method", http.MethodGet)
 	rec := httptest.NewRecorder()

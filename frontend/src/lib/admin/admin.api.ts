@@ -3,6 +3,10 @@ import type {
   AdminUserFilters,
   AdminPagination,
   AppliedSearch,
+  Membership,
+  UpdateUserRequest,
+  User,
+  UserResponse,
   UsersResponse,
   AuditLogResponse,
 } from "./admin.types";
@@ -50,6 +54,29 @@ export async function fetchUsers(
   });
 
   return response.data;
+}
+
+export async function fetchUser(userId: string, signal?: AbortSignal): Promise<User> {
+  const response = await apiClient.get<UserResponse>(`/admin/users/${userId}`, { signal });
+
+  return response.data.user;
+}
+
+export async function fetchUserMemberships(
+  userId: string,
+  signal?: AbortSignal,
+): Promise<Membership[]> {
+  const response = await apiClient.get<Membership[]>(`/admin/users/${userId}/memberships`, {
+    signal,
+  });
+
+  return response.data ?? [];
+}
+
+export async function updateUser(userId: string, body: UpdateUserRequest): Promise<User> {
+  const response = await apiClient.patch<UserResponse>(`/admin/users/${userId}`, body);
+
+  return response.data.user;
 }
 
 export async function exportUsersCSV(
