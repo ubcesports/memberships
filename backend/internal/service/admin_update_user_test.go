@@ -62,6 +62,10 @@ func (f *fakeAdminStore) CreateAdminAuditLog(_ context.Context, params db.Create
 	return nil
 }
 
+func (f *fakeAdminStore) CountAdminAuditLogs(context.Context, pgtype.Text) (int64, error) {
+	return 0, nil
+}
+
 func (f *fakeAdminStore) GetAdminAuditLogs(context.Context, db.GetAdminAuditLogsParams) ([]db.GetAdminAuditLogsRow, error) {
 	return nil, nil
 }
