@@ -27,6 +27,24 @@ func (q *Queries) AddUserGroup(ctx context.Context, arg AddUserGroupParams) erro
 	return err
 }
 
+const countAdminAuditLogs = `-- name: CountAdminAuditLogs :one
+SELECT COUNT(*)
+FROM admin_audit_logs aal
+JOIN users actor
+    ON actor.id = aal.actor_user_id
+WHERE (
+    $1::text IS NULL
+    OR actor.full_name ILIKE '%' || $1::text || '%'
+)
+`
+
+func (q *Queries) CountAdminAuditLogs(ctx context.Context, actorName pgtype.Text) (int64, error) {
+	row := q.db.QueryRow(ctx, countAdminAuditLogs, actorName)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countUsersAdmin = `-- name: CountUsersAdmin :one
 WITH args AS (
     SELECT

@@ -317,7 +317,7 @@ func (s *AdminService) UpdateUser(
 	return profile, nil
 }
 
-func (s *AdminService) GetAdminAuditLogs(ctx context.Context, filters AdminAuditLogFilters) ([]dto.AdminAuditLogResponse, error) {
+func (s *AdminService) GetAdminAuditLogs(ctx context.Context, filters AdminAuditLogFilters) ([]dto.AdminAuditLogResponse, int64, error) {
 	// Ensure limit is a proper number. Shouldn't return too many items at once
 	if filters.Limit <= 0 {
 		filters.Limit = 25
@@ -330,6 +330,11 @@ func (s *AdminService) GetAdminAuditLogs(ctx context.Context, filters AdminAudit
 	}
 
 	actorName := strings.TrimSpace(filters.ActorName)
+	total, err := s.adminRepository.CountAdminAuditLogs(ctx, pgtype.Text{
+		String: actorName,
+		Valid:  actorName != "",
+	})
+
 	rows, err := s.adminRepository.GetAdminAuditLogs(ctx, db.GetAdminAuditLogsParams{
 		ActorName: pgtype.Text{
 			String: actorName,
@@ -339,7 +344,7 @@ func (s *AdminService) GetAdminAuditLogs(ctx context.Context, filters AdminAudit
 		Offset: filters.Offset,
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	logs := make([]dto.AdminAuditLogResponse, 0, len(rows))
@@ -366,6 +371,45 @@ func (s *AdminService) GetAdminAuditLogs(ctx context.Context, filters AdminAudit
 			RequestId:   row.RequestID,
 			TargetUser:  targetUser,
 		})
+	}
+
+	return logs, total, nil
+}
+
+func (s *AdminService) ExportAuditLogs(
+	ctx context.Context,
+	filters AdminAuditLogFilters,
+	actorId string,
+	requestId string,
+) ([]dto.AdminAuditLogResponse, error) {
+	logs, exportErr := s.getAdminAuditLogs(ctx, buildAdminAuditLogParams(filters))
+
+	outcome := db.AdminAuditOutcomeTypeSuccess
+	description := fmt.Sprintf("Exported %d audit logs", len(logs))
+
+	if exportErr != nil {
+		outcome = db.AdminAuditOutcomeTypeFailed
+		description = "Failed to export audit logs"
+	}
+
+	auditErr := s.createAdminAuditLog(ctx, s.adminRepository, AdminAuditLogInput{
+		ActorUserID: actorId,
+		Action:      "audit_logs.exported",
+		Outcome:     outcome,
+		RequestID:   requestId,
+		Description: description,
+	})
+
+	if auditErr != nil {
+		if exportErr != nil {
+			return nil, errors.Join(exportErr, auditErr)
+		}
+
+		return nil, auditErr
+	}
+
+	if exportErr != nil {
+		return nil, exportErr
 	}
 
 	return logs, nil
@@ -853,4 +897,47 @@ func (s *AdminService) getUsers(ctx context.Context, params db.GetUsersAdminPara
 	}
 
 	return users, nil
+}
+
+func buildAdminAuditLogParams(filters AdminAuditLogFilters) db.GetAdminAuditLogsParams {
+	actorName := strings.TrimSpace(filters.ActorName)
+	return db.GetAdminAuditLogsParams{
+		ActorName: pgtype.Text{
+			String: actorName,
+			Valid:  actorName != "",
+		},
+		Limit:  filters.Limit,
+		Offset: filters.Offset,
+	}
+}
+
+func (s *AdminService) getAdminAuditLogs(ctx context.Context, params db.GetAdminAuditLogsParams) ([]dto.AdminAuditLogResponse, error) {
+	rows, err := s.adminRepository.GetAdminAuditLogs(ctx, params)
+
+	if err != nil {
+		return nil, err
+	}
+
+	logs := make([]dto.AdminAuditLogResponse, 0, len(rows))
+	for _, row := range rows {
+		logs = append(logs, dto.AdminAuditLogResponse{
+			Actor: dto.AdminAuditLogActor{
+				ActorUserId:    row.ActorID.String(),
+				ActorFullName:  row.ActorName,
+				ActorAvatarURL: row.ActorAvatarUrl.String,
+			},
+			OccuredAt:   row.OccurredAt.Time,
+			Action:      row.Action,
+			Description: util.TextPointer(row.Description),
+			Outcome:     dto.AdminAuditLogOutcomeType(row.Outcome),
+			RequestId:   row.RequestID,
+			TargetUser: &dto.AdminAuditLogActor{
+				ActorUserId:    row.TargetID.String(),
+				ActorFullName:  row.TargetName.String,
+				ActorAvatarURL: row.TargetAvatarUrl.String,
+			},
+		})
+	}
+
+	return logs, nil
 }

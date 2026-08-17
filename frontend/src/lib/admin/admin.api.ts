@@ -8,6 +8,7 @@ import type {
   User,
   UserResponse,
   UsersResponse,
+  AuditLogResponse,
 } from "./admin.types";
 
 export function buildAdminUserParams(
@@ -85,6 +86,46 @@ export async function exportUsersCSV(
 ): Promise<Blob> {
   const response = await apiClient.get<Blob>("/admin/users/export", {
     params: buildAdminUserParams(appliedSearch, filters),
+    responseType: "blob",
+    signal,
+  });
+
+  return response.data;
+}
+
+export function buildAdminAuditLogParams(
+  actorName?: string,
+  pagination?: AdminPagination,
+): Record<string, string | number> {
+  const params: Record<string, string | number> = {};
+
+  if (actorName?.trim()) {
+    params.actor_name = actorName.trim();
+  }
+
+  if (pagination) {
+    params.limit = pagination.limit;
+    params.offset = pagination.offset;
+  }
+
+  return params;
+}
+
+export async function fetchAuditLogs(
+  actorName?: string,
+  pagination?: AdminPagination,
+  signal?: AbortSignal,
+): Promise<AuditLogResponse> {
+  const response = await apiClient.get<AuditLogResponse>("/admin/audit-logs", {
+    params: buildAdminAuditLogParams(actorName, pagination),
+    signal,
+  });
+  return response.data;
+}
+
+export async function exportAuditLogsCSV(actorName?: string, signal?: AbortSignal): Promise<Blob> {
+  const response = await apiClient.get<Blob>("/admin/audit-logs/export", {
+    params: buildAdminAuditLogParams(actorName),
     responseType: "blob",
     signal,
   });

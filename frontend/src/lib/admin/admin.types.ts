@@ -4,6 +4,8 @@ export type GroupType = "member" | "competitive_team" | "executive" | "director"
 
 export type SearchMode = "full_name" | "email" | "student_id";
 
+export type IsStudent = "yes" | "no";
+
 export type AppliedSearch = {
   mode: SearchMode;
   value: string;
@@ -28,6 +30,29 @@ export type User = {
   onboarding_completed_at: string | null;
   avatar_url: string | null;
   groups: GroupType[];
+};
+
+export type AuditLogActor = {
+  actor_user_id: string;
+  actor_full_name: string;
+  actor_avatar_url: string;
+};
+
+export type AuditLogOutcome = "success" | "failed" | "denied";
+
+export type AuditLogResponse = {
+  logs: AuditLogEntry[];
+  total: number;
+};
+
+export type AuditLogEntry = {
+  actor: AuditLogActor;
+  occured_at: string;
+  action: string;
+  description: string | null;
+  outcome: AuditLogOutcome;
+  request_id: string;
+  target_user: AuditLogActor | null;
 };
 
 export type UsersResponse = {
@@ -103,4 +128,9 @@ export const SEARCH_MODE_OPTIONS: { value: SearchMode; label: string }[] = [
   { value: "full_name", label: "Full name" },
   { value: "email", label: "Email" },
   { value: "student_id", label: "Student ID" },
+];
+
+export const IS_STUDENT_OPTIONS: { value: IsStudent; label: string }[] = [
+  { value: "yes", label: "Yes" },
+  { value: "no", label: "No" },
 ];

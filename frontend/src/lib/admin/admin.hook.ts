@@ -1,5 +1,11 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchUser, fetchUserMemberships, fetchUsers, updateUser } from "./admin.api";
+import {
+  fetchUser,
+  fetchUserMemberships,
+  fetchUsers,
+  updateUser,
+  fetchAuditLogs,
+} from "./admin.api";
 import type {
   AdminUserFilters,
   AdminPagination,
@@ -56,5 +62,18 @@ export function useUpdateUser(userId: string) {
         queryClient.invalidateQueries({ queryKey: ["admin", "user", userId, "memberships"] });
       }
     },
+  });
+}
+
+export function useAuditLogs(
+  actorName?: string,
+  pagination?: AdminPagination,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: ["admin", "audit-logs", { actorName, pagination }],
+    queryFn: ({ signal }) => fetchAuditLogs(actorName, pagination, signal),
+    placeholderData: keepPreviousData,
+    enabled: options?.enabled ?? true,
   });
 }
