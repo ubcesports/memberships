@@ -19,6 +19,7 @@ import (
 type AdminStore interface {
 	GetUsers(ctx context.Context, params db.GetUsersAdminParams) ([]db.GetUsersAdminRow, error)
 	CountUsers(ctx context.Context, params db.CountUsersAdminParams) (int64, error)
+	CountAdminAuditLogs(ctx context.Context, params pgtype.Text) (int64, error)
 	CreateAdminAuditLog(ctx context.Context, params db.CreateAdminAuditLogParams) error
 	GetAdminAuditLogs(ctx context.Context, params db.GetAdminAuditLogsParams) ([]db.GetAdminAuditLogsRow, error)
 	GetUserByID(ctx context.Context, userId string) (db.GetAdminUserByIDRow, error)

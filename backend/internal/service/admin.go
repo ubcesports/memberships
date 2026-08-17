@@ -392,7 +392,7 @@ func (s *AdminService) ExportAuditLogs(
 		description = "Failed to export audit logs"
 	}
 
-	auditErr := s.createAdminAuditLog(ctx, AdminAuditLogInput{
+	auditErr := s.createAdminAuditLog(ctx, s.adminRepository, AdminAuditLogInput{
 		ActorUserID: actorId,
 		Action:      "audit_logs.exported",
 		Outcome:     outcome,
