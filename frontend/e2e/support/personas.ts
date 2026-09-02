@@ -12,6 +12,8 @@ export type TestPersona = {
   userId: string;
   email: string;
   sessionToken: string;
+  isStudent: boolean;
+  groups: Group[];
 };
 
 export async function createPersona({ isStudent, groups }: PersonaOptions): Promise<TestPersona> {
@@ -28,7 +30,7 @@ export async function createPersona({ isStudent, groups }: PersonaOptions): Prom
   const email = `e2e-${unique}@example.test`;
   const studentId = isStudent ? `TEST-${unique.slice(0, 8)}` : null;
   const sessionToken = randomUUID();
-  const personaGroups = [...new Set(groups ?? ["member"])];
+  const personaGroups = [...new Set<Group>(groups ?? ["member"])];
 
   try {
     await client.query("BEGIN");
@@ -64,15 +66,13 @@ export async function createPersona({ isStudent, groups }: PersonaOptions): Prom
 
     const userId = userResult.rows[0].id;
 
-    const persistedGroups = personaGroups.filter((personaGroup) => personaGroup !== "member");
-
-    if (persistedGroups.length > 0) {
+    if (personaGroups.length > 0) {
       await client.query(
         `
           INSERT INTO user_groups (user_id, "group")
           SELECT $1, unnest($2::group_type[])
         `,
-        [userId, persistedGroups],
+        [userId, personaGroups],
       );
     }
 
@@ -107,10 +107,81 @@ export async function createPersona({ isStudent, groups }: PersonaOptions): Prom
 
     await client.query("COMMIT");
 
-    return { userId, email, sessionToken };
+    return { userId, email, sessionToken, isStudent, groups: personaGroups };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function setPersonaGroups(persona: TestPersona, groups: Group[]) {
+  const connectionString = process.env.E2E_DATABASE_URL;
+
+  if (!connectionString) {
+    throw new Error("E2E_DATABASE_URL is required");
+  }
+
+  const client = new Client({ connectionString });
+  await client.connect();
+
+  const personaGroups = [...new Set<Group>(groups)];
+
+  try {
+    await client.query("BEGIN");
+    await client.query(`DELETE FROM user_groups WHERE user_id = $1`, [persona.userId]);
+
+    if (personaGroups.length > 0) {
+      await client.query(
+        `
+          INSERT INTO user_groups (user_id, "group")
+          SELECT $1, unnest($2::group_type[])
+        `,
+        [persona.userId, personaGroups],
+      );
+    }
+
+    await client.query("COMMIT");
+    persona.groups = personaGroups;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function setPersonaStudentStatus(persona: TestPersona, isStudent: boolean) {
+  const connectionString = process.env.E2E_DATABASE_URL;
+
+  if (!connectionString) {
+    throw new Error("E2E_DATABASE_URL is required");
+  }
+
+  const client = new Client({ connectionString });
+  await client.connect();
+
+  const studentId = isStudent ? `TEST-${randomUUID().slice(0, 8)}` : null;
+
+  try {
+    const result = await client.query(
+      `
+        UPDATE users
+        SET
+          is_student = $2,
+          student_id = $3,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [persona.userId, isStudent, studentId],
+    );
+
+    if (result.rowCount !== 1) {
+      throw new Error(`Persona user "${persona.userId}" was not found`);
+    }
+
+    persona.isStudent = isStudent;
   } finally {
     await client.end();
   }
