@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -42,18 +43,106 @@ func NewMembershipRepository(pool *pgxpool.Pool, store *db.Queries) *MembershipR
 	return &MembershipRepository{pool: pool, store: store}
 }
 
+func (r *MembershipRepository) GetActiveTiersWithPrices(
+	ctx context.Context,
+) ([]dto.MembershipTierDTO, error) {
+	rows, err := r.store.GetActiveTiersWithPrices(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	tiers := make([]dto.MembershipTierDTO, 0, len(rows))
+	indexByTierID := make(map[string]int)
+
+	for _, row := range rows {
+		tierID := row.ID.String()
+
+		var studentRequired *bool
+		if row.IsStudentRequired.Valid {
+			value := row.IsStudentRequired.Bool
+			studentRequired = &value
+		}
+
+		price := dto.MembershipTierPriceDTO{
+			Price:             float64(row.PriceInCents.Int64) / 100,
+			PriceId:           row.StripePriceID.String,
+			IsStudentRequired: studentRequired,
+		}
+
+		if index, exists := indexByTierID[tierID]; exists {
+			tiers[index].Prices = append(
+				tiers[index].Prices,
+				price,
+			)
+			continue
+		}
+
+		indexByTierID[tierID] = len(tiers)
+
+		tiers = append(tiers, dto.MembershipTierDTO{
+			ID:          tierID,
+			Title:       row.Title,
+			Description: row.Description.String,
+			Slug:        row.Slug.String,
+			ProductId:   row.StripeProductID.String,
+			Benefits:    row.Benefits,
+			Prices:      []dto.MembershipTierPriceDTO{price},
+			ProgramId:   row.ProgramID.String(),
+			ProgramName: row.ProgramName,
+			RequiredGroup: dto.GroupType(
+				row.RequiredGroup.GroupType,
+			),
+		})
+	}
+
+	return tiers, nil
+}
+
 func (r *MembershipRepository) GetPublicTiersAndPrices(ctx context.Context) ([]db.GetPublicTiersAndPricesRow, error) {
 	return r.store.GetPublicTiersAndPrices(ctx)
 }
 
-func (r *MembershipRepository) GetCurrentMembershipWithTransaction(ctx context.Context, userId string) (db.GetCurrentMembershipWithTransactionRow, error) {
+func (r *MembershipRepository) GetCurrentMembershipsWithTransactions(ctx context.Context, userId string) ([]dto.MembershipDTO, error) {
 	var pgUserId pgtype.UUID
 
 	if err := pgUserId.Scan(userId); err != nil {
-		return db.GetCurrentMembershipWithTransactionRow{}, err
+		return []dto.MembershipDTO{}, err
 	}
 
-	return r.store.GetCurrentMembershipWithTransaction(ctx, pgUserId)
+	memberships, err := r.store.GetCurrentMembershipsWithTransactions(ctx, pgUserId)
+	if err != nil {
+		return nil, err
+	}
+
+	returnMemberships := make([]dto.MembershipDTO, len(memberships))
+
+	for i, m := range memberships {
+		var cancelledAt *time.Time
+		if m.CancelledAt.Valid {
+			cancelledAt = &m.CancelledAt.Time
+		}
+
+		returnMemberships[i] = dto.MembershipDTO{
+			ID:          m.ID.String(),
+			TierId:      m.TierID.String(),
+			TierTitle:   m.TierTitle,
+			Slug:        m.Slug.String,
+			StartedAt:   m.StartedAt.Time,
+			ExpiresAt:   m.ExpiresAt.Time,
+			CancelledAt: cancelledAt,
+			Transaction: dto.TransactionDTO{
+				ID:              m.TransactionID.String(),
+				AmountPaid:      fmt.Sprintf("%.2f", float64(m.AmountPaidCents.Int64)/100),
+				AmountPaidCents: m.AmountPaidCents.Int64,
+				Status:          dto.TransactionStatusType(m.Status),
+				GroupAtPurchase: dto.GroupType(m.GroupAtPurchase.GroupType),
+			},
+			ProgramId:   m.ProgramID.String(),
+			ProgramName: m.ProgramName,
+		}
+	}
+
+	return returnMemberships, nil
 }
 
 func (r *MembershipRepository) GetAllMembershipsWithTransactions(ctx context.Context, userId string) ([]db.GetAllMembershipsWithTransactionsRow, error) {
@@ -64,16 +153,6 @@ func (r *MembershipRepository) GetAllMembershipsWithTransactions(ctx context.Con
 	}
 
 	return r.store.GetAllMembershipsWithTransactions(ctx, pgUserId)
-}
-
-func (r *MembershipRepository) GetEligibleTiersWithPrices(ctx context.Context, userId string) ([]db.GetEligibleTiersWithPricesRow, error) {
-	var pgUserId pgtype.UUID
-
-	if err := pgUserId.Scan(userId); err != nil {
-		return []db.GetEligibleTiersWithPricesRow{}, err
-	}
-
-	return r.store.GetEligibleTiersWithPrices(ctx, pgUserId)
 }
 
 func (r *MembershipRepository) GetTierByTierId(ctx context.Context, tierId string) (db.GetTierByTierIdRow, error) {
@@ -240,14 +319,20 @@ func (r *MembershipRepository) CompleteTransaction(ctx context.Context, params C
 	})
 }
 
-func (r *MembershipRepository) CancelActiveMembershipsByUserId(ctx context.Context, userId string, occurredAt time.Time) error {
-	var userID pgtype.UUID
-	if err := userID.Scan(userId); err != nil {
+func (r *MembershipRepository) CancelActiveMembershipsByUserIdAndProgramId(ctx context.Context, userId string, programId string, occurredAt time.Time) error {
+	var pgUserID pgtype.UUID
+	if err := pgUserID.Scan(userId); err != nil {
 		return err
 	}
 
-	return r.store.CancelActiveMembershipsByUserId(ctx, db.CancelActiveMembershipsByUserIdParams{
-		UserID: userID,
+	var pgProgramId pgtype.UUID
+	if err := pgProgramId.Scan(programId); err != nil {
+		return err
+	}
+
+	return r.store.CancelActiveMembershipsByUserIdAndProgramId(ctx, db.CancelActiveMembershipsByUserIdAndProgramIdParams{
+		UserID:    pgUserID,
+		ProgramID: pgProgramId,
 		CancelledAt: pgtype.Timestamptz{
 			Time:  occurredAt,
 			Valid: true,

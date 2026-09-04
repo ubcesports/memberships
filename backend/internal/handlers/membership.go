@@ -106,14 +106,14 @@ func (h *MembershipHandler) GetEligibleTiersWithPrices(w http.ResponseWriter, r 
 	}
 
 	if tiers != nil {
-		util.WriteJson(w, 200, *tiers)
+		util.WriteJson(w, 200, tiers)
 	} else {
 		util.WriteJson(w, 200, nil)
 	}
 }
 
 /*
-Returns the current user's active membership and transaction.
+Returns the current user's active memberships and transactions.
 
 API URL: GET /membership/me/current
 
@@ -123,7 +123,7 @@ Args:
 
 Returns:
 
-	dto.MembershipDTO (HTTP 200)
+	[]dto.MembershipDTO (HTTP 200)
 
 Raises:
 
@@ -138,10 +138,10 @@ func (h *MembershipHandler) GetCurrentMembershipWithTransaction(w http.ResponseW
 		return
 	}
 
-	membership, err := h.membershipService.GetCurrentMembershipWithTransaction(r.Context(), userId)
+	membership, err := h.membershipService.GetCurrentMembershipsWithTransactions(r.Context(), userId)
 	if err != nil {
-		slog.ErrorContext(r.Context(), "unable to load current membership", "error", err, "request_id", requestID, "user_id", userId)
-		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to load current membership", requestID)
+		slog.ErrorContext(r.Context(), "unable to load current memberships", "error", err, "request_id", requestID, "user_id", userId)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to load current memberships", requestID)
 		return
 	}
 	util.WriteJson(w, 200, membership)

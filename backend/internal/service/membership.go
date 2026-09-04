@@ -6,25 +6,26 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/stripe/stripe-go/v86"
 	"github.com/ubcesports/memberships/internal/database/db"
 	"github.com/ubcesports/memberships/internal/dto"
+	"github.com/ubcesports/memberships/internal/membershippolicy"
 	"github.com/ubcesports/memberships/internal/repository"
 	"github.com/ubcesports/memberships/internal/stripeclient"
 )
 
 type MembershipService struct {
-	membershipRepo *repository.MembershipRepository
-	stripeClient   *stripeclient.Client
-	profileService *ProfileService
+	membershipRepo     *repository.MembershipRepository
+	stripeClient       *stripeclient.Client
+	profileService     *ProfileService
+	eligibilityService *membershippolicy.EligibilityService
 }
 
-func NewMembershipService(membershipRepo *repository.MembershipRepository, stripeClient *stripeclient.Client, profileService *ProfileService) *MembershipService {
-	return &MembershipService{membershipRepo: membershipRepo, stripeClient: stripeClient, profileService: profileService}
+func NewMembershipService(membershipRepo *repository.MembershipRepository, stripeClient *stripeclient.Client, profileService *ProfileService, eligibilityService *membershippolicy.EligibilityService) *MembershipService {
+	return &MembershipService{membershipRepo: membershipRepo, stripeClient: stripeClient, profileService: profileService, eligibilityService: eligibilityService}
 }
 
 /*
@@ -32,11 +33,11 @@ func NewMembershipService(membershipRepo *repository.MembershipRepository, strip
 */
 
 var (
-	ErrMembershipAlreadyExists    = errors.New("An active un-upgradeable membership already exists! Can't create new checkout session.")
+	ErrMembershipAlreadyExists    = errors.New("An active un-upgradeable membership already exists!")
 	ErrTierNotEligible            = errors.New("Requested membership tier not eligible for current user. Please try another value.")
 	ErrTierNotFound               = errors.New("Tier with given tier id not found.")
 	ErrMembershipPurchaseClosed   = errors.New("Membership purchases are closed until the next membership period.")
-	ErrPendingCheckoutAlreadyPaid = errors.New("A previous checkout payment is still being processed. Please wait a moment and refresh.")
+	ErrPendingCheckoutAlreadyPaid = errors.New("A previous checkout payment is still being processed. Please wait a moment and refresh or contact an admin.")
 )
 
 /*
@@ -86,6 +87,8 @@ func (s *MembershipService) GetPublicTiersAndPrices(ctx context.Context) ([]dto.
 				Slug:        tier.Slug.String,
 				ProductId:   tier.StripeProductID.String,
 				Prices:      []dto.MembershipTierPriceDTO{priceDto},
+				ProgramId:   tier.ProgramID.String(),
+				ProgramName: tier.ProgramName,
 			})
 		}
 	}
@@ -93,36 +96,8 @@ func (s *MembershipService) GetPublicTiersAndPrices(ctx context.Context) ([]dto.
 	return returnTiers, nil
 }
 
-func (s *MembershipService) GetCurrentMembershipWithTransaction(ctx context.Context, userId string) (*dto.MembershipDTO, error) {
-	membership, err := s.membershipRepo.GetCurrentMembershipWithTransaction(ctx, userId)
-	if err != nil {
-		// If user has no current membership, return nil
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-
-		return nil, err
-	}
-
-	var cancelledAt *time.Time
-	if membership.CancelledAt.Valid {
-		cancelledAt = &membership.CancelledAt.Time
-	}
-
-	return &dto.MembershipDTO{
-		ID:          membership.ID.String(),
-		TierId:      membership.TierID.String(),
-		TierTitle:   membership.TierTitle,
-		StartedAt:   membership.StartedAt.Time,
-		ExpiresAt:   membership.ExpiresAt.Time,
-		CancelledAt: cancelledAt,
-		Transaction: dto.TransactionDTO{
-			ID:              membership.TransactionID.String(),
-			AmountPaid:      fmt.Sprintf("%.2f", float64(membership.AmountPaidCents.Int64)/100),
-			Status:          dto.TransactionStatusType(membership.Status),
-			GroupAtPurchase: dto.GroupType(membership.GroupAtPurchase.GroupType),
-		},
-	}, nil
+func (s *MembershipService) GetCurrentMembershipsWithTransactions(ctx context.Context, userId string) ([]dto.MembershipDTO, error) {
+	return s.membershipRepo.GetCurrentMembershipsWithTransactions(ctx, userId)
 }
 
 func (s *MembershipService) GetAllMembershipsWithTransactions(ctx context.Context, userId string) (*[]dto.MembershipDTO, error) {
@@ -147,6 +122,7 @@ func (s *MembershipService) GetAllMembershipsWithTransactions(ctx context.Contex
 			ID:          membership.ID.String(),
 			TierId:      membership.TierID.String(),
 			TierTitle:   membership.TierTitle,
+			Slug:        membership.Slug.String,
 			StartedAt:   membership.StartedAt.Time,
 			ExpiresAt:   membership.ExpiresAt.Time,
 			CancelledAt: cancelledAt,
@@ -156,6 +132,8 @@ func (s *MembershipService) GetAllMembershipsWithTransactions(ctx context.Contex
 				Status:          dto.TransactionStatusType(membership.Status),
 				GroupAtPurchase: dto.GroupType(membership.GroupAtPurchase.GroupType),
 			},
+			ProgramId:   membership.ProgramID.String(),
+			ProgramName: membership.ProgramName,
 		}
 		returnMemberships = append(returnMemberships, membershipDto)
 	}
@@ -163,175 +141,12 @@ func (s *MembershipService) GetAllMembershipsWithTransactions(ctx context.Contex
 	return &returnMemberships, nil
 }
 
-func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, userId string) (*[]dto.EligibleMembershipTierDTO, error) {
-	tiers, err := s.membershipRepo.GetEligibleTiersWithPrices(ctx, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	returnTiers := make([]dto.EligibleMembershipTierDTO, 0, len(tiers))
-	tierIndexById := make(map[string]int)
-
-	// Get user info
-	user, err := s.profileService.GetProfileByUserID(ctx, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get current membership info
-	currMembership, err := s.GetCurrentMembershipWithTransaction(ctx, userId)
-	if err != nil {
-		return nil, err
-	}
-	var currTierSlug string
-	if currMembership != nil {
-		tier, err := s.getTierByTierId(ctx, currMembership.TierId)
-		if err != nil {
-			return nil, err
-		}
-
-		currTierSlug = tier.Slug
-	}
-
-	// Store slugs for eligible tiers
-	eligibleSlugs := make(map[string]dto.PurchaseType)
-
-	addPriceToTier := func(tier db.GetEligibleTiersWithPricesRow, purchaseType dto.PurchaseType, priceDto dto.MembershipTierPriceDTO) {
-		tierId := tier.ID.String()
-
-		if _, exists := tierIndexById[tierId]; exists {
-			return
-		}
-
-		tierIndexById[tierId] = len(returnTiers)
-		returnTiers = append(returnTiers, dto.EligibleMembershipTierDTO{
-			ID:           tier.ID.String(),
-			Title:        tier.Title,
-			Description:  tier.Description.String,
-			Benefits:     tier.Benefits,
-			Slug:         tier.Slug.String,
-			PurchaseType: purchaseType,
-			ProductId:    tier.StripeProductID.String,
-			Price:        priceDto,
-		})
-	}
-
-	// 1. Users in executive, director, and board groups should not be able to see any other tier other than executive tier
-	// 	  If they already have an active executive membership, they should not be able to see any eligible tiers
-	//    If a user is in an exec and a competitive player, prioritize exec membership over comp membership
-	if slices.Contains(user.Groups, dto.GroupExecutive) ||
-		slices.Contains(user.Groups, dto.GroupDirector) ||
-		slices.Contains(user.Groups, dto.GroupBoard) {
-
-		if currMembership != nil {
-			// If user has a current membership and its tier slug is "exec" return no eligible memberships
-			if currTierSlug == "executive" {
-				return nil, nil
-			}
-
-			return nil, fmt.Errorf("exec/director/board user has unexpected active membership tier: %s", currTierSlug)
-		} else {
-			eligibleSlugs["executive"] = dto.PurchaseNew
-		}
-	} else if slices.Contains(user.Groups, dto.GroupCompetitiveTeam) {
-		// 2. Users in competitive_team group should not be able to see any other tier other than competitive team tier
-		//	  If they already have an active competitive team membership, they should not be able to see any eligible tiers
-
-		if currMembership != nil {
-			// If user has a current membership and its tier slug is "comp" return no eligible memberships
-			if currTierSlug == "competitive_team" {
-				return nil, nil
-			}
-
-			return nil, fmt.Errorf("competitive team user has unexpected active membership tier: %s", currTierSlug)
-		} else {
-			eligibleSlugs["competitive_team"] = dto.PurchaseNew
-		}
-	} else {
-		// 3. All other users should see the day pass, basic and lounge memberships
-		// CASES
-		// If user has day pass, return basic/lounge pass which they have to pay full price for
-		// If user has basic pass, return lounge pass which they pay the difference in price for
-		// If user has lounge pass, return no eligible tiers
-
-		if currMembership != nil {
-			switch currTierSlug {
-			// If user has a current membership and its tier slug is "day" return basic/lounge memberships, which would be a replacement
-			case "day":
-				eligibleSlugs["basic"] = dto.PurchaseNew
-				eligibleSlugs["lounge"] = dto.PurchaseNew
-			case "basic":
-				// If user has a current membership and its tier slug is "basic" return lounge membership, which would be an upgrade
-				eligibleSlugs["lounge"] = dto.PurchaseUpgrade
-			case "lounge":
-				// If user has a current membership and its tier slug is "lounge" return no eligible memberships
-				return nil, nil
-			default:
-				return nil, fmt.Errorf("unsupported current membership tier slug: %s", currTierSlug)
-			}
-		} else {
-			eligibleSlugs["day"] = dto.PurchaseNew
-			eligibleSlugs["basic"] = dto.PurchaseNew
-			eligibleSlugs["lounge"] = dto.PurchaseNew
-		}
-	}
-
-	for _, tier := range tiers {
-		purchaseType, ok := eligibleSlugs[tier.Slug.String]
-		if !ok {
-			continue
-		}
-
-		if tier.IsStudentRequired.Valid && tier.IsStudentRequired.Bool != user.IsStudent {
-			continue
-		}
-		if !tier.PriceInCents.Valid {
-			return nil, fmt.Errorf("membership tier price %s has no database price", tier.StripePriceID.String)
-		}
-
-		switch purchaseType {
-		case dto.PurchaseNew:
-			// Set up price dto
-			priceDto := dto.MembershipTierPriceDTO{
-				Price:             priceFromCents(tier.PriceInCents.Int64),
-				PriceId:           tier.StripePriceID.String,
-				IsStudentRequired: nil, // Leave nil as this is not really required in this context.
-			}
-
-			addPriceToTier(tier, purchaseType, priceDto)
-		case dto.PurchaseUpgrade:
-			if currMembership == nil {
-				return nil, fmt.Errorf("cannot calculate upgrade price without current membership")
-			}
-
-			// Calculate upgrade price to pay
-			amountPaidFloat, err := strconv.ParseFloat(currMembership.Transaction.AmountPaid, 64)
-			if err != nil {
-				return nil, err
-			}
-
-			amountPaidInCents := int64(math.Round(amountPaidFloat * 100))
-			priceToPay := tier.PriceInCents.Int64 - amountPaidInCents
-			if priceToPay < 0 {
-				priceToPay = 0 // Ensure negative price cannot be paid
-			}
-
-			// Set up price dto
-			priceDto := dto.MembershipTierPriceDTO{
-				Price:             float64(priceToPay) / 100,
-				PriceId:           tier.StripePriceID.String,
-				IsStudentRequired: nil, // Leave nil as this is not really required in this context.
-			}
-
-			addPriceToTier(tier, purchaseType, priceDto)
-		}
-	}
-
-	return &returnTiers, nil
+func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, userId string) ([]dto.EligibleMembershipTierDTO, error) {
+	return s.eligibilityService.GetEligibleTiers(ctx, userId)
 }
 
 func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId string, req dto.CheckoutSessionRequest) (*dto.CheckoutSessionResponse, error) {
-	// 1. Ensure user isn't trying to purchase a meaningless membership too late in the membership period
+	// 1. Check whether purchases are currently closed.
 	isClosed, err := isPurchaseClosed(time.Now())
 	if err != nil {
 		return nil, err
@@ -340,52 +155,24 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 		return nil, ErrMembershipPurchaseClosed
 	}
 
-	reqTier, err := s.getTierByTierId(ctx, req.TierId)
+	// 2. Let the centralized eligibility service determine whether the
+	// requested tier can be purchased, its purchase type, and final price.
+	eligibleTiers, err := s.eligibilityService.GetEligibleTiers(
+		ctx,
+		userId,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	// 2. Check if an active membership already exists. If if does, return an error.
-	membership, err := s.GetCurrentMembershipWithTransaction(ctx, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	// If the user already has an active membership, only allow checkout sessions
-	// for supported upgrade paths. All other purchases are rejected to prevent
-	// multiple active memberships.
-	if membership != nil {
-		currTier, err := s.getTierByTierId(ctx, membership.TierId)
-		if err != nil {
-			return nil, err
-		}
-
-		// Users can create an "upgrade" checkout session if they have a basic membership and want to buy lounge
-		// OR they have a day pass and want to buy basic/lounge
-		// Return ErrMembershipAlreadyExists if they don't meet the above criteria
-		if !((currTier.Slug == "basic" && reqTier.Slug == "lounge") ||
-			(currTier.Slug == "day" && (reqTier.Slug == "basic" || reqTier.Slug == "lounge"))) {
-			return nil, ErrMembershipAlreadyExists
-		}
-	}
-
-	// 3. Check if the requested tier is eligible for the user. If not, return an error.
-	eligibleTiers, err := s.GetEligibleTiersWithPrices(ctx, userId)
-	if err != nil {
-		return nil, err
-	}
-
+	// 3. Check if user is eligible for this tier
 	var selectedTier *dto.EligibleMembershipTierDTO
-	if eligibleTiers != nil {
-		for i := range *eligibleTiers {
-			tier := &(*eligibleTiers)[i]
-			if req.TierId == tier.ID {
-				selectedTier = tier
-				break
-			}
+	for _, t := range eligibleTiers {
+		if req.TierId == t.ID {
+			selectedTier = &t
+			break
 		}
 	}
-
 	if selectedTier == nil {
 		return nil, ErrTierNotEligible
 	}
@@ -522,7 +309,7 @@ func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *str
 		}
 
 		// 6. Cancel any old active membership before creating the new fulfilled membership.
-		if err := mr.CancelActiveMembershipsByUserId(ctx, transaction.UserID.String(), occurredAt); err != nil {
+		if err := mr.CancelActiveMembershipsByUserIdAndProgramId(ctx, transaction.UserID.String(), transaction.ProgramID.String(), occurredAt); err != nil {
 			return err
 		}
 
@@ -671,5 +458,7 @@ func (s *MembershipService) getTierByTierId(ctx context.Context, tierId string) 
 		Slug:        tier.Slug.String,
 		ProductId:   tier.StripeProductID.String,
 		Prices:      []dto.MembershipTierPriceDTO{},
+		ProgramId:   tier.ProgramID.String(),
+		ProgramName: tier.ProgramName,
 	}, nil
 }

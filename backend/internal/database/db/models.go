@@ -264,6 +264,11 @@ type Membership struct {
 	UpdatedAt   pgtype.Timestamptz
 }
 
+type MembershipProgram struct {
+	ID          pgtype.UUID
+	ProgramName string
+}
+
 type MembershipTier struct {
 	ID              pgtype.UUID
 	Title           string
@@ -275,6 +280,7 @@ type MembershipTier struct {
 	Slug            pgtype.Text
 	Group           NullGroupType
 	Benefits        []string
+	ProgramID       pgtype.UUID
 }
 
 type MembershipTierPrice struct {
