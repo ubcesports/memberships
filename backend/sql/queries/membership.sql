@@ -7,6 +7,7 @@ SELECT
     mt.stripe_product_id,
     mt.slug,
     mt."group" AS required_group,
+    mt.expiration_type,
     mtp.stripe_price_id,
     mtp.price_in_cents,
     mtp.is_student_required,
@@ -30,6 +31,7 @@ SELECT
     mt.benefits,
     mt.slug,
     mt.stripe_product_id,
+    mt.expiration_type,
     mtp.stripe_price_id,
     mtp.price_in_cents,
     mtp.is_student_required,
@@ -104,6 +106,7 @@ SELECT
     mt.benefits,
     mt.slug,
     mt.stripe_product_id,
+    mt.expiration_type,
     mtp.stripe_price_id,
     mtp.price_in_cents,
     mtp.is_student_required,
@@ -225,7 +228,8 @@ SELECT
     t.status,
     t.purchase_type,
     t.stripe_checkout_session_id,
-    mt.program_id
+    mt.program_id,
+    mt.expiration_type
 FROM transactions AS t
 JOIN membership_tiers AS mt
     ON mt.id = t.tier_id

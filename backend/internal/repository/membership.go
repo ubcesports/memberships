@@ -89,6 +89,9 @@ func (r *MembershipRepository) GetActiveTiersWithPrices(
 			Prices:      []dto.MembershipTierPriceDTO{price},
 			ProgramId:   row.ProgramID.String(),
 			ProgramName: row.ProgramName,
+			ExpirationType: dto.MembershipExpirationType(
+				row.ExpirationType,
+			),
 			RequiredGroup: dto.GroupType(
 				row.RequiredGroup.GroupType,
 			),

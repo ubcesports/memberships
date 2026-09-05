@@ -68,7 +68,7 @@ func (s *MembershipService) GetPublicTiersAndPrices(ctx context.Context) ([]dto.
 		}
 
 		priceDto := dto.MembershipTierPriceDTO{
-			Price:             priceFromCents(tier.PriceInCents.Int64),
+			Price:             float64(tier.PriceInCents.Int64),
 			PriceId:           tier.StripePriceID.String,
 			IsStudentRequired: isStudentRequired,
 		}
@@ -146,16 +146,7 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 }
 
 func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId string, req dto.CheckoutSessionRequest) (*dto.CheckoutSessionResponse, error) {
-	// 1. Check whether purchases are currently closed.
-	isClosed, err := isPurchaseClosed(time.Now())
-	if err != nil {
-		return nil, err
-	}
-	if isClosed {
-		return nil, ErrMembershipPurchaseClosed
-	}
-
-	// 2. Let the centralized eligibility service determine whether the
+	// 1. Let the centralized eligibility service determine whether the
 	// requested tier can be purchased, its purchase type, and final price.
 	eligibleTiers, err := s.eligibilityService.GetEligibleTiers(
 		ctx,
@@ -165,7 +156,7 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 		return nil, err
 	}
 
-	// 3. Check if user is eligible for this tier
+	// 2. Check if user is eligible for this tier
 	var selectedTier *dto.EligibleMembershipTierDTO
 	for _, t := range eligibleTiers {
 		if req.TierId == t.ID {
@@ -175,6 +166,15 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 	}
 	if selectedTier == nil {
 		return nil, ErrTierNotEligible
+	}
+
+	// 3. Check whether purchases are currently closed.
+	isClosed, err := membershippolicy.IsPurchaseClosed(time.Now(), selectedTier.ExpirationType)
+	if err != nil {
+		return nil, err
+	}
+	if isClosed {
+		return nil, ErrMembershipPurchaseClosed
 	}
 
 	// 4. If there is a pending transaction, then expire it and its stripe checkout session
@@ -279,7 +279,7 @@ func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *str
 		}
 
 		// 2. Ensure membership purchase is not closed
-		isClosed, err := isPurchaseClosed(occurredAt)
+		isClosed, err := membershippolicy.IsPurchaseClosed(occurredAt, dto.MembershipExpirationType(transaction.ExpirationType))
 		if err != nil {
 			return err
 		}
@@ -313,8 +313,8 @@ func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *str
 			return err
 		}
 
-		// 7. Create the fulfilled membership. Memberships expire after April 30 in Vancouver time.
-		expiresAt, err := membershipExpiresAt(occurredAt)
+		// 7. Create the fulfilled membership.
+		expiresAt, err := membershippolicy.MembershipExpiresAt(occurredAt, dto.MembershipExpirationType(transaction.ExpirationType))
 		if err != nil {
 			return err
 		}
@@ -353,66 +353,6 @@ func (s *MembershipService) HandleCheckoutFailed(ctx context.Context, sessionId 
 /*
 	Private functions
 */
-
-// memberships follow the UBC Esports membership year, which runs from
-// May 1 00:00:00 to April 30 23:59:59 (America/Vancouver).
-//
-// Expiry rules:
-//   - Purchases made from January 1 through April 30 expire on
-//     April 30 23:59:59 of the same calendar year.
-//   - Purchases made on or after May 1 expire on
-//     April 30 23:59:59 of the following calendar year.
-//
-// All calculations are performed in the America/Vancouver time zone,
-// regardless of the purchaser's local time zone.
-func membershipExpiresAt(purchasedAt time.Time) (time.Time, error) {
-	location, err := time.LoadLocation("America/Vancouver")
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	localPurchasedAt := purchasedAt.In(location)
-
-	expiryYear := localPurchasedAt.Year()
-
-	// Membership year rolls over at May 1 00:00:00.
-	cutoff := time.Date(expiryYear, time.May, 1, 0, 0, 0, 0, location)
-
-	if !localPurchasedAt.Before(cutoff) {
-		expiryYear++
-	}
-
-	return time.Date(
-		expiryYear,
-		time.April,
-		30,
-		23, 59, 59,
-		0,
-		location,
-	), nil
-}
-
-// check if membership purchase is closed at the given time
-//
-// Users should not be able to purchase a membership after April 25, as that will not
-// result in a meaningful length membership
-func isPurchaseClosed(now time.Time) (bool, error) {
-	location, err := time.LoadLocation("America/Vancouver")
-	if err != nil {
-		return false, err
-	}
-
-	localNow := now.In(location)
-
-	closedFrom := time.Date(localNow.Year(), time.April, 25, 0, 0, 0, 0, location)
-	closedUntil := time.Date(localNow.Year(), time.May, 1, 0, 0, 0, 0, location)
-
-	return !localNow.Before(closedFrom) && localNow.Before(closedUntil), nil
-}
-
-func priceFromCents(priceInCents int64) float64 {
-	return float64(priceInCents) / 100
-}
 
 // returns the highest priority group a user belongs to at the time of membership purchase.
 //
