@@ -48,12 +48,12 @@ type AdminAuditLogInput struct {
 // UpdateUserRequest describes the edits an admin wants to apply to a user.
 // Every field is optional; only the ones that are set are acted on.
 type UpdateUserRequest struct {
-	StudentID        *string
-	IsStudent        *bool
-	GroupsAdd        []db.GroupType
-	GroupsRemove     []db.GroupType
-	Role             *db.RoleType
-	CancelMembership bool
+	StudentID          *string
+	IsStudent          *bool
+	GroupsAdd          []db.GroupType
+	GroupsRemove       []db.GroupType
+	Role               *db.RoleType
+	CancelMembershipId *string
 }
 
 // Audit log actions emitted by UpdateUser.
@@ -590,29 +590,71 @@ func (s *AdminService) applyMembershipUpdates(
 	user db.GetAdminUserByIDRow,
 	req UpdateUserRequest,
 ) ([]pendingAuditLog, error) {
-	userID := user.ID.String()
-
-	if req.CancelMembership {
-		hasActive, err := store.HasActiveMembership(ctx, userID)
-		if err != nil {
-			return nil, auditable(actionMembershipCancelled, "Failed to cancel membership", err)
-		}
-		if !hasActive {
-			err := fmt.Errorf("%w: user has no active membership to cancel", ErrValidation)
-			return nil, auditable(actionMembershipCancelled, "Failed to cancel membership: no active membership", err)
-		}
-
-		if err := store.CancelActiveMembershipsByUserId(ctx, userID, time.Now()); err != nil {
-			return nil, auditable(actionMembershipCancelled, "Failed to cancel membership", err)
-		}
-
-		return []pendingAuditLog{{
-			action:      actionMembershipCancelled,
-			description: "Cancelled the user's active membership",
-		}}, nil
+	if req.CancelMembershipId == nil {
+		return nil, nil
 	}
 
-	return nil, nil
+	membershipID := strings.TrimSpace(
+		*req.CancelMembershipId,
+	)
+
+	if membershipID == "" {
+		err := fmt.Errorf(
+			"%w: membership ID is required",
+			ErrValidation,
+		)
+		return nil, auditable(
+			actionMembershipCancelled,
+			"Failed to cancel membership: membership ID is required",
+			err,
+		)
+	}
+
+	if _, err := util.GetValidatedUUID(membershipID); err != nil {
+		validationErr := fmt.Errorf(
+			"%w: invalid membership ID",
+			ErrValidation,
+		)
+		return nil, auditable(
+			actionMembershipCancelled,
+			"Failed to cancel membership: invalid membership ID",
+			validationErr,
+		)
+	}
+
+	cancelled, err := s.adminRepository.CancelActiveMembershipByUserIdAndMembershipId(
+		ctx,
+		user.ID.String(),
+		membershipID,
+		time.Now(),
+	)
+	if err != nil {
+		return nil, auditable(
+			actionMembershipCancelled,
+			"Failed to cancel membership",
+			err,
+		)
+	}
+
+	if !cancelled {
+		err := fmt.Errorf(
+			"%w: membership is not active or does not belong to this user",
+			ErrValidation,
+		)
+		return nil, auditable(
+			actionMembershipCancelled,
+			"Failed to cancel membership: no matching active membership",
+			err,
+		)
+	}
+
+	return []pendingAuditLog{{
+		action: actionMembershipCancelled,
+		description: fmt.Sprintf(
+			"Cancelled membership %s",
+			membershipID,
+		),
+	}}, nil
 }
 
 // studentUpdate is the resolved outcome of the student ID and student status

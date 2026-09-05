@@ -67,16 +67,17 @@ func TestParseAdminAuditLogFiltersRejectsInvalidPagination(t *testing.T) {
 
 func TestBuildUpdateUserRequestMapsBodyToServiceTypes(t *testing.T) {
 	studentID := "12345678"
+	membershipID := "2d746a56-c977-49e0-a04c-20504cdb07c0"
 	isStudent := true
 	role := dto.RoleAdmin
 
 	request := buildUpdateUserRequest(dto.AdminUpdateUserRequest{
-		StudentID:        &studentID,
-		IsStudent:        &isStudent,
-		GroupsAdd:        []dto.GroupType{dto.GroupBoard},
-		GroupsRemove:     []dto.GroupType{dto.GroupMember, dto.GroupExecutive},
-		Role:             &role,
-		CancelMembership: true,
+		StudentID:          &studentID,
+		IsStudent:          &isStudent,
+		GroupsAdd:          []dto.GroupType{dto.GroupBoard},
+		GroupsRemove:       []dto.GroupType{dto.GroupMember, dto.GroupExecutive},
+		Role:               &role,
+		CancelMembershipId: &membershipID,
 	})
 
 	if request.StudentID == nil || *request.StudentID != "12345678" {
@@ -94,8 +95,8 @@ func TestBuildUpdateUserRequestMapsBodyToServiceTypes(t *testing.T) {
 	if len(request.GroupsRemove) != 2 || request.GroupsRemove[1] != db.GroupTypeExecutive {
 		t.Fatalf("unexpected groups to remove: %v", request.GroupsRemove)
 	}
-	if !request.CancelMembership {
-		t.Fatalf("unexpected membership flags: %#v", request)
+	if request.CancelMembershipId == nil || *request.CancelMembershipId != membershipID {
+		t.Fatalf("expected membership ID to be carried over, got %#v", request.CancelMembershipId)
 	}
 }
 

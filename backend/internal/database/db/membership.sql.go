@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const cancelActiveMembershipByUserIdAndMembershipId = `-- name: CancelActiveMembershipByUserIdAndMembershipId :exec
+const cancelActiveMembershipByUserIdAndMembershipId = `-- name: CancelActiveMembershipByUserIdAndMembershipId :execrows
 UPDATE memberships
 SET
     cancelled_at = $3,
@@ -29,9 +29,12 @@ type CancelActiveMembershipByUserIdAndMembershipIdParams struct {
 	CancelledAt pgtype.Timestamptz
 }
 
-func (q *Queries) CancelActiveMembershipByUserIdAndMembershipId(ctx context.Context, arg CancelActiveMembershipByUserIdAndMembershipIdParams) error {
-	_, err := q.db.Exec(ctx, cancelActiveMembershipByUserIdAndMembershipId, arg.UserID, arg.ID, arg.CancelledAt)
-	return err
+func (q *Queries) CancelActiveMembershipByUserIdAndMembershipId(ctx context.Context, arg CancelActiveMembershipByUserIdAndMembershipIdParams) (int64, error) {
+	result, err := q.db.Exec(ctx, cancelActiveMembershipByUserIdAndMembershipId, arg.UserID, arg.ID, arg.CancelledAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const cancelActiveMembershipsByUserIdAndProgramId = `-- name: CancelActiveMembershipsByUserIdAndProgramId :exec

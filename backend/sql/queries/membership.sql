@@ -132,7 +132,7 @@ VALUES (
 )
 RETURNING id;
 
--- name: CancelActiveMembershipByUserIdAndMembershipId :exec
+-- name: CancelActiveMembershipByUserIdAndMembershipId :execrows
 UPDATE memberships
 SET
     cancelled_at = $3,

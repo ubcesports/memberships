@@ -30,7 +30,7 @@ type AdminStore interface {
 	RemoveUserGroup(ctx context.Context, userId string, group db.GroupType) error
 	GetUserMemberships(ctx context.Context, userId string) ([]db.GetAllMembershipsWithTransactionsRow, error)
 	HasActiveMembership(ctx context.Context, userId string) (bool, error)
-	CancelActiveMembershipsByUserId(ctx context.Context, userId string, occurredAt time.Time) error
+	CancelActiveMembershipByUserIdAndMembershipId(ctx context.Context, userId string, membershipId string, occurredAt time.Time) (bool, error)
 	WithTx(ctx context.Context, fn func(AdminStore) error) error
 }
 
@@ -221,27 +221,42 @@ func (r *AdminRepository) HasActiveMembership(ctx context.Context, userId string
 	return exists, nil
 }
 
-func (r *AdminRepository) CancelActiveMembershipsByUserId(
+func (r *AdminRepository) CancelActiveMembershipByUserIdAndMembershipId(
 	ctx context.Context,
 	userId string,
+	membershipId string,
 	occurredAt time.Time,
-) error {
-	pgUserId, err := util.GetValidatedUUID(userId)
+) (bool, error) {
+	pgUserID, err := util.GetValidatedUUID(userId)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	err = r.store.CancelActiveMembershipsByUserId(ctx, db.CancelActiveMembershipsByUserIdParams{
-		UserID: pgUserId,
-		CancelledAt: pgtype.Timestamptz{
-			Time:  occurredAt,
-			Valid: true,
-		},
-	})
+	pgMembershipID, err := util.GetValidatedUUID(membershipId)
 	if err != nil {
-		return fmt.Errorf("cancel active memberships: %w", err)
+		return false, err
 	}
-	return nil
+
+	rowsAffected, err :=
+		r.store.CancelActiveMembershipByUserIdAndMembershipId(
+			ctx,
+			db.CancelActiveMembershipByUserIdAndMembershipIdParams{
+				UserID: pgUserID,
+				ID:     pgMembershipID,
+				CancelledAt: pgtype.Timestamptz{
+					Time:  occurredAt,
+					Valid: true,
+				},
+			},
+		)
+	if err != nil {
+		return false, fmt.Errorf(
+			"cancel active membership: %w",
+			err,
+		)
+	}
+
+	return rowsAffected == 1, nil
 }
 
 // executes fn within a database transaction.
