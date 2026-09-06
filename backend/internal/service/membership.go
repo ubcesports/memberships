@@ -68,7 +68,7 @@ func (s *MembershipService) GetPublicTiersAndPrices(ctx context.Context) ([]dto.
 		}
 
 		priceDto := dto.MembershipTierPriceDTO{
-			Price:             float64(tier.PriceInCents.Int64),
+			Price:             float64(tier.PriceInCents.Int64) / 100,
 			PriceId:           tier.StripePriceID.String,
 			IsStudentRequired: isStudentRequired,
 		}
@@ -80,15 +80,16 @@ func (s *MembershipService) GetPublicTiersAndPrices(ctx context.Context) ([]dto.
 			// If tier doesn't exist in return body, add a new tier with price
 			tierIndexById[tierId] = len(returnTiers)
 			returnTiers = append(returnTiers, dto.MembershipTierDTO{
-				ID:          tier.ID.String(),
-				Title:       tier.Title,
-				Description: tier.Description.String,
-				Benefits:    tier.Benefits,
-				Slug:        tier.Slug.String,
-				ProductId:   tier.StripeProductID.String,
-				Prices:      []dto.MembershipTierPriceDTO{priceDto},
-				ProgramId:   tier.ProgramID.String(),
-				ProgramName: tier.ProgramName,
+				ID:             tier.ID.String(),
+				Title:          tier.Title,
+				Description:    tier.Description.String,
+				Benefits:       tier.Benefits,
+				Slug:           tier.Slug.String,
+				ProductId:      tier.StripeProductID.String,
+				Prices:         []dto.MembershipTierPriceDTO{priceDto},
+				ProgramId:      tier.ProgramID.String(),
+				ProgramName:    tier.ProgramName,
+				ExpirationType: dto.MembershipExpirationType(tier.ExpirationType),
 			})
 		}
 	}

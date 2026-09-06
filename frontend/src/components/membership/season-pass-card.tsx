@@ -1,6 +1,7 @@
 import { CalendarDays, Check, Sparkles } from "lucide-react";
 import { PurchaseButton } from "@/components/membership/purchase-button";
 import {
+  formatMembershipExpiration,
   formatMembershipPrice,
   getPriceByStudentStatus,
   isMembershipTierPrice,
@@ -88,9 +89,8 @@ export function SeasonPassCard({
                 className="mt-0.5 size-4 shrink-0 text-brand-text-subtle"
               />
               <div>
-                <p className="text-sm font-medium text-brand-text">Valid for the membership year</p>
-                <p className="mt-1 text-xs leading-5 text-brand-text-subtle">
-                  Basic and Lounge tiers expire at the end of the membership period.
+                <p className="text-sm font-medium leading-6 text-brand-text">
+                  {formatMembershipExpiration(tier.expiration_type)}
                 </p>
               </div>
             </div>
