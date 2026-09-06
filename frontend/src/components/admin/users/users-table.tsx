@@ -1,3 +1,7 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DataTable, type Column } from "../admin-data-table";
 import { AvatarCell, EmptyValue, formatOptionalTime } from "../admin-table-cells";
 import { StatusBadge } from "@/components/status-badge";
@@ -15,7 +19,14 @@ const columns: Column<User>[] = [
   {
     header: "Full name",
     cellClassName: "whitespace-nowrap px-4 py-3 font-medium text-brand-text",
-    cell: (user) => user.full_name,
+    cell: (user) => (
+      <Link
+        href={`/admin/users/${user.id}`}
+        className="underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+      >
+        {user.full_name}
+      </Link>
+    ),
   },
   { header: "Email", cell: (user) => user.email },
   {
@@ -74,6 +85,8 @@ const columns: Column<User>[] = [
 ];
 
 export function UsersTable({ users, isLoading, isFetching }: UsersTableProps) {
+  const router = useRouter();
+
   return (
     <DataTable
       data={users}
@@ -83,6 +96,7 @@ export function UsersTable({ users, isLoading, isFetching }: UsersTableProps) {
       isFetching={isFetching}
       loadingLabel="Loading users"
       emptyLabel="No users match your search and filters."
+      onRowClick={(user) => router.push(`/admin/users/${user.id}`)}
     />
   );
 }
