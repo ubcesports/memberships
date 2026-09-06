@@ -82,11 +82,14 @@ export type MembershipTransaction = {
 export type Membership = {
   id: string;
   tier_id: string;
-  tier_title?: string;
+  tier_title: string;
+  slug: string;
   started_at: string;
   expires_at: string;
   cancelled_at: string | null;
   transaction: MembershipTransaction;
+  program_id: string;
+  program_name: string;
 };
 
 /*
@@ -99,7 +102,7 @@ export type UpdateUserRequest = {
   groups_add?: GroupType[];
   groups_remove?: GroupType[];
   role?: RoleType;
-  cancel_membership?: boolean;
+  cancel_membership_id?: string;
 };
 
 export type AdminPagination = {

@@ -16,6 +16,7 @@ type DataTableProps<T> = {
   isFetching: boolean;
   loadingLabel: string;
   emptyLabel: string;
+  onRowClick?: (row: T) => void;
 };
 
 export function DataTable<T>({
@@ -26,6 +27,7 @@ export function DataTable<T>({
   isFetching,
   loadingLabel,
   emptyLabel,
+  onRowClick,
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
@@ -69,7 +71,29 @@ export function DataTable<T>({
           </thead>
           <tbody>
             {data.map((row) => (
-              <tr key={getRowKey(row)} className="border-b border-brand-border/70 last:border-b-0">
+              <tr
+                key={getRowKey(row)}
+                onClick={
+                  onRowClick
+                    ? (event) => {
+                        const target = event.target;
+                        if (
+                          target instanceof Element &&
+                          target.closest("a, button, input, select, textarea")
+                        ) {
+                          return;
+                        }
+
+                        onRowClick(row);
+                      }
+                    : undefined
+                }
+                className={`border-b border-brand-border/70 last:border-b-0 ${
+                  onRowClick
+                    ? "cursor-pointer transition-colors hover:bg-white/[0.04] focus-within:bg-white/[0.04]"
+                    : ""
+                }`}
+              >
                 {columns.map((column) => (
                   <td
                     key={column.header}

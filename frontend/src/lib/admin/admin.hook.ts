@@ -58,7 +58,7 @@ export function useUpdateUser(userId: string) {
       queryClient.setQueryData(["admin", "user", userId], user);
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
 
-      if (body.cancel_membership) {
+      if (body.cancel_membership_id) {
         queryClient.invalidateQueries({ queryKey: ["admin", "user", userId, "memberships"] });
       }
     },

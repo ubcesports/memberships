@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	testActorID   = "8f0f7a4c-1a2b-4c3d-9e5f-6a7b8c9d0e1f"
-	testTargetID  = "3c2b1a09-8765-4321-abcd-0123456789ab"
-	testRequestID = "req-1"
+	testActorID      = "8f0f7a4c-1a2b-4c3d-9e5f-6a7b8c9d0e1f"
+	testTargetID     = "3c2b1a09-8765-4321-abcd-0123456789ab"
+	testMembershipID = "2d746a56-c977-49e0-a04c-20504cdb07c0"
+	testRequestID    = "req-1"
 )
 
 var nonStudentIDRegex = regexp.MustCompile(`^N\d{7}$`)
@@ -35,14 +36,17 @@ type fakeAdminStore struct {
 	takenStudentIDs    map[string]bool
 	allStudentIDsTaken bool
 
-	memberships             []db.GetAllMembershipsWithTransactionsRow
-	hasActiveMembership     bool
-	updateStudentInfoErr    error
-	studentInfoUpdates      []studentInfoUpdate
-	roleUpdates             []db.RoleType
-	addedGroups             []db.GroupType
-	removedGroups           []db.GroupType
-	cancelledMembershipUser []string
+	memberships              []db.GetAllMembershipsWithTransactionsRow
+	hasActiveMembership      bool
+	updateStudentInfoErr     error
+	studentInfoUpdates       []studentInfoUpdate
+	roleUpdates              []db.RoleType
+	addedGroups              []db.GroupType
+	removedGroups            []db.GroupType
+	cancelledMembershipUsers []string
+	cancelledMembershipIDs   []string
+	cancelMembershipResult   bool
+	cancelMembershipErr      error
 
 	auditLogs []db.CreateAdminAuditLogParams
 }
@@ -112,9 +116,19 @@ func (f *fakeAdminStore) HasActiveMembership(context.Context, string) (bool, err
 	return f.hasActiveMembership, nil
 }
 
-func (f *fakeAdminStore) CancelActiveMembershipsByUserId(_ context.Context, userId string, _ time.Time) error {
-	f.cancelledMembershipUser = append(f.cancelledMembershipUser, userId)
-	return nil
+func (f *fakeAdminStore) CancelActiveMembershipByUserIdAndMembershipId(
+	_ context.Context,
+	userId string,
+	membershipId string,
+	_ time.Time,
+) (bool, error) {
+	if f.cancelMembershipErr != nil {
+		return false, f.cancelMembershipErr
+	}
+
+	f.cancelledMembershipUsers = append(f.cancelledMembershipUsers, userId)
+	f.cancelledMembershipIDs = append(f.cancelledMembershipIDs, membershipId)
+	return f.cancelMembershipResult, nil
 }
 
 func (f *fakeAdminStore) WithTx(ctx context.Context, fn func(repository.AdminStore) error) error {
@@ -439,31 +453,61 @@ func TestUpdateUserLeavesRoleUntouchedWhenAbsent(t *testing.T) {
 
 func TestUpdateUserCancelMembershipWithoutActiveMembership(t *testing.T) {
 	store := newFakeAdminStore(t, true, "12345678", db.RoleTypeMember, "member")
-	store.hasActiveMembership = false
 
-	err := updateUser(t, store, UpdateUserRequest{CancelMembership: true})
+	err := updateUser(t, store, UpdateUserRequest{CancelMembershipId: ptr(testMembershipID)})
 
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected validation error, got %v", err)
 	}
-	if len(store.cancelledMembershipUser) != 0 {
-		t.Fatalf("expected no cancellation, got %v", store.cancelledMembershipUser)
+	if len(store.cancelledMembershipIDs) != 1 || store.cancelledMembershipIDs[0] != testMembershipID {
+		t.Fatalf("expected cancellation attempt for %q, got %v", testMembershipID, store.cancelledMembershipIDs)
 	}
 	assertAuditActions(t, store, db.AdminAuditOutcomeTypeFailed, actionMembershipCancelled)
 }
 
 func TestUpdateUserCancelsMembership(t *testing.T) {
 	store := newFakeAdminStore(t, true, "12345678", db.RoleTypeMember, "member")
-	store.hasActiveMembership = true
+	store.cancelMembershipResult = true
 
-	if err := updateUser(t, store, UpdateUserRequest{CancelMembership: true}); err != nil {
+	if err := updateUser(t, store, UpdateUserRequest{CancelMembershipId: ptr(testMembershipID)}); err != nil {
 		t.Fatalf("expected cancellation to succeed, got %v", err)
 	}
 
-	if len(store.cancelledMembershipUser) != 1 {
-		t.Fatalf("expected one cancellation, got %v", store.cancelledMembershipUser)
+	if len(store.cancelledMembershipUsers) != 1 || store.cancelledMembershipUsers[0] != testTargetID {
+		t.Fatalf("expected cancellation for user %q, got %v", testTargetID, store.cancelledMembershipUsers)
+	}
+	if len(store.cancelledMembershipIDs) != 1 || store.cancelledMembershipIDs[0] != testMembershipID {
+		t.Fatalf("expected cancellation for membership %q, got %v", testMembershipID, store.cancelledMembershipIDs)
 	}
 	assertAuditActions(t, store, db.AdminAuditOutcomeTypeSuccess, actionMembershipCancelled)
+}
+
+func TestUpdateUserRejectsBlankMembershipID(t *testing.T) {
+	store := newFakeAdminStore(t, true, "12345678", db.RoleTypeMember, "member")
+
+	err := updateUser(t, store, UpdateUserRequest{CancelMembershipId: ptr("  ")})
+
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+	if len(store.cancelledMembershipIDs) != 0 {
+		t.Fatalf("expected no cancellation attempt, got %v", store.cancelledMembershipIDs)
+	}
+	assertAuditActions(t, store, db.AdminAuditOutcomeTypeFailed, actionMembershipCancelled)
+}
+
+func TestUpdateUserRejectsInvalidMembershipID(t *testing.T) {
+	store := newFakeAdminStore(t, true, "12345678", db.RoleTypeMember, "member")
+
+	err := updateUser(t, store, UpdateUserRequest{CancelMembershipId: ptr("not-a-uuid")})
+
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+	if len(store.cancelledMembershipIDs) != 0 {
+		t.Fatalf("expected no cancellation attempt, got %v", store.cancelledMembershipIDs)
+	}
+	assertAuditActions(t, store, db.AdminAuditOutcomeTypeFailed, actionMembershipCancelled)
 }
 
 /*
@@ -497,11 +541,10 @@ func TestUpdateUserLogsOneEntryPerAction(t *testing.T) {
 
 func TestUpdateUserRollsBackAndLogsFailureWhenLaterActionFails(t *testing.T) {
 	store := newFakeAdminStore(t, true, "12345678", db.RoleTypeMember, "member")
-	store.hasActiveMembership = false
 
 	err := updateUser(t, store, UpdateUserRequest{
-		Role:             ptr(db.RoleTypeAdmin),
-		CancelMembership: true,
+		Role:               ptr(db.RoleTypeAdmin),
+		CancelMembershipId: ptr(testMembershipID),
 	})
 
 	if !errors.Is(err, ErrValidation) {

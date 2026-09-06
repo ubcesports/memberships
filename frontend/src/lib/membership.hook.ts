@@ -1,6 +1,8 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/client";
 
+export type MembershipExpirationType = "day" | "semester" | "year";
+
 export type MembershipTierPrice = {
   price: number;
   price_id: string;
@@ -15,6 +17,9 @@ export type MembershipTier = {
   slug: string;
   product_id: string;
   prices: MembershipTierPrice[];
+  program_id: string;
+  program_name: string;
+  expiration_type: MembershipExpirationType;
 };
 
 export type EligibleMembershipTier = Omit<MembershipTier, "prices"> & {
@@ -69,6 +74,9 @@ export type Membership = {
   expires_at: string;
   cancelled_at: string | null;
   transaction: Transaction;
+  slug: string;
+  program_id: string;
+  program_name: string;
 };
 
 export const useAllMemberships = () =>

@@ -5,24 +5,31 @@ import "time"
 // Membership tiers
 
 type MembershipTierDTO struct {
-	ID          string                   `json:"id"`
-	Title       string                   `json:"title"`
-	Description string                   `json:"description"`
-	Slug        string                   `json:"slug"`
-	ProductId   string                   `json:"product_id"`
-	Benefits    []string                 `json:"benefits"`
-	Prices      []MembershipTierPriceDTO `json:"prices"`
+	ID             string                   `json:"id"`
+	Title          string                   `json:"title"`
+	Description    string                   `json:"description"`
+	Slug           string                   `json:"slug"`
+	ProductId      string                   `json:"product_id"`
+	Benefits       []string                 `json:"benefits"`
+	Prices         []MembershipTierPriceDTO `json:"prices"`
+	ProgramId      string                   `json:"program_id"`
+	ProgramName    string                   `json:"program_name"`
+	ExpirationType MembershipExpirationType `json:"expiration_type"`
+	RequiredGroup  GroupType                `json:"-"`
 }
 
 type EligibleMembershipTierDTO struct {
-	ID           string                 `json:"id"`
-	Title        string                 `json:"title"`
-	Description  string                 `json:"description"`
-	Slug         string                 `json:"slug"`
-	PurchaseType PurchaseType           `json:"purchase_type"`
-	ProductId    string                 `json:"product_id"`
-	Benefits     []string               `json:"benefits"`
-	Price        MembershipTierPriceDTO `json:"prices"`
+	ID             string                   `json:"id"`
+	Title          string                   `json:"title"`
+	Description    string                   `json:"description"`
+	Slug           string                   `json:"slug"`
+	PurchaseType   PurchaseType             `json:"purchase_type"`
+	ProductId      string                   `json:"product_id"`
+	Benefits       []string                 `json:"benefits"`
+	Price          MembershipTierPriceDTO   `json:"prices"`
+	ProgramId      string                   `json:"program_id"`
+	ProgramName    string                   `json:"program_name"`
+	ExpirationType MembershipExpirationType `json:"expiration_type"`
 }
 
 type MembershipTierPriceDTO struct {
@@ -37,10 +44,13 @@ type MembershipDTO struct {
 	ID          string         `json:"id"`
 	TierId      string         `json:"tier_id"`
 	TierTitle   string         `json:"tier_title"`
+	Slug        string         `json:"slug"`
 	StartedAt   time.Time      `json:"started_at"`
 	ExpiresAt   time.Time      `json:"expires_at"`
 	CancelledAt *time.Time     `json:"cancelled_at"`
 	Transaction TransactionDTO `json:"transaction"`
+	ProgramId   string         `json:"program_id"`
+	ProgramName string         `json:"program_name"`
 }
 
 type TransactionDTO struct {
@@ -48,6 +58,7 @@ type TransactionDTO struct {
 	AmountPaid      string                `json:"amount_paid"`
 	Status          TransactionStatusType `json:"status"`
 	GroupAtPurchase GroupType             `json:"group_at_purchase"`
+	AmountPaidCents int64                 `json:"-"`
 }
 
 // Request

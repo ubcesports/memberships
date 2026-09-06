@@ -4,8 +4,8 @@ import { Check } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BasePage } from "@/components/layout/base-page";
+import { AdditionalTierCard } from "@/components/membership/additional-tier-card";
 import { AssignedPassCard } from "@/components/membership/assigned-pass-card";
-import { DayPassCard } from "@/components/membership/day-pass-card";
 import { SeasonPassCard } from "@/components/membership/season-pass-card";
 import { redirectToSignIn } from "@/lib/auth";
 import apiClient from "@/lib/client";
@@ -27,6 +27,7 @@ type ApiErrorResponse = {
 };
 
 const RESTRICTED_TIER_SLUGS = ["competitive_team", "executive"];
+const MAIN_TIER_SLUGS = ["basic", "lounge"];
 
 function getApiErrorMessage(data: CheckoutResponse | ApiErrorResponse) {
   return "message" in data && data.message
@@ -81,11 +82,14 @@ export default function PricingPage() {
   });
 
   const tierBySlug = (slug: string) => catalog?.find((tier) => tier.slug === slug);
-  const eligibleBySlug = (slug: string) => eligibleTiers.find((tier) => tier.slug === slug);
+  const eligibleById = (tierId: string) => eligibleTiers.find((tier) => tier.id === tierId);
 
-  const mainTiers = [tierBySlug("basic"), tierBySlug("lounge")].filter(notNull);
-  const dayTier = tierBySlug("day");
+  const mainTiers = MAIN_TIER_SLUGS.map(tierBySlug).filter(notNull);
   const assignedTiers = eligibleTiers.filter((tier) => RESTRICTED_TIER_SLUGS.includes(tier.slug));
+  const additionalTiers =
+    catalog?.filter(
+      (tier) => !MAIN_TIER_SLUGS.includes(tier.slug) && !RESTRICTED_TIER_SLUGS.includes(tier.slug),
+    ) ?? [];
 
   return (
     <BasePage>
@@ -185,7 +189,7 @@ export default function PricingPage() {
                 <SeasonPassCard
                   key={tier.id}
                   tier={tier}
-                  eligibleTier={eligibleBySlug(tier.slug)}
+                  eligibleTier={eligibleById(tier.id)}
                   checkoutPending={checkoutPending && checkoutTier?.id === tier.id}
                   isSignedIn={isSignedIn}
                   onCheckout={checkout}
@@ -196,28 +200,33 @@ export default function PricingPage() {
             </div>
           </section>
 
-          {dayTier ? (
+          {additionalTiers.length > 0 ? (
             <section className="pb-20 pt-12" aria-labelledby="additional-passes-heading">
               <div className="mb-5">
                 <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-brand-text-subtle">
-                  Additional option
+                  More ways to join
                 </p>
                 <h2
                   id="additional-passes-heading"
                   className="mt-2 text-xl font-semibold text-brand-text"
                 >
-                  Just here for the day?
+                  Additional memberships
                 </h2>
               </div>
-              <DayPassCard
-                tier={dayTier}
-                eligibleTier={eligibleBySlug(dayTier.slug)}
-                checkoutPending={checkoutPending && checkoutTier?.id === dayTier.id}
-                isSignedIn={isSignedIn}
-                onCheckout={checkout}
-                onSignIn={() => signIn()}
-                signInPending={signInPending}
-              />
+              <div className="grid gap-5">
+                {additionalTiers.map((tier) => (
+                  <AdditionalTierCard
+                    key={tier.id}
+                    tier={tier}
+                    eligibleTier={eligibleById(tier.id)}
+                    checkoutPending={checkoutPending && checkoutTier?.id === tier.id}
+                    isSignedIn={isSignedIn}
+                    onCheckout={checkout}
+                    onSignIn={() => signIn()}
+                    signInPending={signInPending}
+                  />
+                ))}
+              </div>
             </section>
           ) : null}
         </>
