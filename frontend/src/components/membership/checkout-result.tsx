@@ -11,7 +11,9 @@ type CheckoutResultProps = {
 };
 
 export function CheckoutResult({ successful }: CheckoutResultProps) {
-  const secondsRemaining = useRedirectCountdown("/pricing", REDIRECT_DELAY_SECONDS);
+  const destination = successful ? "/profile" : "/pricing";
+  const destinationLabel = successful ? "profile" : "passes";
+  const secondsRemaining = useRedirectCountdown(destination, REDIRECT_DELAY_SECONDS);
 
   return (
     <section className="mx-auto flex w-full max-w-xl flex-col items-center border border-brand-border bg-brand-surface/90 px-6 py-10 text-center shadow-2xl shadow-black/25 sm:px-10 sm:py-12">
@@ -41,28 +43,22 @@ export function CheckoutResult({ successful }: CheckoutResultProps) {
           : "You left checkout before completing payment. Your previous membership, if any, remains active."}
       </p>
 
-      <div className="mt-8 grid w-full gap-3 sm:grid-cols-2">
+      <div className="mt-8 w-full">
         <Link
-          href="/pricing"
-          className="inline-flex h-11 items-center justify-center gap-2 bg-brand-primary px-5 text-sm font-semibold text-white transition hover:bg-brand-primary-hover"
+          href={destination}
+          className="inline-flex h-11 w-full items-center justify-center gap-2 bg-brand-primary px-5 text-sm font-semibold text-white transition hover:bg-brand-primary-hover"
         >
           {successful ? (
             <Check aria-hidden="true" className="size-4" />
           ) : (
             <RotateCcw aria-hidden="true" className="size-4" />
           )}
-          {successful ? "View passes" : "Return to passes"}
-        </Link>
-        <Link
-          href="/profile"
-          className="inline-flex h-11 items-center justify-center border border-brand-border px-5 text-sm font-semibold text-brand-text transition hover:border-brand-text-muted hover:bg-white/5"
-        >
-          View profile
+          {successful ? "View profile" : "View passes"}
         </Link>
       </div>
 
       <p className="mt-6 text-xs text-brand-text-subtle" aria-live="polite">
-        Returning to passes in {secondsRemaining} second
+        Redirecting to {destinationLabel} in {secondsRemaining} second
         {secondsRemaining === 1 ? "" : "s"}.
       </p>
     </section>
