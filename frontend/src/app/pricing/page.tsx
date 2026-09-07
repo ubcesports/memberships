@@ -2,7 +2,6 @@
 
 import { Check } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { BasePage } from "@/components/layout/base-page";
 import { AdditionalTierCard } from "@/components/membership/additional-tier-card";
 import { AssignedPassCard } from "@/components/membership/assigned-pass-card";
@@ -15,16 +14,9 @@ import { useOptionalProfile } from "@/lib/profile.hook";
 import { notNull } from "@/lib/utils/type-guards";
 
 import type { CheckoutResponse, CheckoutRequest } from "@/lib/types/membership.types";
-import type { ApiErrorResponse } from "@/lib/types/api.types";
 
 const RESTRICTED_TIER_SLUGS = ["competitive_team", "executive"];
 const MAIN_TIER_SLUGS = ["basic", "lounge"];
-
-function getApiErrorMessage(data: CheckoutResponse | Partial<ApiErrorResponse>) {
-  return "message" in data && data.message
-    ? data.message
-    : "Unable to open checkout. Refresh and try again.";
-}
 
 export default function PricingPage() {
   const {
@@ -43,7 +35,6 @@ export default function PricingPage() {
 
   const { mutate: signIn, isPending: signInPending } = useMutation({
     mutationFn: async () => await redirectToSignIn(window.location.href),
-    onError: () => toast.error("Unable to start sign in. Try again."),
   });
 
   const {
@@ -52,24 +43,12 @@ export default function PricingPage() {
     isPending: checkoutPending,
   } = useMutation({
     mutationFn: async (tier: EligibleMembershipTier) => {
-      const response = await apiClient.post<CheckoutResponse | Partial<ApiErrorResponse>>(
-        "/membership/checkout",
-        { tier_id: tier.id } satisfies CheckoutRequest,
-        {
-          validateStatus: (status) => status >= 200 && status < 500,
-        },
-      );
-
-      if (response.status !== 200 || !("url" in response.data)) {
-        throw new Error(getApiErrorMessage(response.data));
-      }
+      const response = await apiClient.post<CheckoutResponse>("/membership/checkout", {
+        tier_id: tier.id,
+      } satisfies CheckoutRequest);
 
       window.location.assign(response.data.url);
     },
-    onError: (error) =>
-      toast.error(
-        error instanceof Error ? error.message : "Unable to open checkout. Refresh and try again.",
-      ),
   });
 
   const tierBySlug = (slug: string) => catalog?.find((tier) => tier.slug === slug);

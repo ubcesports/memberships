@@ -37,6 +37,7 @@ apiClient.interceptors.response.use(
     const apiError = data instanceof Blob ? undefined : data;
     const code = apiError?.code;
     const requestId = apiError?.request_id;
+    const toastId = `api-error:${error.config?.method ?? "request"}:${error.config?.url ?? "unknown"}`;
 
     // Only show a toast when the backend gave us an actual message to show.
     // A response that doesn't match the expected {code, message} shape (e.g.
@@ -44,6 +45,7 @@ apiClient.interceptors.response.use(
     // so stay quiet rather than show a generic "something went wrong".
     if (apiError?.message) {
       toast.error(apiError.message, {
+        id: toastId,
         description: requestId ? `Request ID: ${requestId}` : undefined,
       });
     }
