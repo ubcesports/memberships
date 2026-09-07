@@ -23,6 +23,12 @@ type AdminUpdateUserRequest struct {
 	CancelMembership bool        `json:"cancel_membership"`
 }
 
+type AdminUpdateExecProfileRequest struct {
+	Title        *string    `json:"title"`
+	DisplayOrder *int32     `json:"display_order"`
+	DisplayGroup *GroupType `json:"display_group"`
+}
+
 type AdminAuditLogActor struct {
 	ActorUserId    string `json:"actor_user_id"`
 	ActorFullName  string `json:"actor_full_name"`

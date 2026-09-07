@@ -293,7 +293,7 @@ WHERE mt.is_active = TRUE
                 ug."group" = mt."group"
                 OR (
                     mt."group" = 'executive'
-                    AND ug."group" IN ('director', 'board')
+                    AND ug."group" IN ('central_director', 'game_director', 'board')
                 )
             )
     )

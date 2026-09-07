@@ -220,7 +220,8 @@ func (s *MembershipService) GetEligibleTiersWithPrices(ctx context.Context, user
 	// 	  If they already have an active executive membership, they should not be able to see any eligible tiers
 	//    If a user is in an exec and a competitive player, prioritize exec membership over comp membership
 	if slices.Contains(user.Groups, dto.GroupExecutive) ||
-		slices.Contains(user.Groups, dto.GroupDirector) ||
+		slices.Contains(user.Groups, dto.GroupCentralDirector) ||
+		slices.Contains(user.Groups, dto.GroupGameDirector) ||
 		slices.Contains(user.Groups, dto.GroupBoard) {
 
 		if currMembership != nil {
@@ -641,8 +642,11 @@ func getGroupAtPurchase(groups []dto.GroupType) dto.GroupType {
 	if slices.Contains(groups, dto.GroupBoard) {
 		return dto.GroupBoard
 	}
-	if slices.Contains(groups, dto.GroupDirector) {
-		return dto.GroupDirector
+	if slices.Contains(groups, dto.GroupCentralDirector) {
+		return dto.GroupCentralDirector
+	}
+	if slices.Contains(groups, dto.GroupGameDirector) {
+		return dto.GroupGameDirector
 	}
 	if slices.Contains(groups, dto.GroupExecutive) {
 		return dto.GroupExecutive

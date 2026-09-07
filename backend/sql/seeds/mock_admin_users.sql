@@ -40,9 +40,9 @@ FROM (
         ('alex.chen.mock@example.com', 'executive'),
         ('alex.chen.mock@example.com', 'board'),
         ('maya.patel.mock@example.com', 'member'),
-        ('jordan.lee.mock@example.com', 'director'),
+        ('jordan.lee.mock@example.com', 'central_director'),
         ('priya.shah.mock@example.com', 'executive'),
-        ('priya.shah.mock@example.com', 'director'),
+        ('priya.shah.mock@example.com', 'game_director'),
         ('noah.williams.mock@example.com', 'board'),
         ('emma.garcia.mock@example.com', 'member'),
         ('emma.garcia.mock@example.com', 'competitive_team')

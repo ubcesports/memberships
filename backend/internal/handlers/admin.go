@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ubcesports/memberships/internal/database/db"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/service"
@@ -385,6 +386,83 @@ func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
+Updates the editable fields of the executive profile of a single user.
+
+API URL: PATCH /admin/exec-profile/{id}
+
+Args (JSON body, every field optional):
+
+	title: new title for the executive profile
+	display_order: new display order for the executive profile
+	display_group: new display group for the executive profile
+
+Returns:
+
+	response body containing the updated executive profile under the "exec_profile" key (HTTP 200)
+*/
+func (h *AdminHandler) UpdateExecProfile(w http.ResponseWriter, r *http.Request) {
+	requestId := middleware.GetReqID(r.Context())
+
+	actorId, ok := util.CurrentUserID(r)
+	if !ok {
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestId)
+		return
+	}
+
+	targetUserId := chi.URLParam(r, "id")
+	if _, err := util.GetValidatedUUID(targetUserId); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid user ID.", requestId)
+		return
+	}
+
+	var updateExecProfileRequest dto.AdminUpdateExecProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&updateExecProfileRequest); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again.", requestId)
+		return
+	}
+
+	profile, err := h.adminService.UpdateExecProfile(
+		r.Context(),
+		actorId,
+		targetUserId,
+		pgtype.Text{
+			String: *updateExecProfileRequest.Title,
+			Valid:  updateExecProfileRequest.Title != nil,
+		},
+		pgtype.Int4{
+			Int32: *updateExecProfileRequest.DisplayOrder,
+			Valid: updateExecProfileRequest.DisplayOrder != nil,
+		},
+		db.NullGroupType{
+			GroupType: db.GroupType(*updateExecProfileRequest.DisplayGroup),
+			Valid:     updateExecProfileRequest.DisplayGroup != nil,
+		},
+		requestId,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrValidation):
+			util.WriteApiResponse(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), requestId)
+
+		case errors.Is(err, service.ErrNotFound):
+			util.WriteApiResponse(w, http.StatusNotFound, "NOT_FOUND", err.Error(), requestId)
+
+		default:
+			slog.ErrorContext(r.Context(), "unable to update exec profile",
+				"error", err,
+				"request_id", requestId,
+				"user_id", targetUserId,
+			)
+			util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to update exec profile. Please try again.", requestId)
+		}
+
+		return
+	}
+
+	util.WriteJson(w, http.StatusOK, map[string]db.GetExecProfileByUserIDRow{"exec_profile": profile})
+}
+
+/*
 Returns a paginated list of admin audit logs.
 
 API URL: GET /admin/audit-logs
@@ -626,8 +704,10 @@ func parseAdminUserFilters(r *http.Request, includePagination bool) (service.Adm
 		case dto.GroupMember,
 			dto.GroupCompetitiveTeam,
 			dto.GroupExecutive,
-			dto.GroupDirector,
-			dto.GroupBoard:
+			dto.GroupCentralDirector,
+			dto.GroupGameDirector,
+			dto.GroupBoard,
+			dto.GroupPresident:
 		default:
 			return service.AdminUserFilters{}, errors.New("invalid group")
 		}

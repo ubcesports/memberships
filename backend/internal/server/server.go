@@ -28,6 +28,7 @@ type RouterParams struct {
 	HealthHandler        *handlers.HealthHandler
 	ProfileHandler       *handlers.ProfileHandler
 	AdminHandler         *handlers.AdminHandler
+	ExecProfileHandler   *handlers.ExecProfileHandler
 	MembershipHandler    *handlers.MembershipHandler
 	StripeWebhookHandler *handlers.StripeWebhookHandler
 	Limen                *limen.Limen
@@ -82,6 +83,18 @@ func provideRouter(params RouterParams) *chi.Mux {
 		r.Patch("/admin/users/{id}", params.AdminHandler.UpdateUser)
 		r.Get("/admin/audit-logs", params.AdminHandler.GetAdminAuditLogs)
 		r.Get("/admin/audit-logs/export", params.AdminHandler.ExportAuditLogsCSV)
+	})
+
+	// All exec profile routes
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RequireAuth(params.Limen))
+		r.Use(auth.RequireRole("admin"))
+
+		r.Get("/exec-profile", params.ExecProfileHandler.GetExecProfiles)
+		r.Post("/exec-profile/social-links", params.ExecProfileHandler.AddExecSocialLink)
+		r.Patch("/exec-profile/social-links", params.ExecProfileHandler.UpdateExecSocialLink)
+		r.Delete("/exec-profile/social-links", params.ExecProfileHandler.DeleteExecSocialLink)
+		r.Patch("/exec-profile/title", params.ExecProfileHandler.UpdateExecProfileTitle)
 	})
 
 	return r

@@ -1,6 +1,6 @@
 export type RoleType = "member" | "admin";
 
-export type GroupType = "member" | "competitive_team" | "executive" | "director" | "board";
+export type GroupType = "member" | "competitive_team" | "executive" | "central_director" | "game_director" | "board";
 
 export type SearchMode = "full_name" | "email" | "student_id";
 
@@ -115,7 +115,8 @@ export const GROUP_OPTIONS: { value: GroupType; label: string }[] = [
   { value: "member", label: "Member" },
   { value: "competitive_team", label: "Competitive Team" },
   { value: "executive", label: "Executive" },
-  { value: "director", label: "Director" },
+  { value: "central_director", label: "Central Director" },
+  { value: "game_director", label: "Game Director" },
   { value: "board", label: "Board" },
 ];
 

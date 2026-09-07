@@ -151,6 +151,37 @@ func (q *Queries) CreateAdminAuditLog(ctx context.Context, arg CreateAdminAuditL
 	return err
 }
 
+const createExecProfile = `-- name: CreateExecProfile :exec
+INSERT INTO exec_profile (
+    user_id, 
+    title,
+    display_order,
+    display_group
+) VALUES (
+    $1::uuid,
+    $2::text,
+    $3::int,
+    $4::group_type
+)
+`
+
+type CreateExecProfileParams struct {
+	UserID       pgtype.UUID
+	Title        pgtype.Text
+	DisplayOrder pgtype.Int4
+	DisplayGroup NullGroupType
+}
+
+func (q *Queries) CreateExecProfile(ctx context.Context, arg CreateExecProfileParams) error {
+	_, err := q.db.Exec(ctx, createExecProfile,
+		arg.UserID,
+		arg.Title,
+		arg.DisplayOrder,
+		arg.DisplayGroup,
+	)
+	return err
+}
+
 const getAdminAuditLogs = `-- name: GetAdminAuditLogs :many
 WITH args AS (
     SELECT
@@ -299,6 +330,35 @@ func (q *Queries) GetAdminUserByID(ctx context.Context, id pgtype.UUID) (GetAdmi
 		&i.OnboardingCompletedAt,
 		&i.AvatarUrl,
 		&i.Groups,
+	)
+	return i, err
+}
+
+const getExecProfileByUserID = `-- name: GetExecProfileByUserID :one
+SELECT
+    user_id,
+    title,
+    display_order,
+    display_group
+FROM exec_profile
+WHERE user_id = $1
+`
+
+type GetExecProfileByUserIDRow struct {
+	UserID       pgtype.UUID
+	Title        string
+	DisplayOrder int32
+	DisplayGroup GroupType
+}
+
+func (q *Queries) GetExecProfileByUserID(ctx context.Context, userID pgtype.UUID) (GetExecProfileByUserIDRow, error) {
+	row := q.db.QueryRow(ctx, getExecProfileByUserID, userID)
+	var i GetExecProfileByUserIDRow
+	err := row.Scan(
+		&i.UserID,
+		&i.Title,
+		&i.DisplayOrder,
+		&i.DisplayGroup,
 	)
 	return i, err
 }
@@ -456,6 +516,47 @@ func (q *Queries) HasActiveMembershipForUser(ctx context.Context, userID pgtype.
 	return exists, err
 }
 
+const hasExecGroupForUser = `-- name: HasExecGroupForUser :one
+SELECT EXISTS (
+    SELECT 1 
+    FROM user_groups
+    WHERE user_id = $1
+        AND "group" IN ('executive', 'central_director', 'game_director', 'board')
+)
+`
+
+func (q *Queries) HasExecGroupForUser(ctx context.Context, userID pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasExecGroupForUser, userID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const hasExecProfileForUser = `-- name: HasExecProfileForUser :one
+SELECT EXISTS (
+    SELECT 1 
+    FROM exec_profile
+    WHERE user_id = $1
+)
+`
+
+func (q *Queries) HasExecProfileForUser(ctx context.Context, userID pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasExecProfileForUser, userID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const removeExecProfile = `-- name: RemoveExecProfile :exec
+DELETE FROM exec_profile
+WHERE user_id = $1
+`
+
+func (q *Queries) RemoveExecProfile(ctx context.Context, userID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, removeExecProfile, userID)
+	return err
+}
+
 const removeUserGroup = `-- name: RemoveUserGroup :exec
 DELETE FROM user_groups
 WHERE user_id = $1 AND "group" = $2
@@ -484,6 +585,33 @@ func (q *Queries) StudentIDExists(ctx context.Context, studentID pgtype.Text) (b
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const updateExecProfile = `-- name: UpdateExecProfile :exec
+UPDATE exec_profile
+SET
+    title = COALESCE($1, title),
+    display_order = COALESCE($2, display_order),
+    display_group = COALESCE($3, display_group),
+    updated_at = NOW()
+WHERE user_id = $4
+`
+
+type UpdateExecProfileParams struct {
+	Title        pgtype.Text
+	DisplayOrder pgtype.Int4
+	DisplayGroup NullGroupType
+	UserID       pgtype.UUID
+}
+
+func (q *Queries) UpdateExecProfile(ctx context.Context, arg UpdateExecProfileParams) error {
+	_, err := q.db.Exec(ctx, updateExecProfile,
+		arg.Title,
+		arg.DisplayOrder,
+		arg.DisplayGroup,
+		arg.UserID,
+	)
+	return err
 }
 
 const updateUserRole = `-- name: UpdateUserRole :exec

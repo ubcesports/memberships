@@ -13,8 +13,10 @@ const (
 	GroupMember          GroupType = "member"
 	GroupCompetitiveTeam GroupType = "competitive_team"
 	GroupExecutive       GroupType = "executive"
-	GroupDirector        GroupType = "director"
+	GroupCentralDirector GroupType = "central_director"
+	GroupGameDirector    GroupType = "game_director"
 	GroupBoard           GroupType = "board"
+	GroupPresident       GroupType = "president"
 )
 
 type TransactionStatusType string
@@ -40,4 +42,15 @@ const (
 	AuditLogSuccess AdminAuditLogOutcomeType = "success"
 	AuditLogFailed  AdminAuditLogOutcomeType = "failed"
 	AuditLogDenied  AdminAuditLogOutcomeType = "denied"
+)
+
+type ExecSocialPlatformType string
+
+const (
+	ExecSocialPlatformInstagram ExecSocialPlatformType = "instagram"
+	ExecSocialPlatformX         ExecSocialPlatformType = "x"
+	ExecSocialPlatformTwitch    ExecSocialPlatformType = "twitch"
+	ExecSocialPlatformYoutube   ExecSocialPlatformType = "youtube"
+	ExecSocialPlatformTiktok    ExecSocialPlatformType = "tiktok"
+	ExecSocialPlatformLinkedIn  ExecSocialPlatformType = "linkedin"
 )

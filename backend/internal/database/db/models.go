@@ -54,14 +54,62 @@ func (ns NullAdminAuditOutcomeType) Value() (driver.Value, error) {
 	return string(ns.AdminAuditOutcomeType), nil
 }
 
+type ExecSocialPlatformType string
+
+const (
+	ExecSocialPlatformTypeInstagram ExecSocialPlatformType = "instagram"
+	ExecSocialPlatformTypeX         ExecSocialPlatformType = "x"
+	ExecSocialPlatformTypeTwitch    ExecSocialPlatformType = "twitch"
+	ExecSocialPlatformTypeYoutube   ExecSocialPlatformType = "youtube"
+	ExecSocialPlatformTypeTiktok    ExecSocialPlatformType = "tiktok"
+	ExecSocialPlatformTypeLinkedin  ExecSocialPlatformType = "linkedin"
+)
+
+func (e *ExecSocialPlatformType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ExecSocialPlatformType(s)
+	case string:
+		*e = ExecSocialPlatformType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ExecSocialPlatformType: %T", src)
+	}
+	return nil
+}
+
+type NullExecSocialPlatformType struct {
+	ExecSocialPlatformType ExecSocialPlatformType
+	Valid                  bool // Valid is true if ExecSocialPlatformType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullExecSocialPlatformType) Scan(value interface{}) error {
+	if value == nil {
+		ns.ExecSocialPlatformType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ExecSocialPlatformType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullExecSocialPlatformType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ExecSocialPlatformType), nil
+}
+
 type GroupType string
 
 const (
 	GroupTypeMember          GroupType = "member"
 	GroupTypeCompetitiveTeam GroupType = "competitive_team"
 	GroupTypeExecutive       GroupType = "executive"
-	GroupTypeDirector        GroupType = "director"
+	GroupTypeCentralDirector GroupType = "central_director"
+	GroupTypeGameDirector    GroupType = "game_director"
 	GroupTypeBoard           GroupType = "board"
+	GroupTypePresident       GroupType = "president"
 )
 
 func (e *GroupType) Scan(src interface{}) error {
@@ -251,6 +299,21 @@ type AdminAuditLog struct {
 	Outcome      AdminAuditOutcomeType
 	RequestID    string
 	Description  pgtype.Text
+}
+
+type ExecProfile struct {
+	UserID       pgtype.UUID
+	Title        string
+	DisplayOrder int32
+	DisplayGroup GroupType
+	UpdatedAt    pgtype.Timestamptz
+}
+
+type ExecSocialLink struct {
+	UserID    pgtype.UUID
+	Platform  ExecSocialPlatformType
+	Url       string
+	UpdatedAt pgtype.Timestamptz
 }
 
 type Membership struct {
