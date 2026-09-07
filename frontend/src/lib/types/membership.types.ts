@@ -1,0 +1,58 @@
+import type { GroupType } from "./user.types";
+import type { RedirectUrlResponse } from "./api.types";
+
+export type TransactionStatusType = "pending" | "completed" | "failed" | "refunded" | "expired";
+
+export type MembershipStatus = "active" | "expired" | "cancelled";
+
+export type PurchaseType = "new" | "upgrade";
+
+export type MembershipExpirationType = "day" | "semester" | "year";
+
+export type MembershipTierPrice = {
+  price: number;
+  price_id: string;
+  is_student_required: boolean | null;
+};
+
+export type MembershipTier = {
+  id: string;
+  title: string;
+  description: string;
+  benefits: string[];
+  slug: string;
+  product_id: string;
+  prices: MembershipTierPrice[];
+  program_id: string;
+  program_name: string;
+  expiration_type: MembershipExpirationType;
+};
+
+export type EligibleMembershipTier = Omit<MembershipTier, "prices"> & {
+  purchase_type: PurchaseType;
+  prices: MembershipTierPrice;
+};
+
+export type Transaction = {
+  id: string;
+  amount_paid: string;
+  status: TransactionStatusType;
+  group_at_purchase: GroupType;
+};
+
+export type Membership<TTransaction extends Transaction = Transaction> = {
+  id: string;
+  tier_id: string;
+  tier_title: string;
+  started_at: string;
+  expires_at: string;
+  cancelled_at: string | null;
+  transaction: TTransaction;
+  slug: string;
+  program_id: string;
+  program_name: string;
+};
+
+export type CheckoutResponse = RedirectUrlResponse;
+
+export type CheckoutRequest = { tier_id: string };

@@ -1,9 +1,7 @@
 import axios from "axios";
 import { API_BASE } from "@/lib/client";
 
-type OAuthAuthorizeResponse = {
-  url: string;
-};
+import type { OAuthAuthorizeResponse } from "@/lib/types/user.types";
 
 export async function redirectToSignIn(returnTo: string) {
   const response = await axios.get<OAuthAuthorizeResponse>(

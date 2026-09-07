@@ -1,10 +1,10 @@
 import { ChevronRight } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
-import type { Membership } from "@/lib/membership.hook";
+import type { Membership } from "@/lib/types/membership.types";
 import { formatDate } from "@/lib/utils/formatting";
 import { titleCase } from "@/lib/utils/groups";
 
-type MembershipStatus = "active" | "expired" | "cancelled";
+import type { MembershipStatus } from "@/lib/types/membership.types";
 
 const MEMBERSHIP_STATUS_TONE = {
   active: "success",
@@ -38,7 +38,7 @@ export function MembershipHistoryItem({ membership }: MembershipHistoryItemProps
   return (
     <li>
       <details className="group/transaction">
-        <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 transition hover:bg-white/[0.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand-primary [&::-webkit-details-marker]:hidden">
+        <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 transition hover:bg-white/3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-primary [&::-webkit-details-marker]:hidden">
           <ChevronRight
             aria-hidden="true"
             className="size-4 shrink-0 text-brand-text-subtle transition-transform group-open/transaction:rotate-90"
@@ -60,7 +60,7 @@ export function MembershipHistoryItem({ membership }: MembershipHistoryItemProps
           </span>
         </summary>
 
-        <dl className="grid gap-x-8 gap-y-5 border-t border-brand-border/70 bg-white/[0.02] px-5 py-5 pl-12 sm:grid-cols-2">
+        <dl className="grid gap-x-8 gap-y-5 border-t border-brand-border/70 bg-white/2 px-5 py-5 pl-12 sm:grid-cols-2">
           <TransactionDetail label="Payment status">
             <StatusBadge tone={TRANSACTION_STATUS_TONE[membership.transaction.status]}>
               {titleCase(membership.transaction.status)}

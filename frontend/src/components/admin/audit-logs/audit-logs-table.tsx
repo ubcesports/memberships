@@ -1,4 +1,4 @@
-import { AuditLogEntry } from "@/lib/admin/admin.types";
+import { AuditLogEntry } from "@/lib/types/admin.types";
 import { Column, DataTable } from "../admin-data-table";
 import { AvatarCell, EmptyValue, formatOptionalTime, LinkCell } from "../admin-table-cells";
 

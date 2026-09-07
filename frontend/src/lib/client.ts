@@ -1,11 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { toast } from "sonner";
 
-export type ApiErrorResponse = {
-  code: string;
-  message: string;
-  request_id: string;
-};
+import type { ApiErrorResponse } from "@/lib/types/api.types";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8080";

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { DataTable, type Column } from "../admin-data-table";
 import { AvatarCell, EmptyValue, formatOptionalTime } from "../admin-table-cells";
 import { StatusBadge } from "@/components/status-badge";
-import type { User } from "@/lib/admin/admin.types";
+import type { User } from "@/lib/types/user.types";
 import { formatTime } from "@/lib/utils/formatting";
 import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
 

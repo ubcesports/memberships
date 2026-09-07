@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuditLogs } from "@/lib/admin/admin.hook";
-import { AuditLogEntry, DEFAULT_PAGE_SIZE } from "@/lib/admin/admin.types";
+import { AuditLogEntry, DEFAULT_PAGE_SIZE } from "@/lib/types/admin.types";
 import { useState } from "react";
 import { AuditLogsToolbar } from "@/components/admin/audit-logs/audit-logs-toolbar";
 import { AuditLogsTable } from "@/components/admin/audit-logs/audit-logs-table";

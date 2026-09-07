@@ -3,7 +3,7 @@ import type {
   MembershipExpirationType,
   MembershipTier,
   MembershipTierPrice,
-} from "@/lib/membership.hook";
+} from "@/lib/types/membership.types";
 
 const STUDENT_LABELS: Record<string, string> = {
   true: "Student",
@@ -31,8 +31,8 @@ export function formatMembershipPrice(price: number) {
   return new Intl.NumberFormat("en-CA", {
     style: "currency",
     currency: "CAD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: Math.round(price * 100) % 100 === 0 ? 0 : 2,
+    minimumFractionDigits: Number.isInteger(price) ? 0 : 2,
+    maximumFractionDigits: 2,
   }).format(price);
 }
 

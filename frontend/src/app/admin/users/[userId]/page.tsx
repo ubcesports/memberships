@@ -9,7 +9,7 @@ import { UserMembershipsPanel } from "@/components/admin/users/user-memberships-
 import { UserProfilePanel } from "@/components/admin/users/user-profile-panel";
 import { BasePage } from "@/components/layout/base-page";
 import { useUpdateUser, useUser, useUserMemberships } from "@/lib/admin/admin.hook";
-import type { UpdateUserRequest } from "@/lib/admin/admin.types";
+import type { UpdateUserRequest } from "@/lib/types/admin.types";
 import { useProfile } from "@/lib/profile.hook";
 
 type AdminUserDetailPageProps = {

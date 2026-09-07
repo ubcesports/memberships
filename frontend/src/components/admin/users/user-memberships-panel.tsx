@@ -7,7 +7,7 @@ import { ActionButton } from "@/components/action-button";
 import { DetailRow } from "@/components/detail-row";
 import { StatusBadge } from "@/components/status-badge";
 import { SurfacePanel } from "@/components/surface-panel";
-import type { Membership, UpdateUserRequest } from "@/lib/admin/admin.types";
+import type { AdminMembership as Membership, UpdateUserRequest } from "@/lib/types/admin.types";
 import { useMembershipCatalog } from "@/lib/membership.hook";
 import { formatDate, formatTime } from "@/lib/utils/formatting";
 import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
@@ -18,9 +18,9 @@ type UserMembershipsPanelProps = {
   isSaving: boolean;
 };
 
-type MembershipState = "active" | "cancelled" | "expired";
+import type { MembershipStatus } from "@/lib/types/membership.types";
 
-function getMembershipState(membership: Membership): MembershipState {
+function getMembershipState(membership: Membership): MembershipStatus {
   if (membership.cancelled_at) {
     return "cancelled";
   }

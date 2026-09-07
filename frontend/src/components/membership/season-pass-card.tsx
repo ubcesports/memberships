@@ -7,7 +7,7 @@ import {
   isMembershipTierPrice,
   membershipPriceLabel,
 } from "@/components/membership/pricing";
-import type { EligibleMembershipTier, MembershipTier } from "@/lib/membership.hook";
+import type { EligibleMembershipTier, MembershipTier } from "@/lib/types/membership.types";
 
 type SeasonPassCardProps = {
   tier: MembershipTier;

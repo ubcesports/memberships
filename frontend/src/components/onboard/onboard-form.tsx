@@ -1,7 +1,7 @@
 import type { FormEvent, ReactNode } from "react";
 import { GraduationCap, Loader2, UserRound } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
-import type { StudentStatus } from "@/lib/onboard/onboard.types";
+import type { StudentStatus } from "@/lib/types/user.types";
 
 type OnboardFormProps = {
   studentStatus: StudentStatus | null;

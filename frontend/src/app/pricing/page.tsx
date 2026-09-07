@@ -9,27 +9,18 @@ import { AssignedPassCard } from "@/components/membership/assigned-pass-card";
 import { SeasonPassCard } from "@/components/membership/season-pass-card";
 import { redirectToSignIn } from "@/lib/auth";
 import apiClient from "@/lib/client";
-import {
-  type EligibleMembershipTier,
-  useEligibleMembershipTiers,
-  useMembershipCatalog,
-} from "@/lib/membership.hook";
+import type { EligibleMembershipTier } from "@/lib/types/membership.types";
+import { useEligibleMembershipTiers, useMembershipCatalog } from "@/lib/membership.hook";
 import { useOptionalProfile } from "@/lib/profile.hook";
 import { notNull } from "@/lib/utils/type-guards";
 
-type CheckoutResponse = {
-  url: string;
-};
-
-type ApiErrorResponse = {
-  code?: string;
-  message?: string;
-};
+import type { CheckoutResponse, CheckoutRequest } from "@/lib/types/membership.types";
+import type { ApiErrorResponse } from "@/lib/types/api.types";
 
 const RESTRICTED_TIER_SLUGS = ["competitive_team", "executive"];
 const MAIN_TIER_SLUGS = ["basic", "lounge"];
 
-function getApiErrorMessage(data: CheckoutResponse | ApiErrorResponse) {
+function getApiErrorMessage(data: CheckoutResponse | Partial<ApiErrorResponse>) {
   return "message" in data && data.message
     ? data.message
     : "Unable to open checkout. Refresh and try again.";
@@ -61,9 +52,9 @@ export default function PricingPage() {
     isPending: checkoutPending,
   } = useMutation({
     mutationFn: async (tier: EligibleMembershipTier) => {
-      const response = await apiClient.post<CheckoutResponse | ApiErrorResponse>(
+      const response = await apiClient.post<CheckoutResponse | Partial<ApiErrorResponse>>(
         "/membership/checkout",
-        { tier_id: tier.id },
+        { tier_id: tier.id } satisfies CheckoutRequest,
         {
           validateStatus: (status) => status >= 200 && status < 500,
         },

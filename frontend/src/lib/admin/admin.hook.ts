@@ -11,8 +11,8 @@ import type {
   AdminPagination,
   AppliedSearch,
   UpdateUserRequest,
-  User,
-} from "./admin.types";
+} from "@/lib/types/admin.types";
+import type { User } from "@/lib/types/user.types";
 
 export function useUsers(
   appliedSearch: AppliedSearch,

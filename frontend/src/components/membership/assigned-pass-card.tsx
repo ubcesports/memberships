@@ -1,7 +1,7 @@
 import { Check, ShieldCheck } from "lucide-react";
 import { PurchaseButton } from "@/components/membership/purchase-button";
 import { formatMembershipPrice } from "@/components/membership/pricing";
-import type { EligibleMembershipTier } from "@/lib/membership.hook";
+import type { EligibleMembershipTier } from "@/lib/types/membership.types";
 
 type AssignedPassCardProps = {
   tier: EligibleMembershipTier;

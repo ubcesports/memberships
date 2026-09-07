@@ -8,8 +8,9 @@ import { ActionButton } from "@/components/action-button";
 import { DetailRow } from "@/components/detail-row";
 import { StatusBadge } from "@/components/status-badge";
 import { SurfacePanel } from "@/components/surface-panel";
-import type { GroupType, RoleType, UpdateUserRequest, User } from "@/lib/admin/admin.types";
-import { GROUP_OPTIONS, ROLE_OPTIONS } from "@/lib/admin/admin.types";
+import type { GroupType, RoleType, User } from "@/lib/types/user.types";
+import type { UpdateUserRequest } from "@/lib/types/admin.types";
+import { GROUP_OPTIONS, ROLE_OPTIONS } from "@/lib/types/admin.types";
 import { formatTime, getInitials } from "@/lib/utils/formatting";
 import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
 
