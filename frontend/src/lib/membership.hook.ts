@@ -15,7 +15,11 @@ const catalogQuery = queryOptions({
   },
 });
 
-export const useMembershipCatalog = () => useQuery(catalogQuery);
+export const useMembershipCatalog = (initialData?: MembershipTier[]) =>
+  useQuery({
+    ...catalogQuery,
+    initialData,
+  });
 
 export const useEligibleMembershipTiers = (enabled: boolean) =>
   useQuery({
