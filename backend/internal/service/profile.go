@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/ubcesports/memberships/internal/database/db"
 	"github.com/ubcesports/memberships/internal/dto"
+	"github.com/ubcesports/memberships/internal/mailer"
 	"github.com/ubcesports/memberships/internal/repository"
 	"github.com/ubcesports/memberships/internal/util"
 )
@@ -76,12 +79,50 @@ func (s *ProfileService) OnboardUser(ctx context.Context, userId string, onboard
 		studentID = util.GenerateNonStudentID()
 	}
 
-	return s.profileRepository.OnboardUserByUserId(
+	if err := s.profileRepository.OnboardUserByUserId(
 		ctx,
 		userId,
 		onboardUserRequest.IsStudent,
 		studentID,
+	); err != nil {
+		return err
+	}
+
+	s.sendWelcomeEmail(ctx, user)
+	return nil
+}
+
+// sendWelcomeEmail fires the one-time signup welcome email. Onboarding has
+// already succeeded by this point, so a failure here is logged and swallowed
+// rather than surfaced to the user.
+func (s *ProfileService) sendWelcomeEmail(ctx context.Context, user *dto.ProfileDTO) {
+	data := welcomeEmail()
+
+	html, err := mailer.RenderEmail(data)
+	if err != nil {
+		slog.Error("render welcome email failed", "error", err, "user_id", user.ID)
+		return
+	}
+
+	mailer.SendEmailAsync(
+		[]string{user.Email},
+		data.Heading,
+		html,
+		middleware.GetReqID(ctx),
+		user.ID,
 	)
+}
+
+// welcomeEmail builds the one-time signup welcome email's content.
+func welcomeEmail() mailer.EmailData {
+	heading := "Welcome to UBCEA!"
+	return mailer.EmailData{
+		Title:      heading,
+		Heading:    heading,
+		Subheading: "Thanks for signing up. You're now part of the UBC Esports Association community — the next step is picking a membership so you can access events, the lounge, and everything else we run throughout the year.",
+		CTAText:    "View membership pricing",
+		CTAURL:     mailer.FrontendURL() + "/pricing",
+	}
 }
 
 /*

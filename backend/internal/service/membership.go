@@ -4,15 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"slices"
 	"strconv"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
 	"github.com/stripe/stripe-go/v86"
 	"github.com/ubcesports/memberships/internal/database/db"
 	"github.com/ubcesports/memberships/internal/dto"
+	"github.com/ubcesports/memberships/internal/mailer"
 	"github.com/ubcesports/memberships/internal/repository"
 	"github.com/ubcesports/memberships/internal/stripeclient"
 )
@@ -483,8 +486,19 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 	Stripe webhook callback functions
 */
 
+// fulfilledPurchase is the info needed to email a user after a checkout
+// session has been fulfilled inside HandleCheckoutPaid's transaction.
+type fulfilledPurchase struct {
+	userId       string
+	tierId       string
+	purchaseType db.PurchaseType
+	amountCents  int64
+}
+
 func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *stripe.CheckoutSession, occurredAt time.Time) error {
-	return s.membershipRepo.WithTx(ctx, func(mr *repository.MembershipRepository) error {
+	var fulfilled *fulfilledPurchase
+
+	err := s.membershipRepo.WithTx(ctx, func(mr *repository.MembershipRepository) error {
 		// 1. Lock the transaction for this checkout session so duplicate webhooks cannot fulfill it twice.
 		transaction, err := mr.GetTransactionByCheckoutSessionIdForUpdate(ctx, session.ID)
 		if err != nil {
@@ -546,13 +560,115 @@ func (s *MembershipService) HandleCheckoutPaid(ctx context.Context, session *str
 		if session.PaymentIntent != nil {
 			paymentIntentId = session.PaymentIntent.ID
 		}
-		return mr.CompleteTransaction(ctx, repository.CompleteTransactionParams{
+		if err := mr.CompleteTransaction(ctx, repository.CompleteTransactionParams{
 			TransactionId:         transaction.ID.String(),
 			MembershipId:          membershipId,
 			StripePaymentIntentId: paymentIntentId,
 			AmountPaidCents:       session.AmountTotal,
-		})
+		}); err != nil {
+			return err
+		}
+
+		fulfilled = &fulfilledPurchase{
+			userId:       transaction.UserID.String(),
+			tierId:       transaction.TierID.String(),
+			purchaseType: transaction.PurchaseType.PurchaseType,
+			amountCents:  session.AmountTotal,
+		}
+		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	if fulfilled != nil {
+		s.sendPurchaseEmail(ctx, *fulfilled)
+	}
+	return nil
+}
+
+// sendPurchaseEmail emails the user after a checkout session has been
+// fulfilled. The membership itself is already saved by this point, so a
+// failure here is logged and swallowed rather than surfaced to the caller.
+func (s *MembershipService) sendPurchaseEmail(ctx context.Context, fulfilled fulfilledPurchase) {
+	tier, err := s.getTierByTierId(ctx, fulfilled.tierId)
+	if err != nil {
+		slog.Error("send purchase email: get tier failed", "error", err, "user_id", fulfilled.userId)
+		return
+	}
+
+	profile, err := s.profileService.GetProfileByUserID(ctx, fulfilled.userId)
+	if err != nil {
+		slog.Error("send purchase email: get profile failed", "error", err, "user_id", fulfilled.userId)
+		return
+	}
+
+	data := purchaseEmail(tier.Title, fulfilled.purchaseType, fulfilled.amountCents)
+
+	html, err := mailer.RenderEmail(data)
+	if err != nil {
+		slog.Error("render purchase email failed", "error", err, "user_id", fulfilled.userId)
+		return
+	}
+
+	mailer.SendEmailAsync(
+		[]string{profile.Email},
+		data.Heading,
+		html,
+		middleware.GetReqID(ctx),
+		fulfilled.userId,
+	)
+}
+
+// purchaseEmail builds the content for the purchase/upgrade confirmation
+// email. purchaseType distinguishes a brand-new membership from an upgrade
+// of an existing one.
+func purchaseEmail(tierTitle string, purchaseType db.PurchaseType, amountPaidCents int64) mailer.EmailData {
+	heading := "Your membership is confirmed 🎉"
+	subheading := "Thanks for your purchase! Here's a summary of your new membership."
+	transactionTypeLabel := "New"
+	if purchaseType == db.PurchaseTypeUpgrade {
+		heading = "Your membership was upgraded"
+		subheading = "Here's a summary of your upgrade."
+		transactionTypeLabel = "Upgrade"
+	}
+
+	return mailer.EmailData{
+		Title:      heading,
+		Heading:    heading,
+		Subheading: subheading,
+		Rows: mailer.NewRows(
+			"Tier", tierTitle,
+			"Transaction type", transactionTypeLabel,
+			"Amount paid", fmt.Sprintf("$%.2f CAD", float64(amountPaidCents)/100),
+		),
+		CTAText: "View your membership",
+		CTAURL:  mailer.FrontendURL() + "/profile",
+	}
+}
+
+// RunExpiryNotifications emails members whose active membership expires in
+// exactly one week, and members whose active membership expires today.
+//
+// Every active membership shares the same fixed expiry date (see
+// membershipExpiresAt), so this only ever needs to check two exact dates
+// rather than a rolling per-user window — checking a range instead would
+// re-send the same email on every day of that window.
+//
+// Intended to be called once per day by a scheduler; failures are logged
+// and swallowed per-membership so one bad row doesn't block the rest.
+func (s *MembershipService) RunExpiryNotifications(ctx context.Context) {
+	location, err := vancouverLocation()
+	if err != nil {
+		slog.Error("expiry notifications: load location failed", "error", err)
+		return
+	}
+
+	now := time.Now().In(location)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location)
+
+	s.sendExpiryEmails(ctx, today.AddDate(0, 0, 7), expiringSoonEmail)
+	s.sendExpiryEmails(ctx, today, expiredEmail)
 }
 
 func (s *MembershipService) HandleCheckoutExpired(ctx context.Context, sessionId string) error {
@@ -563,9 +679,80 @@ func (s *MembershipService) HandleCheckoutFailed(ctx context.Context, sessionId 
 	return s.membershipRepo.UpdatePendingTransactionStatusByCheckoutId(ctx, sessionId, dto.TransactionFailed)
 }
 
+// expiryEmailContent builds an expiry-related email's content for one
+// membership row.
+type expiryEmailContent func(row db.GetActiveMembershipsExpiringOnDateRow) mailer.EmailData
+
+func expiringSoonEmail(row db.GetActiveMembershipsExpiringOnDateRow) mailer.EmailData {
+	heading := "Your membership expires in 1 week"
+	return mailer.EmailData{
+		Title:      heading,
+		Heading:    heading,
+		Subheading: "Your membership is expiring soon. Renew now to keep your access without any interruption.",
+		Rows: mailer.NewRows(
+			"Tier", row.TierTitle,
+			"Expires on", formatVancouverDate(row.ExpiresAt.Time),
+		),
+		CTAText: "Renew your membership",
+		CTAURL:  mailer.FrontendURL() + "/pricing",
+	}
+}
+
+// formatVancouverDate renders t as a calendar date in America/Vancouver
+// time. t is stored as a UTC timestamp, so formatting it directly (without
+// converting first) can show the wrong day — eg. an expiry stored as
+// "April 30 23:59:59 Vancouver" is "May 1, ~07:00 UTC".
+func formatVancouverDate(t time.Time) string {
+	location, err := vancouverLocation()
+	if err != nil {
+		location = time.UTC
+	}
+	return t.In(location).Format("January 2, 2006")
+}
+
+func expiredEmail(row db.GetActiveMembershipsExpiringOnDateRow) mailer.EmailData {
+	heading := "Your membership has expired"
+	return mailer.EmailData{
+		Title:      heading,
+		Heading:    heading,
+		Subheading: "Your membership has expired. Renew anytime to regain access.",
+		Rows:       mailer.NewRows("Tier", row.TierTitle),
+		CTAText:    "Renew your membership",
+		CTAURL:     mailer.FrontendURL() + "/pricing",
+	}
+}
+
+// sendExpiryEmails emails every active membership expiring on date using the
+// given content builder.
+func (s *MembershipService) sendExpiryEmails(ctx context.Context, date time.Time, content expiryEmailContent) {
+	rows, err := s.membershipRepo.GetActiveMembershipsExpiringOnDate(ctx, date)
+	if err != nil {
+		slog.Error("expiry notifications: query failed", "error", err, "date", date.Format(time.DateOnly))
+		return
+	}
+
+	for _, row := range rows {
+		data := content(row)
+
+		html, err := mailer.RenderEmail(data)
+		if err != nil {
+			slog.Error("expiry notifications: render email failed", "error", err, "membership_id", row.ID.String())
+			continue
+		}
+
+		mailer.SendEmailAsync([]string{row.Email}, data.Heading, html, "", row.UserID.String())
+	}
+}
+
 /*
 	Private functions
 */
+
+// vancouverLocation returns the time zone all membership-year and expiry
+// calculations are performed in, regardless of the caller's local time zone.
+func vancouverLocation() (*time.Location, error) {
+	return time.LoadLocation("America/Vancouver")
+}
 
 // memberships follow the UBC Esports membership year, which runs from
 // May 1 00:00:00 to April 30 23:59:59 (America/Vancouver).
@@ -579,7 +766,7 @@ func (s *MembershipService) HandleCheckoutFailed(ctx context.Context, sessionId 
 // All calculations are performed in the America/Vancouver time zone,
 // regardless of the purchaser's local time zone.
 func membershipExpiresAt(purchasedAt time.Time) (time.Time, error) {
-	location, err := time.LoadLocation("America/Vancouver")
+	location, err := vancouverLocation()
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -610,7 +797,7 @@ func membershipExpiresAt(purchasedAt time.Time) (time.Time, error) {
 // Users should not be able to purchase a membership after April 25, as that will not
 // result in a meaningful length membership
 func isPurchaseClosed(now time.Time) (bool, error) {
-	location, err := time.LoadLocation("America/Vancouver")
+	location, err := vancouverLocation()
 	if err != nil {
 		return false, err
 	}

@@ -208,3 +208,20 @@ WHERE user_id = $1
     AND cancelled_at IS NULL
     AND started_at <= NOW()
     AND expires_at > NOW();
+
+-- name: GetActiveMembershipsExpiringOnDate :many
+-- Active (non-cancelled) memberships whose expires_at falls on the given
+-- calendar date in Vancouver time. Used by the daily expiry-notification job:
+-- called with (expiry date - 7 days) for "expiring soon" emails, and with
+-- today's date for "expired" emails.
+SELECT
+    m.id,
+    m.user_id,
+    m.expires_at,
+    mt.title AS tier_title,
+    u.email
+FROM memberships m
+JOIN membership_tiers mt ON mt.id = m.tier_id
+JOIN users u ON u.id = m.user_id
+WHERE m.cancelled_at IS NULL
+    AND (m.expires_at AT TIME ZONE 'America/Vancouver')::date = $1::date;

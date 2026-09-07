@@ -4,14 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ubcesports/memberships/internal/database/db"
 	"github.com/ubcesports/memberships/internal/dto"
+	"github.com/ubcesports/memberships/internal/mailer"
 	"github.com/ubcesports/memberships/internal/repository"
 	"github.com/ubcesports/memberships/internal/util"
 )
@@ -75,6 +78,15 @@ const maxNonStudentIDAttempts = 5
 type pendingAuditLog struct {
 	action      string
 	description string
+	email       *pendingUserEmail // nil = no email for this entry
+}
+
+// pendingUserEmail is a fully rendered-content email earned by a successful
+// admin action, sent only after the enclosing transaction has committed.
+type pendingUserEmail struct {
+	heading    string
+	subheading string
+	rows       []mailer.Row
 }
 
 // auditableError attributes a failure to the action that caused it, so a
@@ -246,6 +258,8 @@ func (s *AdminService) UpdateUser(
 	req UpdateUserRequest,
 ) (*dto.ProfileDTO, error) {
 	var profile *dto.ProfileDTO
+	var pendingEmails []pendingUserEmail
+	var targetEmail string
 
 	updateErr := s.adminRepository.WithTx(ctx, func(store repository.AdminStore) error {
 		user, err := store.GetUserByID(ctx, targetUserId)
@@ -259,6 +273,7 @@ func (s *AdminService) UpdateUser(
 			}
 			return err
 		}
+		targetEmail = user.Email
 
 		entries, err := s.applyUserUpdates(ctx, store, user, req)
 		if err != nil {
@@ -275,6 +290,9 @@ func (s *AdminService) UpdateUser(
 				Description:  entry.description,
 			}); err != nil {
 				return err
+			}
+			if entry.email != nil {
+				pendingEmails = append(pendingEmails, *entry.email)
 			}
 		}
 
@@ -314,7 +332,35 @@ func (s *AdminService) UpdateUser(
 		return nil, updateErr
 	}
 
+	for _, email := range pendingEmails {
+		s.sendUserEmail(ctx, targetEmail, targetUserId, email)
+	}
+
 	return profile, nil
+}
+
+// sendUserEmail renders and fires one admin-triggered email. The update it
+// describes has already committed, so a failure here is logged and
+// swallowed rather than surfaced to the caller.
+func (s *AdminService) sendUserEmail(ctx context.Context, targetEmail, targetUserId string, email pendingUserEmail) {
+	html, err := mailer.RenderEmail(mailer.EmailData{
+		Title:      email.heading,
+		Heading:    email.heading,
+		Subheading: email.subheading,
+		Rows:       email.rows,
+	})
+	if err != nil {
+		slog.Error("render admin-triggered email failed", "error", err, "user_id", targetUserId)
+		return
+	}
+
+	mailer.SendEmailAsync(
+		[]string{targetEmail},
+		email.heading,
+		html,
+		middleware.GetReqID(ctx),
+		targetUserId,
+	)
 }
 
 func (s *AdminService) GetAdminAuditLogs(ctx context.Context, filters AdminAuditLogFilters) ([]dto.AdminAuditLogResponse, int64, error) {
@@ -487,6 +533,9 @@ func (s *AdminService) applyStudentUpdate(
 
 	currentStudentID := textOrEmpty(user.StudentID)
 	description := fmt.Sprintf("Updated student ID from %s to %s", displayValue(currentStudentID), studentID)
+	item := "Student ID"
+	oldValue := displayValue(currentStudentID)
+	newValue := studentID
 	if update.action == actionStudentStatusUpdated {
 		description = fmt.Sprintf(
 			"Updated student status from %s to %s (student ID %s to %s)",
@@ -495,9 +544,16 @@ func (s *AdminService) applyStudentUpdate(
 			displayValue(currentStudentID),
 			studentID,
 		)
+		item = "Student status"
+		oldValue = studentStatusLabel(user.IsStudent)
+		newValue = studentStatusLabel(update.isStudent)
 	}
 
-	return []pendingAuditLog{{action: update.action, description: description}}, nil
+	return []pendingAuditLog{{
+		action:      update.action,
+		description: description,
+		email:       userInfoUpdateEmail(item, oldValue, newValue),
+	}}, nil
 }
 
 func (s *AdminService) applyRoleUpdate(
@@ -521,7 +577,34 @@ func (s *AdminService) applyRoleUpdate(
 	return []pendingAuditLog{{
 		action:      actionRoleUpdated,
 		description: fmt.Sprintf("Updated role from %s to %s", user.Role, role),
+		email:       userInfoUpdateEmail("Role", string(user.Role), string(role)),
 	}}, nil
+}
+
+// userInfoUpdateEmail builds the "admin updated user info" email content for
+// a single changed field.
+func userInfoUpdateEmail(item, oldValue, newValue string) *pendingUserEmail {
+	return &pendingUserEmail{
+		heading:    "Your account information was updated",
+		subheading: fmt.Sprintf("An admin updated your %s.", strings.ToLower(item)),
+		rows: mailer.NewRows(
+			"Updated", item,
+			"Previous value", displayValue(oldValue),
+			"New value", newValue,
+		),
+	}
+}
+
+// cancellationEmail builds the "admin cancelled your membership" email content.
+func cancellationEmail(tierTitle string, cancelledAt time.Time) *pendingUserEmail {
+	return &pendingUserEmail{
+		heading:    "Your membership was cancelled",
+		subheading: "An admin cancelled your membership. Reach out to us if you think this was a mistake.",
+		rows: mailer.NewRows(
+			"Tier", tierTitle,
+			"Cancelled on", formatVancouverDate(cancelledAt),
+		),
+	}
 }
 
 func (s *AdminService) applyGroupUpdates(
@@ -602,13 +685,30 @@ func (s *AdminService) applyMembershipUpdates(
 			return nil, auditable(actionMembershipCancelled, "Failed to cancel membership: no active membership", err)
 		}
 
-		if err := store.CancelActiveMembershipsByUserId(ctx, userID, time.Now()); err != nil {
+		// Best-effort lookup for the email; the cancellation itself only
+		// depends on HasActiveMembership above.
+		activeTierTitle := "your membership"
+		memberships, err := store.GetUserMemberships(ctx, userID)
+		if err != nil {
+			slog.Error("get user memberships for cancellation email failed", "error", err, "user_id", userID)
+		} else {
+			for _, membership := range memberships {
+				if !membership.CancelledAt.Valid {
+					activeTierTitle = membership.TierTitle
+					break
+				}
+			}
+		}
+
+		cancelledAt := time.Now()
+		if err := store.CancelActiveMembershipsByUserId(ctx, userID, cancelledAt); err != nil {
 			return nil, auditable(actionMembershipCancelled, "Failed to cancel membership", err)
 		}
 
 		return []pendingAuditLog{{
 			action:      actionMembershipCancelled,
 			description: "Cancelled the user's active membership",
+			email:       cancellationEmail(activeTierTitle, cancelledAt),
 		}}, nil
 	}
 
