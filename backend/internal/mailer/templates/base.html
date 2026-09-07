@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>{{.Title}}</title>
+<style>
+  body{margin:0;background:#15204e;}
+
+  [data-ogsc] .ubcea-page-bg { background-color: #15204e !important; }
+  [data-ogsc] .ubcea-card { background-color: #23262f !important; }
+  [data-ogsc] .ubcea-header-text,
+  [data-ogsc] .ubcea-heading,
+  [data-ogsc] .ubcea-row-value { color: #f3f4f6 !important; }
+  [data-ogsc] .ubcea-subheading,
+  [data-ogsc] .ubcea-row-label { color: #9ca3af !important; }
+  [data-ogsc] .ubcea-footer-text { color: #8b8fa3 !important; }
+  [data-ogsc] .ubcea-cta-bg { background-color: #1463e1 !important; }
+  [data-ogsc] .ubcea-cta-text { color: #ffffff !important; }
+</style>
+</head>
+<body style="margin:0;background:#15204e;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#15204e" class="ubcea-page-bg" style="background:#15204e;">
+  <tr>
+    <td align="center" style="padding:40px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#23262f" class="ubcea-card" style="max-width:560px;background:#23262f;border-radius:6px;">
+
+        <!-- Header -->
+        <tr>
+          <td style="padding:24px 32px;border-bottom:1px solid #383b47;">
+            <img src="{{.LogoURL}}" width="24" height="24" alt="" style="border-radius:4px;display:inline-block;vertical-align:middle;" />
+            <span class="ubcea-header-text" style="display:inline-block;vertical-align:middle;margin-left:8px;color:#f3f4f6;font-size:14px;font-weight:600;">UBC Esports Association</span>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:32px;">
+            <h1 class="ubcea-heading" style="margin:0 0 8px 0;font-size:18px;line-height:1.4;color:#f3f4f6;font-weight:600;">
+              {{.Heading}}
+            </h1>
+            <p class="ubcea-subheading" style="margin:0 0 24px 0;font-size:14px;line-height:1.5;color:#9ca3af;">
+              {{.Subheading}}
+            </p>
+
+            {{if .Rows}}
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              {{range .Rows}}
+              <tr>
+                <td class="ubcea-row-label" style="padding:10px 0;font-size:14px;color:#9ca3af;{{if not .IsLast}}border-bottom:1px solid #34363f;{{end}}">{{.Label}}</td>
+                <td class="ubcea-row-value" style="padding:10px 0;font-size:14px;color:#f3f4f6;font-weight:500;text-align:right;{{if not .IsLast}}border-bottom:1px solid #34363f;{{end}}">{{.Value}}</td>
+              </tr>
+              {{end}}
+            </table>
+            {{end}}
+
+            {{if .CTAText}}
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:28px;">
+              <tr>
+                <td bgcolor="#1463e1" class="ubcea-cta-bg" style="border-radius:6px;background:#1463e1;">
+                  <a href="{{.CTAURL}}" class="ubcea-cta-text" style="display:inline-block;padding:10px 20px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;">
+                    {{.CTAText}}
+                  </a>
+                </td>
+              </tr>
+            </table>
+            {{end}}
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 32px;border-top:1px solid #383b47;">
+            <p class="ubcea-footer-text" style="margin:0;font-size:12px;line-height:1.5;color:#8b8fa3;">
+              UBC Esports Association &middot; This is an automated message, please do not reply directly.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

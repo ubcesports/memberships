@@ -48,6 +48,15 @@ func Init() error {
 //		"<h1>Thanks for signing up!</h1>",
 //	)
 func SendEmailAsync(to []string, subject string, htmlContent string, requesdId string, userId string) {
+	if client == nil {
+		slog.Error("email delivery skipped: mailer not initialized",
+			"request_id", requesdId,
+			"used_id", userId,
+			"recipient_count", len(to),
+		)
+		return
+	}
+
 	go func() {
 		params := &resend.SendEmailRequest{
 			From:    senderEmail,

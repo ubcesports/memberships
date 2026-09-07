@@ -343,6 +343,15 @@ func (r *MembershipRepository) CancelActiveMembershipsByUserIdAndProgramId(ctx c
 	})
 }
 
+// GetActiveMembershipsExpiringOnDate returns active memberships whose
+// expires_at falls on the given calendar date, in Vancouver time.
+func (r *MembershipRepository) GetActiveMembershipsExpiringOnDate(ctx context.Context, date time.Time) ([]db.GetActiveMembershipsExpiringOnDateRow, error) {
+	return r.store.GetActiveMembershipsExpiringOnDate(ctx, pgtype.Date{
+		Time:  date,
+		Valid: true,
+	})
+}
+
 // executes fn within a database transaction.
 //
 // The callback receives a MembershipRepository whose operations are executed

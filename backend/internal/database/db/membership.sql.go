@@ -179,6 +179,58 @@ func (q *Queries) ExpirePendingTransactionById(ctx context.Context, id pgtype.UU
 	return err
 }
 
+const getActiveMembershipsExpiringOnDate = `-- name: GetActiveMembershipsExpiringOnDate :many
+SELECT
+    m.id,
+    m.user_id,
+    m.expires_at,
+    mt.title AS tier_title,
+    u.email
+FROM memberships m
+JOIN membership_tiers mt ON mt.id = m.tier_id
+JOIN users u ON u.id = m.user_id
+WHERE m.cancelled_at IS NULL
+    AND (m.expires_at AT TIME ZONE 'America/Vancouver')::date = $1::date
+`
+
+type GetActiveMembershipsExpiringOnDateRow struct {
+	ID        pgtype.UUID
+	UserID    pgtype.UUID
+	ExpiresAt pgtype.Timestamptz
+	TierTitle string
+	Email     string
+}
+
+// Active (non-cancelled) memberships whose expires_at falls on the given
+// calendar date in Vancouver time. Used by the daily expiry-notification job:
+// called with (expiry date - 7 days) for "expiring soon" emails, and with
+// today's date for "expired" emails.
+func (q *Queries) GetActiveMembershipsExpiringOnDate(ctx context.Context, dollar_1 pgtype.Date) ([]GetActiveMembershipsExpiringOnDateRow, error) {
+	rows, err := q.db.Query(ctx, getActiveMembershipsExpiringOnDate, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetActiveMembershipsExpiringOnDateRow
+	for rows.Next() {
+		var i GetActiveMembershipsExpiringOnDateRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ExpiresAt,
+			&i.TierTitle,
+			&i.Email,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getActiveTiersWithPrices = `-- name: GetActiveTiersWithPrices :many
 SELECT
     mt.id,
