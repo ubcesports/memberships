@@ -599,7 +599,7 @@ func userInfoUpdateEmail(item, oldValue, newValue string) *pendingUserEmail {
 func cancellationEmail(tierTitle string, cancelledAt time.Time) *pendingUserEmail {
 	return &pendingUserEmail{
 		heading:    "Your membership was cancelled",
-		subheading: "An admin cancelled your membership. Reach out to us if you think this was a mistake.",
+		subheading: "An admin cancelled your membership. Reach out to us at communications@ubcesports.ca if you think this was a mistake.",
 		rows: mailer.NewRows(
 			"Tier", tierTitle,
 			"Cancelled on", formatVancouverDate(cancelledAt),
