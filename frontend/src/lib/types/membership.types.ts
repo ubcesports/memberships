@@ -38,16 +38,19 @@ export type Transaction = {
   amount_paid: string;
   status: TransactionStatusType;
   group_at_purchase: GroupType;
+  student_at_purchase: boolean;
+  stripe_payment_intent_id: string;
+  purchase_type: PurchaseType;
 };
 
-export type Membership<TTransaction extends Transaction = Transaction> = {
+export type Membership = {
   id: string;
   tier_id: string;
   tier_title: string;
   started_at: string;
   expires_at: string;
   cancelled_at: string | null;
-  transaction: TTransaction;
+  transaction: Transaction;
   slug: string;
   program_id: string;
   program_name: string;

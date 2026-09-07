@@ -94,15 +94,4 @@ export const IS_STUDENT_OPTIONS: { value: IsStudent; label: string }[] = [
   { value: "no", label: "No" },
 ];
 
-export type AdminMembershipTransaction = Transaction & {
-  currency?: string;
-  customer_id?: string;
-  payment_intent?: string;
-  charge_id?: string;
-  created_at?: string;
-  metadata?: Record<string, unknown> | null;
-};
-
-export type AdminMembership = Membership<AdminMembershipTransaction>;
-
 export type IsStudentFilter = "all" | IsStudent;
