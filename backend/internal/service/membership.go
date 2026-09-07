@@ -460,7 +460,7 @@ func (s *MembershipService) RunExpiryNotifications(ctx context.Context) {
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location)
 
 	s.sendExpiryEmails(ctx, today.AddDate(0, 0, 7), expiringSoonEmail)
-	s.sendExpiryEmails(ctx, today, expiredEmail)
+	s.sendExpiryEmails(ctx, today.AddDate(0, 0, -1), expiredEmail)
 }
 
 func (s *MembershipService) HandleCheckoutExpired(ctx context.Context, sessionId string) error {
