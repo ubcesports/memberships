@@ -9,12 +9,6 @@
 <style>
   body{margin:0;background:#15204e;}
 
-  /* The meta tags above stop Apple Mail from repainting colors in dark
-     mode. Outlook's desktop dark mode flags dark-mode-adjusted elements
-     with [data-ogsc], which we re-assert here.
-     The Gmail app ignores all of this and repaints colors with its own
-     heuristics regardless — left as a known gap, not worth chasing further
-     (see u + .body attempt in git history if revisiting this). */
   [data-ogsc] .ubcea-page-bg { background-color: #15204e !important; }
   [data-ogsc] .ubcea-card { background-color: #23262f !important; }
   [data-ogsc] .ubcea-header-text,

@@ -438,10 +438,14 @@ func purchaseEmail(tierTitle string, purchaseType db.PurchaseType, amountPaidCen
 // RunExpiryNotifications emails members whose active membership expires in
 // exactly one week, and members whose active membership expires today.
 //
-// Every active membership shares the same fixed expiry date (see
-// membershipExpiresAt), so this only ever needs to check two exact dates
-// rather than a rolling per-user window — checking a range instead would
-// re-send the same email on every day of that window.
+// This checks two exact dates rather than a rolling per-user window, because
+// membership expiry dates come from a small set of fixed calendar cutoffs
+// (see membershippolicy.MembershipExpiresAt: end of semester, end of school
+// year, or end of the purchase day) rather than N days from purchase —
+// checking a range instead would re-send the same email on every day of
+// that window. A "day" tier's expiry is always earlier than the +7 check
+// reaches it, so it will only ever produce the "expired" email, never the
+// "expiring soon" one — that's expected, not a bug.
 //
 // Intended to be called once per day by a scheduler; failures are logged
 // and swallowed per-membership so one bad row doesn't block the rest.
