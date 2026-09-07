@@ -399,6 +399,14 @@ Args (JSON body, every field optional):
 Returns:
 
 	response body containing the updated executive profile under the "exec_profile" key (HTTP 200)
+
+Raises:
+
+	400: invalid request body or validation error
+	401: user is not authenticated
+	403: user is not an admin
+	404: target user does not exist
+	500: the executive profile could not be updated
 */
 func (h *AdminHandler) UpdateExecProfile(w http.ResponseWriter, r *http.Request) {
 	requestId := middleware.GetReqID(r.Context())
