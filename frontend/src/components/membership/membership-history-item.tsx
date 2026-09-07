@@ -12,14 +12,6 @@ const MEMBERSHIP_STATUS_TONE = {
   cancelled: "muted",
 } as const;
 
-const TRANSACTION_STATUS_TONE = {
-  completed: "success",
-  pending: "warning",
-  failed: "muted",
-  refunded: "muted",
-  expired: "muted",
-} as const;
-
 function getMembershipStatus(membership: Membership): MembershipStatus {
   if (membership.cancelled_at) return "cancelled";
   if (new Date(membership.expires_at) < new Date()) return "expired";
@@ -61,19 +53,26 @@ export function MembershipHistoryItem({ membership }: MembershipHistoryItemProps
         </summary>
 
         <dl className="grid gap-x-8 gap-y-5 border-t border-brand-border/70 bg-white/2 px-5 py-5 pl-12 sm:grid-cols-2">
-          <TransactionDetail label="Payment status">
-            <StatusBadge tone={TRANSACTION_STATUS_TONE[membership.transaction.status]}>
-              {titleCase(membership.transaction.status)}
-            </StatusBadge>
+          <TransactionDetail label="Membership ID">
+            <span className="break-all font-mono text-xs">{membership.id}</span>
+          </TransactionDetail>
+          <TransactionDetail label="Membership program">
+            <span>{membership.program_name}</span>
+          </TransactionDetail>
+          <TransactionDetail label="Transaction ID">
+            <span className="break-all font-mono text-xs">{membership.transaction.id}</span>
           </TransactionDetail>
           <TransactionDetail label="Amount paid">
             ${membership.transaction.amount_paid} CAD
           </TransactionDetail>
-          <TransactionDetail label="Purchase group">
+          <TransactionDetail label="Purchase type">
+            {titleCase(membership.transaction.purchase_type)}
+          </TransactionDetail>
+          <TransactionDetail label="Group at purchase">
             {titleCase(membership.transaction.group_at_purchase)}
           </TransactionDetail>
-          <TransactionDetail label="Transaction ID">
-            <span className="break-all font-mono text-xs">{membership.transaction.id}</span>
+          <TransactionDetail label="Student at purchase">
+            {titleCase(membership.transaction.student_at_purchase.toString())}
           </TransactionDetail>
         </dl>
       </details>

@@ -15,6 +15,7 @@ import (
 	"github.com/ubcesports/memberships/internal/membershippolicy"
 	"github.com/ubcesports/memberships/internal/repository"
 	"github.com/ubcesports/memberships/internal/stripeclient"
+	"github.com/ubcesports/memberships/internal/util"
 )
 
 type MembershipService struct {
@@ -114,27 +115,25 @@ func (s *MembershipService) GetAllMembershipsWithTransactions(ctx context.Contex
 
 	returnMemberships := make([]dto.MembershipDTO, 0, len(memberships))
 	for _, membership := range memberships {
-		var cancelledAt *time.Time
-		if membership.CancelledAt.Valid {
-			cancelledAt = &membership.CancelledAt.Time
-		}
 
 		membershipDto := dto.MembershipDTO{
 			ID:          membership.ID.String(),
 			TierId:      membership.TierID.String(),
 			TierTitle:   membership.TierTitle,
-			Slug:        membership.Slug.String,
 			StartedAt:   membership.StartedAt.Time,
 			ExpiresAt:   membership.ExpiresAt.Time,
-			CancelledAt: cancelledAt,
-			Transaction: dto.TransactionDTO{
-				ID:              membership.TransactionID.String(),
-				AmountPaid:      fmt.Sprintf("%.2f", float64(membership.AmountPaidCents.Int64)/100),
-				Status:          dto.TransactionStatusType(membership.Status),
-				GroupAtPurchase: dto.GroupType(membership.GroupAtPurchase.GroupType),
-			},
-			ProgramId:   membership.ProgramID.String(),
+			CancelledAt: util.TimestampPointer(membership.CancelledAt),
 			ProgramName: membership.ProgramName,
+			ProgramId:   membership.ProgramID.String(),
+			Transaction: dto.TransactionDTO{
+				ID:                    membership.TransactionID.String(),
+				AmountPaid:            fmt.Sprintf("%.2f", float64(membership.AmountPaidCents.Int64)/100),
+				Status:                dto.TransactionStatusType(membership.Status),
+				GroupAtPurchase:       dto.GroupType(membership.GroupAtPurchase.GroupType),
+				StudentAtPurchase:     membership.StudentAtPurchase.Bool,
+				StripePaymentIntentId: membership.StripePaymentIntentID.String,
+				PurchaseType:          dto.PurchaseType(membership.PurchaseType.PurchaseType),
+			},
 		}
 		returnMemberships = append(returnMemberships, membershipDto)
 	}

@@ -46,7 +46,7 @@ function TransactionDetails({ membership }: { membership: Membership }) {
         </div>
         <div>
           <div className="font-medium text-brand-text">Amount Paid</div>
-          <div>{tx.amount_paid}</div>
+          <div>${tx.amount_paid} CAD</div>
         </div>
         <div>
           <div className="font-medium text-brand-text">Group at purchase</div>

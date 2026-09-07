@@ -352,6 +352,9 @@ SELECT
     t.id AS transaction_id,
     t.amount_paid_cents,
     t.status,
+    t.purchase_type,
+    t.student_at_purchase,
+    t.stripe_payment_intent_id,
     t.group_at_purchase,
     mp.id AS program_id,
     mp.program_name
@@ -370,19 +373,22 @@ ORDER BY m.started_at DESC
 `
 
 type GetCurrentMembershipsWithTransactionsRow struct {
-	ID              pgtype.UUID
-	TierID          pgtype.UUID
-	TierTitle       string
-	Slug            pgtype.Text
-	StartedAt       pgtype.Timestamptz
-	ExpiresAt       pgtype.Timestamptz
-	CancelledAt     pgtype.Timestamptz
-	TransactionID   pgtype.UUID
-	AmountPaidCents pgtype.Int8
-	Status          TransactionStatusType
-	GroupAtPurchase NullGroupType
-	ProgramID       pgtype.UUID
-	ProgramName     string
+	ID                    pgtype.UUID
+	TierID                pgtype.UUID
+	TierTitle             string
+	Slug                  pgtype.Text
+	StartedAt             pgtype.Timestamptz
+	ExpiresAt             pgtype.Timestamptz
+	CancelledAt           pgtype.Timestamptz
+	TransactionID         pgtype.UUID
+	AmountPaidCents       pgtype.Int8
+	Status                TransactionStatusType
+	PurchaseType          NullPurchaseType
+	StudentAtPurchase     pgtype.Bool
+	StripePaymentIntentID pgtype.Text
+	GroupAtPurchase       NullGroupType
+	ProgramID             pgtype.UUID
+	ProgramName           string
 }
 
 func (q *Queries) GetCurrentMembershipsWithTransactions(ctx context.Context, userID pgtype.UUID) ([]GetCurrentMembershipsWithTransactionsRow, error) {
@@ -405,6 +411,9 @@ func (q *Queries) GetCurrentMembershipsWithTransactions(ctx context.Context, use
 			&i.TransactionID,
 			&i.AmountPaidCents,
 			&i.Status,
+			&i.PurchaseType,
+			&i.StudentAtPurchase,
+			&i.StripePaymentIntentID,
 			&i.GroupAtPurchase,
 			&i.ProgramID,
 			&i.ProgramName,
