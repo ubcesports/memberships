@@ -41,3 +41,11 @@ const (
 	AuditLogFailed  AdminAuditLogOutcomeType = "failed"
 	AuditLogDenied  AdminAuditLogOutcomeType = "denied"
 )
+
+type MembershipExpirationType string
+
+const (
+	MembershipExpirationSemester MembershipExpirationType = "semester"
+	MembershipExpirationYear     MembershipExpirationType = "year"
+	MembershipExpirationDay      MembershipExpirationType = "day"
+)

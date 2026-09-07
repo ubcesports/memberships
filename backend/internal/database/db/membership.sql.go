@@ -11,24 +11,54 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const cancelActiveMembershipsByUserId = `-- name: CancelActiveMembershipsByUserId :exec
+const cancelActiveMembershipByUserIdAndMembershipId = `-- name: CancelActiveMembershipByUserIdAndMembershipId :execrows
 UPDATE memberships
 SET
-    cancelled_at = $2,
-    updated_at = $2
+    cancelled_at = $3,
+    updated_at = $3
 WHERE user_id = $1
+    AND id = $2
     AND cancelled_at IS NULL
     AND started_at <= NOW()
     AND expires_at > NOW()
 `
 
-type CancelActiveMembershipsByUserIdParams struct {
+type CancelActiveMembershipByUserIdAndMembershipIdParams struct {
 	UserID      pgtype.UUID
+	ID          pgtype.UUID
 	CancelledAt pgtype.Timestamptz
 }
 
-func (q *Queries) CancelActiveMembershipsByUserId(ctx context.Context, arg CancelActiveMembershipsByUserIdParams) error {
-	_, err := q.db.Exec(ctx, cancelActiveMembershipsByUserId, arg.UserID, arg.CancelledAt)
+func (q *Queries) CancelActiveMembershipByUserIdAndMembershipId(ctx context.Context, arg CancelActiveMembershipByUserIdAndMembershipIdParams) (int64, error) {
+	result, err := q.db.Exec(ctx, cancelActiveMembershipByUserIdAndMembershipId, arg.UserID, arg.ID, arg.CancelledAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const cancelActiveMembershipsByUserIdAndProgramId = `-- name: CancelActiveMembershipsByUserIdAndProgramId :exec
+UPDATE memberships AS m
+SET
+    cancelled_at = $3,
+    updated_at = $3
+FROM membership_tiers AS mt
+WHERE mt.id = m.tier_id
+    AND m.user_id = $1
+    AND mt.program_id = $2
+    AND m.cancelled_at IS NULL
+    AND m.started_at <= NOW()
+    AND m.expires_at > NOW()
+`
+
+type CancelActiveMembershipsByUserIdAndProgramIdParams struct {
+	UserID      pgtype.UUID
+	ProgramID   pgtype.UUID
+	CancelledAt pgtype.Timestamptz
+}
+
+func (q *Queries) CancelActiveMembershipsByUserIdAndProgramId(ctx context.Context, arg CancelActiveMembershipsByUserIdAndProgramIdParams) error {
+	_, err := q.db.Exec(ctx, cancelActiveMembershipsByUserIdAndProgramId, arg.UserID, arg.ProgramID, arg.CancelledAt)
 	return err
 }
 
@@ -201,20 +231,102 @@ func (q *Queries) GetActiveMembershipsExpiringOnDate(ctx context.Context, dollar
 	return items, nil
 }
 
+const getActiveTiersWithPrices = `-- name: GetActiveTiersWithPrices :many
+SELECT
+    mt.id,
+    mt.title,
+    mt.description,
+    mt.benefits,
+    mt.stripe_product_id,
+    mt.slug,
+    mt."group" AS required_group,
+    mt.expiration_type,
+    mtp.stripe_price_id,
+    mtp.price_in_cents,
+    mtp.is_student_required,
+    mp.id AS program_id,
+    mp.program_name
+FROM membership_tiers mt
+JOIN membership_tier_prices mtp
+    ON mtp.tier_id = mt.id
+JOIN membership_programs mp
+    ON mp.id = mt.program_id
+WHERE mt.is_active = TRUE
+ORDER BY
+    mp.program_name,
+    mt.title
+`
+
+type GetActiveTiersWithPricesRow struct {
+	ID                pgtype.UUID
+	Title             string
+	Description       pgtype.Text
+	Benefits          []string
+	StripeProductID   pgtype.Text
+	Slug              pgtype.Text
+	RequiredGroup     NullGroupType
+	ExpirationType    MembershipExpirationType
+	StripePriceID     pgtype.Text
+	PriceInCents      pgtype.Int8
+	IsStudentRequired pgtype.Bool
+	ProgramID         pgtype.UUID
+	ProgramName       string
+}
+
+func (q *Queries) GetActiveTiersWithPrices(ctx context.Context) ([]GetActiveTiersWithPricesRow, error) {
+	rows, err := q.db.Query(ctx, getActiveTiersWithPrices)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetActiveTiersWithPricesRow
+	for rows.Next() {
+		var i GetActiveTiersWithPricesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Description,
+			&i.Benefits,
+			&i.StripeProductID,
+			&i.Slug,
+			&i.RequiredGroup,
+			&i.ExpirationType,
+			&i.StripePriceID,
+			&i.PriceInCents,
+			&i.IsStudentRequired,
+			&i.ProgramID,
+			&i.ProgramName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllMembershipsWithTransactions = `-- name: GetAllMembershipsWithTransactions :many
 SELECT
     m.id,
     m.tier_id,
     mt.title AS tier_title,
+    mt.slug,
     m.started_at,
     m.expires_at,
     m.cancelled_at,
     t.id AS transaction_id,
     t.amount_paid_cents,
     t.status,
-    t.group_at_purchase
+    t.group_at_purchase,
+    mp.id AS program_id,
+    mp.program_name
 FROM memberships m
-JOIN membership_tiers mt ON mt.id = m.tier_id
+JOIN membership_tiers mt
+    ON mt.id = m.tier_id
+JOIN membership_programs mp
+    ON mp.id = mt.program_id
 JOIN transactions t
     ON t.membership_id = m.id
 WHERE m.user_id = $1
@@ -225,6 +337,7 @@ type GetAllMembershipsWithTransactionsRow struct {
 	ID              pgtype.UUID
 	TierID          pgtype.UUID
 	TierTitle       string
+	Slug            pgtype.Text
 	StartedAt       pgtype.Timestamptz
 	ExpiresAt       pgtype.Timestamptz
 	CancelledAt     pgtype.Timestamptz
@@ -232,6 +345,8 @@ type GetAllMembershipsWithTransactionsRow struct {
 	AmountPaidCents pgtype.Int8
 	Status          TransactionStatusType
 	GroupAtPurchase NullGroupType
+	ProgramID       pgtype.UUID
+	ProgramName     string
 }
 
 func (q *Queries) GetAllMembershipsWithTransactions(ctx context.Context, userID pgtype.UUID) ([]GetAllMembershipsWithTransactionsRow, error) {
@@ -247,6 +362,7 @@ func (q *Queries) GetAllMembershipsWithTransactions(ctx context.Context, userID 
 			&i.ID,
 			&i.TierID,
 			&i.TierTitle,
+			&i.Slug,
 			&i.StartedAt,
 			&i.ExpiresAt,
 			&i.CancelledAt,
@@ -254,6 +370,8 @@ func (q *Queries) GetAllMembershipsWithTransactions(ctx context.Context, userID 
 			&i.AmountPaidCents,
 			&i.Status,
 			&i.GroupAtPurchase,
+			&i.ProgramID,
+			&i.ProgramName,
 		); err != nil {
 			return nil, err
 		}
@@ -265,20 +383,26 @@ func (q *Queries) GetAllMembershipsWithTransactions(ctx context.Context, userID 
 	return items, nil
 }
 
-const getCurrentMembershipWithTransaction = `-- name: GetCurrentMembershipWithTransaction :one
+const getCurrentMembershipsWithTransactions = `-- name: GetCurrentMembershipsWithTransactions :many
 SELECT
     m.id,
     m.tier_id,
     mt.title AS tier_title,
+    mt.slug,
     m.started_at,
     m.expires_at,
     m.cancelled_at,
     t.id AS transaction_id,
     t.amount_paid_cents,
     t.status,
-    t.group_at_purchase
+    t.group_at_purchase,
+    mp.id AS program_id,
+    mp.program_name
 FROM memberships m
-JOIN membership_tiers mt ON mt.id = m.tier_id
+JOIN membership_tiers mt
+    ON mt.id = m.tier_id
+JOIN membership_programs mp
+    ON mp.id = mt.program_id
 JOIN transactions t
     ON t.membership_id = m.id
 WHERE m.user_id = $1
@@ -286,13 +410,13 @@ WHERE m.user_id = $1
     AND m.started_at <= NOW()
     AND m.expires_at > NOW()
 ORDER BY m.started_at DESC
-LIMIT 1
 `
 
-type GetCurrentMembershipWithTransactionRow struct {
+type GetCurrentMembershipsWithTransactionsRow struct {
 	ID              pgtype.UUID
 	TierID          pgtype.UUID
 	TierTitle       string
+	Slug            pgtype.Text
 	StartedAt       pgtype.Timestamptz
 	ExpiresAt       pgtype.Timestamptz
 	CancelledAt     pgtype.Timestamptz
@@ -300,92 +424,33 @@ type GetCurrentMembershipWithTransactionRow struct {
 	AmountPaidCents pgtype.Int8
 	Status          TransactionStatusType
 	GroupAtPurchase NullGroupType
+	ProgramID       pgtype.UUID
+	ProgramName     string
 }
 
-func (q *Queries) GetCurrentMembershipWithTransaction(ctx context.Context, userID pgtype.UUID) (GetCurrentMembershipWithTransactionRow, error) {
-	row := q.db.QueryRow(ctx, getCurrentMembershipWithTransaction, userID)
-	var i GetCurrentMembershipWithTransactionRow
-	err := row.Scan(
-		&i.ID,
-		&i.TierID,
-		&i.TierTitle,
-		&i.StartedAt,
-		&i.ExpiresAt,
-		&i.CancelledAt,
-		&i.TransactionID,
-		&i.AmountPaidCents,
-		&i.Status,
-		&i.GroupAtPurchase,
-	)
-	return i, err
-}
-
-const getEligibleTiersWithPrices = `-- name: GetEligibleTiersWithPrices :many
-SELECT
-    mt.id,
-    mt.title,
-    mt.description,
-    mt.benefits,
-    mt.stripe_product_id,
-    mt.slug,
-    mtp.stripe_price_id,
-    mtp.price_in_cents,
-    mtp.is_student_required
-FROM membership_tiers mt
-JOIN membership_tier_prices mtp
-    ON mtp.tier_id = mt.id
-JOIN users u
-    on u.id = $1
-WHERE mt.is_active = TRUE
-    AND EXISTS (
-        SELECT 1
-        FROM user_groups ug
-        WHERE ug.user_id = u.id
-            AND (
-                ug."group" = mt."group"
-                OR (
-                    mt."group" = 'executive'
-                    AND ug."group" IN ('director', 'board')
-                )
-            )
-    )
-    AND (
-        mtp.is_student_required IS NULL
-        OR mtp.is_student_required = u.is_student
-    )
-`
-
-type GetEligibleTiersWithPricesRow struct {
-	ID                pgtype.UUID
-	Title             string
-	Description       pgtype.Text
-	Benefits          []string
-	StripeProductID   pgtype.Text
-	Slug              pgtype.Text
-	StripePriceID     pgtype.Text
-	PriceInCents      pgtype.Int8
-	IsStudentRequired pgtype.Bool
-}
-
-func (q *Queries) GetEligibleTiersWithPrices(ctx context.Context, id pgtype.UUID) ([]GetEligibleTiersWithPricesRow, error) {
-	rows, err := q.db.Query(ctx, getEligibleTiersWithPrices, id)
+func (q *Queries) GetCurrentMembershipsWithTransactions(ctx context.Context, userID pgtype.UUID) ([]GetCurrentMembershipsWithTransactionsRow, error) {
+	rows, err := q.db.Query(ctx, getCurrentMembershipsWithTransactions, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetEligibleTiersWithPricesRow
+	var items []GetCurrentMembershipsWithTransactionsRow
 	for rows.Next() {
-		var i GetEligibleTiersWithPricesRow
+		var i GetCurrentMembershipsWithTransactionsRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.Title,
-			&i.Description,
-			&i.Benefits,
-			&i.StripeProductID,
+			&i.TierID,
+			&i.TierTitle,
 			&i.Slug,
-			&i.StripePriceID,
-			&i.PriceInCents,
-			&i.IsStudentRequired,
+			&i.StartedAt,
+			&i.ExpiresAt,
+			&i.CancelledAt,
+			&i.TransactionID,
+			&i.AmountPaidCents,
+			&i.Status,
+			&i.GroupAtPurchase,
+			&i.ProgramID,
+			&i.ProgramName,
 		); err != nil {
 			return nil, err
 		}
@@ -398,6 +463,7 @@ func (q *Queries) GetEligibleTiersWithPrices(ctx context.Context, id pgtype.UUID
 }
 
 const getPendingTransactionForUpdate = `-- name: GetPendingTransactionForUpdate :one
+
 SELECT
     id,
     stripe_checkout_session_id
@@ -411,6 +477,7 @@ type GetPendingTransactionForUpdateRow struct {
 	StripeCheckoutSessionID pgtype.Text
 }
 
+// Transaction related stuff
 func (q *Queries) GetPendingTransactionForUpdate(ctx context.Context, userID pgtype.UUID) (GetPendingTransactionForUpdateRow, error) {
 	row := q.db.QueryRow(ctx, getPendingTransactionForUpdate, userID)
 	var i GetPendingTransactionForUpdateRow
@@ -426,12 +493,17 @@ SELECT
     mt.benefits,
     mt.slug,
     mt.stripe_product_id,
+    mt.expiration_type,
     mtp.stripe_price_id,
     mtp.price_in_cents,
-    mtp.is_student_required
+    mtp.is_student_required,
+    mp.id AS program_id,
+    mp.program_name
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp
     ON mtp.tier_id = mt.id
+JOIN membership_programs mp
+    ON mp.id = mt.program_id
 WHERE mt.is_active = TRUE AND mt."group" = 'member'
 `
 
@@ -442,9 +514,12 @@ type GetPublicTiersAndPricesRow struct {
 	Benefits          []string
 	Slug              pgtype.Text
 	StripeProductID   pgtype.Text
+	ExpirationType    MembershipExpirationType
 	StripePriceID     pgtype.Text
 	PriceInCents      pgtype.Int8
 	IsStudentRequired pgtype.Bool
+	ProgramID         pgtype.UUID
+	ProgramName       string
 }
 
 func (q *Queries) GetPublicTiersAndPrices(ctx context.Context) ([]GetPublicTiersAndPricesRow, error) {
@@ -463,9 +538,12 @@ func (q *Queries) GetPublicTiersAndPrices(ctx context.Context) ([]GetPublicTiers
 			&i.Benefits,
 			&i.Slug,
 			&i.StripeProductID,
+			&i.ExpirationType,
 			&i.StripePriceID,
 			&i.PriceInCents,
 			&i.IsStudentRequired,
+			&i.ProgramID,
+			&i.ProgramName,
 		); err != nil {
 			return nil, err
 		}
@@ -485,12 +563,17 @@ SELECT
     mt.benefits,
     mt.slug,
     mt.stripe_product_id,
+    mt.expiration_type,
     mtp.stripe_price_id,
     mtp.price_in_cents,
-    mtp.is_student_required
+    mtp.is_student_required,
+    mp.id AS program_id,
+    mp.program_name
 FROM membership_tiers mt
 JOIN membership_tier_prices mtp
     ON mtp.tier_id = mt.id
+JOIN membership_programs mp
+    ON mp.id = mt.program_id
 WHERE mt.id = $1
 `
 
@@ -501,9 +584,12 @@ type GetTierByTierIdRow struct {
 	Benefits          []string
 	Slug              pgtype.Text
 	StripeProductID   pgtype.Text
+	ExpirationType    MembershipExpirationType
 	StripePriceID     pgtype.Text
 	PriceInCents      pgtype.Int8
 	IsStudentRequired pgtype.Bool
+	ProgramID         pgtype.UUID
+	ProgramName       string
 }
 
 func (q *Queries) GetTierByTierId(ctx context.Context, id pgtype.UUID) (GetTierByTierIdRow, error) {
@@ -516,25 +602,32 @@ func (q *Queries) GetTierByTierId(ctx context.Context, id pgtype.UUID) (GetTierB
 		&i.Benefits,
 		&i.Slug,
 		&i.StripeProductID,
+		&i.ExpirationType,
 		&i.StripePriceID,
 		&i.PriceInCents,
 		&i.IsStudentRequired,
+		&i.ProgramID,
+		&i.ProgramName,
 	)
 	return i, err
 }
 
 const getTransactionByCheckoutSessionIdForUpdate = `-- name: GetTransactionByCheckoutSessionIdForUpdate :one
 SELECT
-    id,
-    user_id,
-    membership_id,
-    tier_id,
-    status,
-    purchase_type,
-    stripe_checkout_session_id
-FROM transactions
-WHERE stripe_checkout_session_id = $1
-FOR UPDATE
+    t.id,
+    t.user_id,
+    t.membership_id,
+    t.tier_id,
+    t.status,
+    t.purchase_type,
+    t.stripe_checkout_session_id,
+    mt.program_id,
+    mt.expiration_type
+FROM transactions AS t
+JOIN membership_tiers AS mt
+    ON mt.id = t.tier_id
+WHERE t.stripe_checkout_session_id = $1
+FOR UPDATE OF t
 `
 
 type GetTransactionByCheckoutSessionIdForUpdateRow struct {
@@ -545,6 +638,8 @@ type GetTransactionByCheckoutSessionIdForUpdateRow struct {
 	Status                  TransactionStatusType
 	PurchaseType            NullPurchaseType
 	StripeCheckoutSessionID pgtype.Text
+	ProgramID               pgtype.UUID
+	ExpirationType          MembershipExpirationType
 }
 
 func (q *Queries) GetTransactionByCheckoutSessionIdForUpdate(ctx context.Context, stripeCheckoutSessionID pgtype.Text) (GetTransactionByCheckoutSessionIdForUpdateRow, error) {
@@ -558,6 +653,8 @@ func (q *Queries) GetTransactionByCheckoutSessionIdForUpdate(ctx context.Context
 		&i.Status,
 		&i.PurchaseType,
 		&i.StripeCheckoutSessionID,
+		&i.ProgramID,
+		&i.ExpirationType,
 	)
 	return i, err
 }

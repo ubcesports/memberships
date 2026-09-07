@@ -51,12 +51,12 @@ type AdminAuditLogInput struct {
 // UpdateUserRequest describes the edits an admin wants to apply to a user.
 // Every field is optional; only the ones that are set are acted on.
 type UpdateUserRequest struct {
-	StudentID        *string
-	IsStudent        *bool
-	GroupsAdd        []db.GroupType
-	GroupsRemove     []db.GroupType
-	Role             *db.RoleType
-	CancelMembership bool
+	StudentID          *string
+	IsStudent          *bool
+	GroupsAdd          []db.GroupType
+	GroupsRemove       []db.GroupType
+	Role               *db.RoleType
+	CancelMembershipId *string
 }
 
 // Audit log actions emitted by UpdateUser.
@@ -673,46 +673,87 @@ func (s *AdminService) applyMembershipUpdates(
 	user db.GetAdminUserByIDRow,
 	req UpdateUserRequest,
 ) ([]pendingAuditLog, error) {
-	userID := user.ID.String()
-
-	if req.CancelMembership {
-		hasActive, err := store.HasActiveMembership(ctx, userID)
-		if err != nil {
-			return nil, auditable(actionMembershipCancelled, "Failed to cancel membership", err)
-		}
-		if !hasActive {
-			err := fmt.Errorf("%w: user has no active membership to cancel", ErrValidation)
-			return nil, auditable(actionMembershipCancelled, "Failed to cancel membership: no active membership", err)
-		}
-
-		// Best-effort lookup for the email; the cancellation itself only
-		// depends on HasActiveMembership above.
-		activeTierTitle := "your membership"
-		memberships, err := store.GetUserMemberships(ctx, userID)
-		if err != nil {
-			slog.Error("get user memberships for cancellation email failed", "error", err, "user_id", userID)
-		} else {
-			for _, membership := range memberships {
-				if !membership.CancelledAt.Valid {
-					activeTierTitle = membership.TierTitle
-					break
-				}
-			}
-		}
-
-		cancelledAt := time.Now()
-		if err := store.CancelActiveMembershipsByUserId(ctx, userID, cancelledAt); err != nil {
-			return nil, auditable(actionMembershipCancelled, "Failed to cancel membership", err)
-		}
-
-		return []pendingAuditLog{{
-			action:      actionMembershipCancelled,
-			description: "Cancelled the user's active membership",
-			email:       cancellationEmail(activeTierTitle, cancelledAt),
-		}}, nil
+	if req.CancelMembershipId == nil {
+		return nil, nil
 	}
 
-	return nil, nil
+	membershipID := strings.TrimSpace(
+		*req.CancelMembershipId,
+	)
+
+	if membershipID == "" {
+		err := fmt.Errorf(
+			"%w: membership ID is required",
+			ErrValidation,
+		)
+		return nil, auditable(
+			actionMembershipCancelled,
+			"Failed to cancel membership: membership ID is required",
+			err,
+		)
+	}
+
+	if _, err := util.GetValidatedUUID(membershipID); err != nil {
+		validationErr := fmt.Errorf(
+			"%w: invalid membership ID",
+			ErrValidation,
+		)
+		return nil, auditable(
+			actionMembershipCancelled,
+			"Failed to cancel membership: invalid membership ID",
+			validationErr,
+		)
+	}
+
+	// Best-effort lookup for the email; the cancellation itself only
+	// depends on the CancelActiveMembershipByUserIdAndMembershipId call below.
+	cancelledTierTitle := "your membership"
+	if memberships, err := store.GetUserMemberships(ctx, user.ID.String()); err != nil {
+		slog.Error("get user memberships for cancellation email failed", "error", err, "user_id", user.ID.String())
+	} else {
+		for _, membership := range memberships {
+			if membership.ID.String() == membershipID {
+				cancelledTierTitle = membership.TierTitle
+				break
+			}
+		}
+	}
+
+	cancelledAt := time.Now()
+	cancelled, err := s.adminRepository.CancelActiveMembershipByUserIdAndMembershipId(
+		ctx,
+		user.ID.String(),
+		membershipID,
+		cancelledAt,
+	)
+	if err != nil {
+		return nil, auditable(
+			actionMembershipCancelled,
+			"Failed to cancel membership",
+			err,
+		)
+	}
+
+	if !cancelled {
+		err := fmt.Errorf(
+			"%w: membership is not active or does not belong to this user",
+			ErrValidation,
+		)
+		return nil, auditable(
+			actionMembershipCancelled,
+			"Failed to cancel membership: no matching active membership",
+			err,
+		)
+	}
+
+	return []pendingAuditLog{{
+		action: actionMembershipCancelled,
+		description: fmt.Sprintf(
+			"Cancelled membership %s",
+			membershipID,
+		),
+		email: cancellationEmail(cancelledTierTitle, cancelledAt),
+	}}, nil
 }
 
 // studentUpdate is the resolved outcome of the student ID and student status
