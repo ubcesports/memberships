@@ -150,12 +150,6 @@ export function Header() {
                 >
                   My profile
                 </DropdownLink>
-                <DropdownLink
-                  href="/profile#membership"
-                  icon={<WalletCards aria-hidden="true" className="size-4" />}
-                >
-                  My memberships
-                </DropdownLink>
                 {profile.role === "admin" ? <AdminMenuLinks /> : null}
                 <div className="border-t border-brand-border p-1.5">
                   <button
@@ -265,12 +259,6 @@ export function Header() {
                   icon={<UserRound aria-hidden="true" className="size-4" />}
                 >
                   My profile
-                </DropdownLink>
-                <DropdownLink
-                  href="/profile#membership"
-                  icon={<WalletCards aria-hidden="true" className="size-4" />}
-                >
-                  My memberships
                 </DropdownLink>
                 {profile.role === "admin" ? <AdminMenuLinks /> : null}
                 <div className="border-t border-brand-border p-1.5">
