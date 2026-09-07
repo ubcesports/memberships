@@ -121,11 +121,6 @@ func (r *MembershipRepository) GetCurrentMembershipsWithTransactions(ctx context
 	returnMemberships := make([]dto.MembershipDTO, len(memberships))
 
 	for i, m := range memberships {
-		var cancelledAt *time.Time
-		if m.CancelledAt.Valid {
-			cancelledAt = &m.CancelledAt.Time
-		}
-
 		returnMemberships[i] = dto.MembershipDTO{
 			ID:          m.ID.String(),
 			TierId:      m.TierID.String(),
@@ -144,25 +139,6 @@ func (r *MembershipRepository) GetCurrentMembershipsWithTransactions(ctx context
 				StripePaymentIntentId: m.StripePaymentIntentID.String,
 				PurchaseType:          dto.PurchaseType(m.PurchaseType.PurchaseType),
 			},
-		}
-
-		returnMemberships[i] = dto.MembershipDTO{
-			ID:          m.ID.String(),
-			TierId:      m.TierID.String(),
-			TierTitle:   m.TierTitle,
-			Slug:        m.Slug.String,
-			StartedAt:   m.StartedAt.Time,
-			ExpiresAt:   m.ExpiresAt.Time,
-			CancelledAt: cancelledAt,
-			Transaction: dto.TransactionDTO{
-				ID:              m.TransactionID.String(),
-				AmountPaid:      fmt.Sprintf("%.2f", float64(m.AmountPaidCents.Int64)/100),
-				AmountPaidCents: m.AmountPaidCents.Int64,
-				Status:          dto.TransactionStatusType(m.Status),
-				GroupAtPurchase: dto.GroupType(m.GroupAtPurchase.GroupType),
-			},
-			ProgramId:   m.ProgramID.String(),
-			ProgramName: m.ProgramName,
 		}
 	}
 

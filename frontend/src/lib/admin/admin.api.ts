@@ -3,13 +3,13 @@ import type {
   AdminUserFilters,
   AdminPagination,
   AppliedSearch,
-  AdminMembership as Membership,
   UpdateUserRequest,
   UserResponse,
   UsersResponse,
   AuditLogResponse,
 } from "@/lib/types/admin.types";
 import type { User } from "@/lib/types/user.types";
+import { Membership } from "../types/membership.types";
 
 export function buildAdminUserParams(
   appliedSearch: AppliedSearch,

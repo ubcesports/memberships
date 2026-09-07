@@ -7,6 +7,7 @@ import { ActionLink } from "@/components/action-link";
 import { DetailRow } from "@/components/detail-row";
 import { BasePage } from "@/components/layout/base-page";
 import { MembershipHistoryItem } from "@/components/membership/membership-history-item";
+import { MembershipLoadError } from "@/components/membership/membership-load-error";
 import { StatusBadge } from "@/components/status-badge";
 import { SummaryTile } from "@/components/summary-tile";
 import { SurfacePanel } from "@/components/surface-panel";
@@ -63,7 +64,13 @@ function MembershipSection({
 
 export default function ProfilePage() {
   const { data: profile, isPending } = useProfile();
-  const { data: memberships, isPending: membershipsPending } = useAllMemberships();
+  const {
+    data: memberships,
+    isPending: membershipsPending,
+    isError: membershipsError,
+    isFetching: membershipsFetching,
+    refetch: refetchMemberships,
+  } = useAllMemberships();
 
   const { mutate: signOut, error: signOutError, isPending: signOutPending } = useSignOut();
 
@@ -230,6 +237,11 @@ export default function ProfilePage() {
                         <span className="text-sm">Loading memberships</span>
                       </div>
                     </SurfacePanel>
+                  ) : membershipsError ? (
+                    <MembershipLoadError
+                      isRetrying={membershipsFetching}
+                      onRetry={() => void refetchMemberships()}
+                    />
                   ) : (
                     <div className="grid gap-6">
                       <MembershipSection

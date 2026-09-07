@@ -120,6 +120,7 @@ func (s *MembershipService) GetAllMembershipsWithTransactions(ctx context.Contex
 			ID:          membership.ID.String(),
 			TierId:      membership.TierID.String(),
 			TierTitle:   membership.TierTitle,
+			Slug:        membership.Slug.String,
 			StartedAt:   membership.StartedAt.Time,
 			ExpiresAt:   membership.ExpiresAt.Time,
 			CancelledAt: util.TimestampPointer(membership.CancelledAt),

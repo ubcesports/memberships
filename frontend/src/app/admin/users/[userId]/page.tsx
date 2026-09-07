@@ -8,6 +8,7 @@ import { isAxiosError } from "axios";
 import { UserMembershipsPanel } from "@/components/admin/users/user-memberships-panel";
 import { UserProfilePanel } from "@/components/admin/users/user-profile-panel";
 import { BasePage } from "@/components/layout/base-page";
+import { MembershipLoadError } from "@/components/membership/membership-load-error";
 import { useUpdateUser, useUser, useUserMemberships } from "@/lib/admin/admin.hook";
 import type { UpdateUserRequest } from "@/lib/types/admin.types";
 import { useProfile } from "@/lib/profile.hook";
@@ -46,9 +47,13 @@ export default function AdminUserDetailPage({ params }: AdminUserDetailPageProps
     isPending: isUserPending,
     error: userError,
   } = useUser(userId, { enabled: isAdmin });
-  const { data: memberships, isPending: areMembershipsPending } = useUserMemberships(userId, {
-    enabled: isAdmin,
-  });
+  const {
+    data: memberships,
+    isPending: areMembershipsPending,
+    isError: membershipsError,
+    isFetching: membershipsFetching,
+    refetch: refetchMemberships,
+  } = useUserMemberships(userId, { enabled: isAdmin });
   const { mutateAsync: updateUser, isPending: isSaving } = useUpdateUser(userId);
 
   const handleSave = (body: UpdateUserRequest) => updateUser(body);
@@ -112,6 +117,11 @@ export default function AdminUserDetailPage({ params }: AdminUserDetailPageProps
               <Loader2 aria-hidden="true" className="size-4 animate-spin" />
               <span>Loading memberships</span>
             </div>
+          ) : membershipsError ? (
+            <MembershipLoadError
+              isRetrying={membershipsFetching}
+              onRetry={() => void refetchMemberships()}
+            />
           ) : (
             <UserMembershipsPanel
               memberships={memberships ?? []}
