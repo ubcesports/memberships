@@ -95,7 +95,7 @@ export default function ProfilePage() {
   return (
     <BasePage>
       <div className="flex flex-1 items-center py-12">
-        <section className="mx-auto w-full max-w-4xl">
+        <section className="mx-auto w-full max-w-6xl">
           <div className="mt-10 border border-brand-border bg-brand-surface/80 shadow-2xl shadow-black/25">
             <div className="flex flex-col gap-4 border-b border-brand-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div>
@@ -143,14 +143,14 @@ export default function ProfilePage() {
                       )}
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="break-words text-2xl font-semibold text-brand-text">
+                          <h3 className="wrap-break-word text-2xl font-semibold text-brand-text">
                             {displayName}
                           </h3>
                           <StatusBadge tone={profile.role === "admin" ? "warning" : "default"}>
                             {titleCase(profile.role)}
                           </StatusBadge>
                         </div>
-                        <p className="mt-2 break-words text-sm text-brand-text-muted">
+                        <p className="mt-2 wrap-break-word text-sm text-brand-text-muted">
                           {profile.createdAt
                             ? `Member since ${formatDate(profile.createdAt)}`
                             : "Membership start date unavailable"}
@@ -189,12 +189,12 @@ export default function ProfilePage() {
                     </div>
                     <dl>
                       <DetailRow label="Email">
-                        <span className="break-words">{profile.email}</span>
+                        <span className="wrap-break-word">{profile.email}</span>
                       </DetailRow>
                       <DetailRow label="Student status">{studentBadge}</DetailRow>
                       <DetailRow label="Student ID">
                         {profile.studentId ? (
-                          <span className="break-words font-mono">{profile.studentId}</span>
+                          <span className="wrap-break-word font-mono">{profile.studentId}</span>
                         ) : (
                           <StatusBadge tone="muted">Not provided</StatusBadge>
                         )}
