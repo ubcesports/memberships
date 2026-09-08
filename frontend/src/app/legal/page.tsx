@@ -4,7 +4,7 @@ import { BasePage } from "@/components/layout/base-page";
 const CONTACT_EMAIL = "communications@ubcesports.ca";
 
 export const metadata: Metadata = {
-  title: "Legal",
+  title: "Privacy Policy and Terms of Use",
   description: "Privacy Policy and Terms of Use for the UBC Esports membership portal.",
   alternates: {
     canonical: "/legal",
