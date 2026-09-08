@@ -1,11 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { toast } from "sonner";
 
-export type ApiErrorResponse = {
-  code: string;
-  message: string;
-  request_id: string;
-};
+import type { ApiErrorResponse } from "@/lib/types/api.types";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8080";
@@ -41,16 +37,7 @@ apiClient.interceptors.response.use(
     const apiError = data instanceof Blob ? undefined : data;
     const code = apiError?.code;
     const requestId = apiError?.request_id;
-
-    // Only show a toast when the backend gave us an actual message to show.
-    // A response that doesn't match the expected {code, message} shape (e.g.
-    // a plain-text error, or no response at all) has nothing useful to say,
-    // so stay quiet rather than show a generic "something went wrong".
-    if (apiError?.message) {
-      toast.error(apiError.message, {
-        description: requestId ? `Request ID: ${requestId}` : undefined,
-      });
-    }
+    const toastId = `api-error:${error.config?.method ?? "request"}:${error.config?.url ?? "unknown"}`;
 
     if (status === 401) {
       if (currentPath !== "/login") {
@@ -59,14 +46,28 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (status === 403) {
-      if (code === "ONBOARDING_REQUIRED" && currentPath !== "/onboard") {
+    if (status === 403 && code === "ONBOARDING_REQUIRED") {
+      if (currentPath !== "/onboard") {
         window.location.replace("/onboard");
-      } else if (currentPath !== "/403") {
+      }
+      return Promise.reject(error);
+    }
+
+    if (status === 403 && code === "FORBIDDEN") {
+      if (currentPath !== "/403") {
         window.location.replace("/403");
       }
       return Promise.reject(error);
     }
+
+    const fallbackMessage = error.response
+      ? "Something went wrong. Please try again."
+      : "Unable to reach the server. Check your connection and try again.";
+
+    toast.error(apiError?.message || fallbackMessage, {
+      id: toastId,
+      description: requestId ? `Request ID: ${requestId}` : undefined,
+    });
 
     return Promise.reject(error);
   },

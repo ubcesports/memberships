@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ubcesports/memberships/internal/database/db"
 	"github.com/ubcesports/memberships/internal/dto"
+	"github.com/ubcesports/memberships/internal/util"
 )
 
 type CreatePendingTransactionParams struct {
@@ -120,28 +121,24 @@ func (r *MembershipRepository) GetCurrentMembershipsWithTransactions(ctx context
 	returnMemberships := make([]dto.MembershipDTO, len(memberships))
 
 	for i, m := range memberships {
-		var cancelledAt *time.Time
-		if m.CancelledAt.Valid {
-			cancelledAt = &m.CancelledAt.Time
-		}
-
 		returnMemberships[i] = dto.MembershipDTO{
 			ID:          m.ID.String(),
 			TierId:      m.TierID.String(),
 			TierTitle:   m.TierTitle,
-			Slug:        m.Slug.String,
 			StartedAt:   m.StartedAt.Time,
 			ExpiresAt:   m.ExpiresAt.Time,
-			CancelledAt: cancelledAt,
-			Transaction: dto.TransactionDTO{
-				ID:              m.TransactionID.String(),
-				AmountPaid:      fmt.Sprintf("%.2f", float64(m.AmountPaidCents.Int64)/100),
-				AmountPaidCents: m.AmountPaidCents.Int64,
-				Status:          dto.TransactionStatusType(m.Status),
-				GroupAtPurchase: dto.GroupType(m.GroupAtPurchase.GroupType),
-			},
-			ProgramId:   m.ProgramID.String(),
+			CancelledAt: util.TimestampPointer(m.CancelledAt),
 			ProgramName: m.ProgramName,
+			ProgramId:   m.ProgramID.String(),
+			Transaction: dto.TransactionDTO{
+				ID:                    m.TransactionID.String(),
+				AmountPaid:            fmt.Sprintf("%.2f", float64(m.AmountPaidCents.Int64)/100),
+				Status:                dto.TransactionStatusType(m.Status),
+				GroupAtPurchase:       dto.GroupType(m.GroupAtPurchase.GroupType),
+				StudentAtPurchase:     m.StudentAtPurchase.Bool,
+				StripePaymentIntentId: m.StripePaymentIntentID.String,
+				PurchaseType:          dto.PurchaseType(m.PurchaseType.PurchaseType),
+			},
 		}
 	}
 

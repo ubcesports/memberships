@@ -1,23 +1,15 @@
 import { ChevronRight } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
-import type { Membership } from "@/lib/membership.hook";
+import type { Membership } from "@/lib/types/membership.types";
 import { formatDate } from "@/lib/utils/formatting";
 import { titleCase } from "@/lib/utils/groups";
 
-type MembershipStatus = "active" | "expired" | "cancelled";
+import type { MembershipStatus } from "@/lib/types/membership.types";
 
 const MEMBERSHIP_STATUS_TONE = {
   active: "success",
   expired: "muted",
   cancelled: "muted",
-} as const;
-
-const TRANSACTION_STATUS_TONE = {
-  completed: "success",
-  pending: "warning",
-  failed: "muted",
-  refunded: "muted",
-  expired: "muted",
 } as const;
 
 function getMembershipStatus(membership: Membership): MembershipStatus {
@@ -38,7 +30,7 @@ export function MembershipHistoryItem({ membership }: MembershipHistoryItemProps
   return (
     <li>
       <details className="group/transaction">
-        <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 transition hover:bg-white/[0.03] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand-primary [&::-webkit-details-marker]:hidden">
+        <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 transition hover:bg-white/3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-primary [&::-webkit-details-marker]:hidden">
           <ChevronRight
             aria-hidden="true"
             className="size-4 shrink-0 text-brand-text-subtle transition-transform group-open/transaction:rotate-90"
@@ -60,20 +52,27 @@ export function MembershipHistoryItem({ membership }: MembershipHistoryItemProps
           </span>
         </summary>
 
-        <dl className="grid gap-x-8 gap-y-5 border-t border-brand-border/70 bg-white/[0.02] px-5 py-5 pl-12 sm:grid-cols-2">
-          <TransactionDetail label="Payment status">
-            <StatusBadge tone={TRANSACTION_STATUS_TONE[membership.transaction.status]}>
-              {titleCase(membership.transaction.status)}
-            </StatusBadge>
+        <dl className="grid gap-x-8 gap-y-5 border-t border-brand-border/70 bg-white/2 px-5 py-5 pl-12 sm:grid-cols-2">
+          <TransactionDetail label="Membership ID">
+            <span className="break-all font-mono text-xs">{membership.id}</span>
+          </TransactionDetail>
+          <TransactionDetail label="Membership program">
+            <span>{membership.program_name}</span>
+          </TransactionDetail>
+          <TransactionDetail label="Transaction ID">
+            <span className="break-all font-mono text-xs">{membership.transaction.id}</span>
           </TransactionDetail>
           <TransactionDetail label="Amount paid">
             ${membership.transaction.amount_paid} CAD
           </TransactionDetail>
-          <TransactionDetail label="Purchase group">
+          <TransactionDetail label="Purchase type">
+            {titleCase(membership.transaction.purchase_type)}
+          </TransactionDetail>
+          <TransactionDetail label="Group at purchase">
             {titleCase(membership.transaction.group_at_purchase)}
           </TransactionDetail>
-          <TransactionDetail label="Transaction ID">
-            <span className="break-all font-mono text-xs">{membership.transaction.id}</span>
+          <TransactionDetail label="Student at purchase">
+            {titleCase(membership.transaction.student_at_purchase.toString())}
           </TransactionDetail>
         </dl>
       </details>

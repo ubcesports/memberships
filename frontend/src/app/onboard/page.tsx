@@ -5,7 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { BasePage } from "@/components/layout/base-page";
 import { OnboardForm } from "@/components/onboard/onboard-form";
 import { completeOnboarding } from "@/lib/onboard/onboard.api";
-import type { CompleteOnboardingPayload, StudentStatus } from "@/lib/onboard/onboard.types";
+import type { CompleteOnboardingPayload, StudentStatus } from "@/lib/types/user.types";
 
 const STUDENT_ID_PATTERN = /^\d{8}$/;
 

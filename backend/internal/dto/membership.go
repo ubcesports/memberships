@@ -54,11 +54,14 @@ type MembershipDTO struct {
 }
 
 type TransactionDTO struct {
-	ID              string                `json:"id"`
-	AmountPaid      string                `json:"amount_paid"`
-	Status          TransactionStatusType `json:"status"`
-	GroupAtPurchase GroupType             `json:"group_at_purchase"`
-	AmountPaidCents int64                 `json:"-"`
+	ID                    string                `json:"id"`
+	AmountPaid            string                `json:"amount_paid"`
+	Status                TransactionStatusType `json:"status"`
+	GroupAtPurchase       GroupType             `json:"group_at_purchase"`
+	PurchaseType          PurchaseType          `json:"purchase_type"`
+	StripePaymentIntentId string                `json:"stripe_payment_intent_id"`
+	StudentAtPurchase     bool                  `json:"student_at_purchase"`
+	AmountPaidCents       int64                 `json:"-"`
 }
 
 // Request

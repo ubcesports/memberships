@@ -56,6 +56,9 @@ SELECT
     t.id AS transaction_id,
     t.amount_paid_cents,
     t.status,
+    t.purchase_type,
+    t.student_at_purchase,
+    t.stripe_payment_intent_id,
     t.group_at_purchase,
     mp.id AS program_id,
     mp.program_name
@@ -84,6 +87,9 @@ SELECT
     t.id AS transaction_id,
     t.amount_paid_cents,
     t.status,
+    t.student_at_purchase,
+    t.purchase_type,
+    t.stripe_payment_intent_id,
     t.group_at_purchase,
     mp.id AS program_id,
     mp.program_name

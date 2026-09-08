@@ -55,6 +55,8 @@ services:
   frontend:
     image: ${FRONTEND_IMAGE}
     restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://backend:8080
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
 

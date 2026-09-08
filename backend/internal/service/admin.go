@@ -229,14 +229,20 @@ func (s *AdminService) GetUserMemberships(ctx context.Context, userId string) ([
 		memberships = append(memberships, dto.MembershipDTO{
 			ID:          row.ID.String(),
 			TierId:      row.TierID.String(),
+			TierTitle:   row.TierTitle,
 			StartedAt:   row.StartedAt.Time,
 			ExpiresAt:   row.ExpiresAt.Time,
 			CancelledAt: util.TimestampPointer(row.CancelledAt),
+			ProgramName: row.ProgramName,
+			ProgramId:   row.ProgramID.String(),
 			Transaction: dto.TransactionDTO{
-				ID:              row.TransactionID.String(),
-				AmountPaid:      fmt.Sprintf("%.2f", float64(row.AmountPaidCents.Int64)/100),
-				Status:          dto.TransactionStatusType(row.Status),
-				GroupAtPurchase: dto.GroupType(row.GroupAtPurchase.GroupType),
+				ID:                    row.TransactionID.String(),
+				AmountPaid:            fmt.Sprintf("%.2f", float64(row.AmountPaidCents.Int64)/100),
+				Status:                dto.TransactionStatusType(row.Status),
+				GroupAtPurchase:       dto.GroupType(row.GroupAtPurchase.GroupType),
+				StudentAtPurchase:     row.StudentAtPurchase.Bool,
+				StripePaymentIntentId: row.StripePaymentIntentID.String,
+				PurchaseType:          dto.PurchaseType(row.PurchaseType.PurchaseType),
 			},
 		})
 	}

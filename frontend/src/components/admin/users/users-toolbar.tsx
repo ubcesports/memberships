@@ -1,19 +1,20 @@
 import { Download, Loader2 } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
-import type { AdminUserFilters, GroupType, RoleType, SearchMode } from "@/lib/admin/admin.types";
+import type { AdminUserFilters, SearchMode } from "@/lib/types/admin.types";
+import type { GroupType, RoleType } from "@/lib/types/user.types";
 import {
   GROUP_OPTIONS,
   ROLE_OPTIONS,
   SEARCH_MODE_OPTIONS,
   IS_STUDENT_OPTIONS,
-} from "@/lib/admin/admin.types";
+} from "@/lib/types/admin.types";
 import { ToolbarContainer } from "@/components/toolbar/toolbar-container";
 import { ToolbarRow } from "@/components/toolbar/toolbar-row";
 import { SelectField } from "@/components/toolbar/select-option";
 import { SearchField } from "@/components/toolbar/search-field";
 import { ResetButton } from "@/components/toolbar/reset-button";
 
-type IsStudentFilter = "all" | "yes" | "no";
+import type { IsStudentFilter } from "@/lib/types/admin.types";
 
 type UsersToolbarProps = {
   searchMode: SearchMode;

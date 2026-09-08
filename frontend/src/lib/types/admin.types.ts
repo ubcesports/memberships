@@ -1,6 +1,5 @@
-export type RoleType = "member" | "admin";
-
-export type GroupType = "member" | "competitive_team" | "executive" | "director" | "board";
+import type { GroupType, RoleType, User } from "./user.types";
+import type { Membership, Transaction } from "./membership.types";
 
 export type SearchMode = "full_name" | "email" | "student_id";
 
@@ -15,21 +14,6 @@ export type AdminUserFilters = {
   role?: RoleType;
   group?: GroupType;
   isStudent?: boolean;
-};
-
-export type User = {
-  id: string;
-  email: string;
-  student_id: string | null;
-  role: RoleType;
-  created_at: string;
-  updated_at: string;
-  full_name: string;
-  email_verified_at: string | null;
-  is_student: boolean;
-  onboarding_completed_at: string | null;
-  avatar_url: string | null;
-  groups: GroupType[];
 };
 
 export type AuditLogActor = {
@@ -62,34 +46,6 @@ export type UsersResponse = {
 
 export type UserResponse = {
   user: User;
-};
-
-export type TransactionStatusType = "pending" | "completed" | "failed" | "refunded" | "expired";
-
-export type MembershipTransaction = {
-  id: string;
-  amount_paid: string;
-  status: TransactionStatusType;
-  group_at_purchase: GroupType;
-  currency?: string;
-  customer_id?: string;
-  payment_intent?: string;
-  charge_id?: string;
-  created_at?: string;
-  metadata?: Record<string, unknown> | null;
-};
-
-export type Membership = {
-  id: string;
-  tier_id: string;
-  tier_title: string;
-  slug: string;
-  started_at: string;
-  expires_at: string;
-  cancelled_at: string | null;
-  transaction: MembershipTransaction;
-  program_id: string;
-  program_name: string;
 };
 
 /*
@@ -137,3 +93,5 @@ export const IS_STUDENT_OPTIONS: { value: IsStudent; label: string }[] = [
   { value: "yes", label: "Yes" },
   { value: "no", label: "No" },
 ];
+
+export type IsStudentFilter = "all" | IsStudent;

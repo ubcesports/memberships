@@ -7,10 +7,10 @@ import { ActionButton } from "@/components/action-button";
 import { DetailRow } from "@/components/detail-row";
 import { StatusBadge } from "@/components/status-badge";
 import { SurfacePanel } from "@/components/surface-panel";
-import type { Membership, UpdateUserRequest } from "@/lib/admin/admin.types";
+import type { UpdateUserRequest } from "@/lib/types/admin.types";
 import { useMembershipCatalog } from "@/lib/membership.hook";
 import { formatDate, formatTime } from "@/lib/utils/formatting";
-import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
+import { titleCase } from "@/lib/utils/groups";
 
 type UserMembershipsPanelProps = {
   memberships: Membership[];
@@ -18,9 +18,9 @@ type UserMembershipsPanelProps = {
   isSaving: boolean;
 };
 
-type MembershipState = "active" | "cancelled" | "expired";
+import type { Membership, MembershipStatus } from "@/lib/types/membership.types";
 
-function getMembershipState(membership: Membership): MembershipState {
+function getMembershipState(membership: Membership): MembershipStatus {
   if (membership.cancelled_at) {
     return "cancelled";
   }
@@ -34,14 +34,6 @@ const STATE_TONE = {
   expired: "muted",
 } as const;
 
-function TransactionSummary({ membership }: { membership: Membership }) {
-  return (
-    <span className="text-brand-text-muted">
-      ${membership.transaction.amount_paid} · {titleCase(membership.transaction.status)}
-    </span>
-  );
-}
-
 function TransactionDetails({ membership }: { membership: Membership }) {
   const tx = membership.transaction;
 
@@ -50,43 +42,28 @@ function TransactionDetails({ membership }: { membership: Membership }) {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <div className="font-medium text-brand-text">Transaction ID</div>
-          <div>{tx.id ?? "—"}</div>
+          <div>{tx.id}</div>
         </div>
         <div>
-          <div className="font-medium text-brand-text">Status</div>
-          <div>{titleCase(tx.status ?? "unknown")}</div>
+          <div className="font-medium text-brand-text">Amount Paid</div>
+          <div>${tx.amount_paid} CAD</div>
         </div>
         <div>
-          <div className="font-medium text-brand-text">Amount</div>
-          <div>
-            {tx.currency ? `${tx.currency.toUpperCase()} ` : ""}
-            {tx.amount_paid ?? "—"}
-          </div>
+          <div className="font-medium text-brand-text">Group at purchase</div>
+          <div>{titleCase(tx.group_at_purchase)}</div>
         </div>
         <div>
-          <div className="font-medium text-brand-text">Customer</div>
-          <div>{tx.customer_id ?? "—"}</div>
+          <div className="font-medium text-brand-text">Student at purchase</div>
+          <div>{titleCase(tx.student_at_purchase.toString())}</div>
         </div>
         <div>
-          <div className="font-medium text-brand-text">Payment intent</div>
-          <div>{tx.payment_intent ?? "—"}</div>
+          <div className="font-medium text-brand-text">Purchase type</div>
+          <div>{titleCase(tx.purchase_type)}</div>
         </div>
         <div>
-          <div className="font-medium text-brand-text">Charge</div>
-          <div>{tx.charge_id ?? "—"}</div>
+          <div className="font-medium text-brand-text">Stripe payment intent ID</div>
+          <div>{tx.stripe_payment_intent_id}</div>
         </div>
-        <div className="col-span-2">
-          <div className="font-medium text-brand-text">Created</div>
-          <div>{tx.created_at ? formatDate(tx.created_at) : "—"}</div>
-        </div>
-        {tx.metadata ? (
-          <div className="col-span-2">
-            <div className="font-medium text-brand-text">Metadata</div>
-            <pre className="whitespace-pre-wrap break-words text-xs">
-              {JSON.stringify(tx.metadata)}
-            </pre>
-          </div>
-        ) : null}
       </div>
     </div>
   );
@@ -95,23 +72,6 @@ function TransactionDetails({ membership }: { membership: Membership }) {
 export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMembershipsPanelProps) {
   const { data: catalog } = useMembershipCatalog();
   const [pendingCancellationId, setPendingCancellationId] = useState<string | null>(null);
-
-  const tierTitleById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const tier of catalog ?? []) {
-      map.set(tier.id, tier.title);
-    }
-    return map;
-  }, [catalog]);
-
-  const tierTitle = (tierId: string) => tierTitleById.get(tierId) ?? "Unknown tier";
-
-  const tierTitleForMembership = (membership: Membership) => {
-    // Prefer server-provided title when available (joined on membership_tiers).
-    if (membership.tier_title) return membership.tier_title;
-
-    return tierTitle(membership.tier_id);
-  };
 
   const activeMemberships = memberships.filter(
     (membership) => getMembershipState(membership) === "active",
@@ -128,7 +88,7 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
   const cancelMembership = async (membership: Membership) => {
     try {
       await onSave({ cancel_membership_id: membership.id });
-      toast.success(`${tierTitleForMembership(membership)} membership cancelled`);
+      toast.success(`${membership.tier_title} membership cancelled`);
     } catch {
       // The API client already surfaces the error message as a toast.
     } finally {
@@ -150,17 +110,17 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
           <div className="divide-y divide-brand-border">
             {activeMemberships.map((membership) => (
               <section key={membership.id} aria-labelledby={`active-membership-${membership.id}`}>
-                <div className="flex flex-wrap items-start justify-between gap-3 bg-white/[0.02] px-5 py-4">
+                <div className="flex flex-wrap items-start justify-between gap-3 bg-white/2 px-5 py-4">
                   <div>
-                    <p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-brand-text-subtle">
-                      {membership.program_name}
-                    </p>
                     <h3
                       id={`active-membership-${membership.id}`}
                       className="mt-1 text-base font-semibold text-brand-text"
                     >
-                      {tierTitleForMembership(membership)}
+                      Tier: {membership.tier_title}
                     </h3>
+                    <p className="text-sm font-semibold text-brand-text-subtle">
+                      Program: {membership.program_name}
+                    </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     <StatusBadge tone="success">Active</StatusBadge>
@@ -198,20 +158,12 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
                 <dl>
                   <DetailRow label="Started">{formatTime(membership.started_at)}</DetailRow>
                   <DetailRow label="Expires">{formatTime(membership.expires_at)}</DetailRow>
-                  <DetailRow label="Amount paid">${membership.transaction.amount_paid}</DetailRow>
                   <DetailRow label="Transaction">
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge tone="muted">
                           {titleCase(membership.transaction.status)}
                         </StatusBadge>
-                        {membership.transaction.group_at_purchase ? (
-                          <StatusBadge
-                            className={getGroupBadgeClass(membership.transaction.group_at_purchase)}
-                          >
-                            {titleCase(membership.transaction.group_at_purchase)}
-                          </StatusBadge>
-                        ) : null}
                       </div>
                       <button
                         type="button"
@@ -246,25 +198,19 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
           <p className="px-5 py-6 text-sm text-brand-text-muted">No previous memberships.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[42rem] border-collapse text-left">
+            <table className="w-full min-w-2xl border-collapse text-left">
               <thead>
-                <tr className="border-b border-brand-border bg-white/[0.02]">
-                  {[
-                    "Program",
-                    "Tier",
-                    "Status",
-                    "Started",
-                    "Expires",
-                    "Cancelled",
-                    "Transaction",
-                  ].map((header) => (
-                    <th
-                      key={header}
-                      className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-text-subtle"
-                    >
-                      {header}
-                    </th>
-                  ))}
+                <tr className="border-b border-brand-border bg-white/2">
+                  {["Program", "Tier", "Status", "Started", "Expires", "Cancelled"].map(
+                    (header) => (
+                      <th
+                        key={header}
+                        className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-text-subtle"
+                      >
+                        {header}
+                      </th>
+                    ),
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -277,9 +223,7 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
                         <td className="px-4 py-3 text-brand-text-muted">
                           {membership.program_name}
                         </td>
-                        <td className="px-4 py-3 text-brand-text">
-                          {tierTitleForMembership(membership)}
-                        </td>
+                        <td className="px-4 py-3 text-brand-text">{membership.tier_title}</td>
                         <td className="px-4 py-3">
                           <StatusBadge tone={STATE_TONE[state]}>{titleCase(state)}</StatusBadge>
                         </td>
@@ -294,7 +238,6 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-between">
-                            <TransactionSummary membership={membership} />
                             <button
                               type="button"
                               onClick={() => toggleExpanded(membership.id)}
@@ -306,7 +249,7 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
                         </td>
                       </tr>
                       {expanded[membership.id] ? (
-                        <tr key={`${membership.id}-details`} className="bg-white/[0.02]">
+                        <tr key={`${membership.id}-details`} className="bg-white/2">
                           <td colSpan={7} className="px-0">
                             <TransactionDetails membership={membership} />
                           </td>

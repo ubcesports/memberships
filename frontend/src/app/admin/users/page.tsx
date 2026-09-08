@@ -7,14 +7,10 @@ import { UsersTable } from "@/components/admin/users/users-table";
 import { UsersToolbar } from "@/components/admin/users/users-toolbar";
 import { downloadCSVBlob, exportUsersCSV } from "@/lib/admin/admin.api";
 import { useUsers } from "@/lib/admin/admin.hook";
-import type {
-  AdminUserFilters,
-  AppliedSearch,
-  GroupType,
-  RoleType,
-  SearchMode,
-} from "@/lib/admin/admin.types";
-import { DEFAULT_PAGE_SIZE } from "@/lib/admin/admin.types";
+import type { AdminUserFilters, AppliedSearch, SearchMode } from "@/lib/types/admin.types";
+import type { GroupType, RoleType } from "@/lib/types/user.types";
+import type { IsStudentFilter } from "@/lib/types/admin.types";
+import { DEFAULT_PAGE_SIZE } from "@/lib/types/admin.types";
 import { useDebouncedValue } from "@/lib/use-debounced-value.hook";
 import { AdminTablePagination } from "@/components/admin/admin-table-pagination";
 import { AdminTablePage } from "../admin-table-page";
@@ -66,7 +62,7 @@ export default function UsersPage() {
     resetOffset();
   };
 
-  const handleIsStudentChange = (value: "all" | "yes" | "no") => {
+  const handleIsStudentChange = (value: IsStudentFilter) => {
     setFilters((current) => ({
       ...current,
       isStudent: value === "all" ? undefined : value === "yes",
