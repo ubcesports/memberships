@@ -7,9 +7,13 @@ const primaryLinks = [
 ];
 
 const legalLinks = [
-  { href: "/privacy", label: "Privacy Policy" },
-  { href: "/terms", label: "Terms" },
-  { href: "/contact", label: "Contact" },
+  { href: "/legal#privacy", label: "Privacy Policy" },
+  { href: "/legal#terms", label: "Terms" },
+  {
+    href: "mailto:communications@ubcesports.ca",
+    label: "communications@ubcesports.ca",
+    separated: true,
+  },
 ];
 
 const linkClassName =
@@ -19,7 +23,7 @@ export function Footer() {
   return (
     <footer className="border-t border-brand-border bg-brand-surface">
       <div className="mx-auto w-full max-w-7xl px-5 py-8 sm:px-8 lg:px-10">
-        <div className="flex flex-col gap-6 pb-8 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-6 pb-8 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             <Image
               src="/ubcea_logo.jpg"
@@ -49,7 +53,7 @@ export function Footer() {
           </nav>
         </div>
 
-        <div className="flex flex-col-reverse gap-4 border-t border-brand-border/70 pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col-reverse gap-4 border-t border-brand-border/70 pt-5 md:flex-row md:items-center md:justify-between">
           <p className="text-xs text-brand-text-subtle">
             © {new Date().getFullYear()} UBC Esports Association. All rights reserved.
           </p>
@@ -57,8 +61,19 @@ export function Footer() {
           <nav aria-label="Legal links">
             <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
               {legalLinks.map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className={linkClassName}>
+                <li
+                  key={link.href}
+                  className={link.separated ? "flex items-center gap-5" : undefined}
+                >
+                  {link.separated ? (
+                    <span aria-hidden="true" className="text-brand-text-subtle">
+                      |
+                    </span>
+                  ) : null}
+                  <Link
+                    href={link.href}
+                    className={`${linkClassName}${link.separated ? " underline underline-offset-4" : ""}`}
+                  >
                     {link.label}
                   </Link>
                 </li>
