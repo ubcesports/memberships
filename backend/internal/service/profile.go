@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"regexp"
 	"strings"
 
@@ -79,11 +80,18 @@ func (s *ProfileService) OnboardUser(ctx context.Context, userId string, onboard
 		studentID = util.GenerateNonStudentID()
 	}
 
+	// Allow execs to get exec group through a code
+	expectedCode := os.Getenv("EXEC_ONBOARDING_CODE")
+	isExec := onboardUserRequest.InviteCode != nil &&
+		expectedCode != "" &&
+		strings.TrimSpace(*onboardUserRequest.InviteCode) == expectedCode
+
 	if err := s.profileRepository.OnboardUserByUserId(
 		ctx,
 		userId,
 		onboardUserRequest.IsStudent,
 		studentID,
+		isExec,
 	); err != nil {
 		return err
 	}

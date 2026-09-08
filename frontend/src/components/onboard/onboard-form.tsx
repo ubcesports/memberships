@@ -6,22 +6,26 @@ import type { StudentStatus } from "@/lib/types/user.types";
 type OnboardFormProps = {
   studentStatus: StudentStatus | null;
   studentId: string;
+  inviteCode: string;
   validationError: string | null;
   canSubmit: boolean;
   isPending: boolean;
   onStudentStatusChange: (status: StudentStatus) => void;
   onStudentIdChange: (value: string) => void;
+  onInviteCodeChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
 export function OnboardForm({
   studentStatus,
   studentId,
+  inviteCode,
   validationError,
   canSubmit,
   isPending,
   onStudentStatusChange,
   onStudentIdChange,
+  onInviteCodeChange,
   onSubmit,
 }: OnboardFormProps) {
   const isStudent = studentStatus === "student";
@@ -82,6 +86,24 @@ export function OnboardForm({
             </p>
           </div>
         )}
+
+        <div>
+          <label htmlFor="invite-code" className="text-sm font-medium text-brand-text">
+            Invite code <span className="text-brand-text-subtle">(optional)</span>
+          </label>
+          <input
+            id="invite-code"
+            type="text"
+            autoComplete="off"
+            value={inviteCode}
+            onChange={(event) => onInviteCodeChange(event.target.value)}
+            className="mt-2 h-12 w-full border border-brand-border bg-white/3 px-4 font-mono text-base text-brand-text outline-none transition placeholder:text-brand-text-subtle focus:border-brand-primary disabled:cursor-not-allowed"
+            placeholder="Enter your code"
+          />
+          <p className="mt-2 text-sm leading-6 text-brand-text-subtle">
+            If you have an invite code, enter it here.
+          </p>
+        </div>
 
         {validationError ? (
           <p id="onboard-validation-error" className="text-sm leading-6 text-brand-warning">

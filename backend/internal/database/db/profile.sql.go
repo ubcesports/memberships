@@ -87,22 +87,37 @@ func (q *Queries) GetProfileByUserID(ctx context.Context, id pgtype.UUID) (GetPr
 }
 
 const onboardUserByUserId = `-- name: OnboardUserByUserId :exec
-UPDATE users
-SET
-    is_student = $2,
-    student_id = $3,
-    onboarding_completed_at = NOW(),
-    updated_at = NOW()
-WHERE id = $1
+WITH onboarded AS (
+    UPDATE users
+    SET
+        is_student = $2,
+        student_id = $3,
+        onboarding_completed_at = NOW(),
+        updated_at = NOW()
+    WHERE id = $4
+      AND onboarding_completed_at IS NULL
+    RETURNING id
+)
+INSERT INTO user_groups (user_id, "group")
+SELECT id, 'executive'::group_type
+FROM onboarded
+WHERE $1::boolean
+ON CONFLICT (user_id, "group") DO NOTHING
 `
 
 type OnboardUserByUserIdParams struct {
-	ID        pgtype.UUID
-	IsStudent bool
-	StudentID pgtype.Text
+	IsExecutive bool
+	IsStudent   bool
+	StudentID   pgtype.Text
+	ID          pgtype.UUID
 }
 
 func (q *Queries) OnboardUserByUserId(ctx context.Context, arg OnboardUserByUserIdParams) error {
-	_, err := q.db.Exec(ctx, onboardUserByUserId, arg.ID, arg.IsStudent, arg.StudentID)
+	_, err := q.db.Exec(ctx, onboardUserByUserId,
+		arg.IsExecutive,
+		arg.IsStudent,
+		arg.StudentID,
+		arg.ID,
+	)
 	return err
 }
