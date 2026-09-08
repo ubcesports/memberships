@@ -33,10 +33,19 @@ VALUES (
 ON CONFLICT (user_id, "group") DO NOTHING;
 
 -- name: OnboardUserByUserId :exec
-UPDATE users
-SET
-    is_student = $2,
-    student_id = $3,
-    onboarding_completed_at = NOW(),
-    updated_at = NOW()
-WHERE id = $1;
+WITH onboarded AS (
+    UPDATE users
+    SET
+        is_student = sqlc.arg(is_student),
+        student_id = sqlc.arg(student_id),
+        onboarding_completed_at = NOW(),
+        updated_at = NOW()
+    WHERE id = sqlc.arg(id)
+      AND onboarding_completed_at IS NULL
+    RETURNING id
+)
+INSERT INTO user_groups (user_id, "group")
+SELECT id, 'executive'::group_type
+FROM onboarded
+WHERE sqlc.arg(is_executive)::boolean
+ON CONFLICT (user_id, "group") DO NOTHING;

@@ -36,6 +36,7 @@ func (r *ProfileRepository) OnboardUserByUserId(
 	userId string,
 	isStudent bool,
 	studentId string,
+	isExec bool,
 ) error {
 	// Validate user id
 	pgUserId, err := util.GetValidatedUUID(userId)
@@ -50,6 +51,7 @@ func (r *ProfileRepository) OnboardUserByUserId(
 			String: studentId,
 			Valid:  studentId != "",
 		},
+		IsExecutive: isExec,
 	})
 	if err != nil {
 		return fmt.Errorf("update user onboarding status: %w", err)
