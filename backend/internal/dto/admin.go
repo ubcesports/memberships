@@ -15,6 +15,7 @@ type AdminAuditLogResponse struct {
 // AdminUpdateUserRequest is the body of PATCH /admin/users/{id}. Every field is
 // optional and only the ones present are applied.
 type AdminUpdateUserRequest struct {
+	FullName           *string     `json:"full_name"`
 	StudentID          *string     `json:"student_id"`
 	IsStudent          *bool       `json:"is_student"`
 	GroupsAdd          []GroupType `json:"groups_add"`

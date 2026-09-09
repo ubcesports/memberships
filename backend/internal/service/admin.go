@@ -51,6 +51,7 @@ type AdminAuditLogInput struct {
 // UpdateUserRequest describes the edits an admin wants to apply to a user.
 // Every field is optional; only the ones that are set are acted on.
 type UpdateUserRequest struct {
+	FullName           *string
 	StudentID          *string
 	IsStudent          *bool
 	GroupsAdd          []db.GroupType
@@ -62,6 +63,7 @@ type UpdateUserRequest struct {
 // Audit log actions emitted by UpdateUser.
 const (
 	actionUserUpdated          = "user.updated"
+	actionFullNameUpdated      = "user.full_name.updated"
 	actionStudentIDUpdated     = "user.student_id.updated"
 	actionStudentStatusUpdated = "user.student_status.updated"
 	actionRoleUpdated          = "user.role.updated"
@@ -481,6 +483,12 @@ func (s *AdminService) applyUserUpdates(
 ) ([]pendingAuditLog, error) {
 	entries := make([]pendingAuditLog, 0)
 
+	nameEntries, err := s.applyFullNameUpdate(ctx, store, user, req)
+	if err != nil {
+		return nil, err
+	}
+	entries = append(entries, nameEntries...)
+
 	studentEntries, err := s.applyStudentUpdate(ctx, store, user, req)
 	if err != nil {
 		return nil, err
@@ -506,6 +514,27 @@ func (s *AdminService) applyUserUpdates(
 	entries = append(entries, membershipEntries...)
 
 	return entries, nil
+}
+
+func (s *AdminService) applyFullNameUpdate(ctx context.Context, store repository.AdminStore, user db.GetAdminUserByIDRow, req UpdateUserRequest) ([]pendingAuditLog, error) {
+	if req.FullName == nil {
+		return nil, nil
+	}
+	fullName := strings.TrimSpace(*req.FullName)
+	if fullName == "" {
+		return nil, auditable(actionFullNameUpdated, "Failed to update full name: full name is required", fmt.Errorf("%w: full name is required", ErrValidation))
+	}
+	if fullName == user.FullName {
+		return nil, nil
+	}
+	if err := store.UpdateUserFullName(ctx, user.ID.String(), fullName); err != nil {
+		return nil, auditable(actionFullNameUpdated, "Failed to update full name", err)
+	}
+	return []pendingAuditLog{{
+		action:      actionFullNameUpdated,
+		description: fmt.Sprintf("Updated full name from %q to %q", user.FullName, fullName),
+		email:       userInfoUpdateEmail("Full name", user.FullName, fullName),
+	}}, nil
 }
 
 func (s *AdminService) applyStudentUpdate(

@@ -309,6 +309,7 @@ API URL: PATCH /admin/users/{id}
 
 Args (JSON body, every field optional):
 
+	full_name: new nonblank full name
 	student_id: new student ID, only editable while the user is a student
 	is_student: new student status
 	groups_add: groups to add to the user
@@ -546,6 +547,7 @@ func (h *AdminHandler) ExportAuditLogsCSV(w http.ResponseWriter, r *http.Request
 
 func buildUpdateUserRequest(request dto.AdminUpdateUserRequest) service.UpdateUserRequest {
 	updateUserRequest := service.UpdateUserRequest{
+		FullName:           request.FullName,
 		StudentID:          request.StudentID,
 		IsStudent:          request.IsStudent,
 		GroupsAdd:          make([]db.GroupType, 0, len(request.GroupsAdd)),

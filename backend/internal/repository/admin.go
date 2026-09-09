@@ -17,6 +17,7 @@ import (
 // lives here rather than in the service package because WithTx has to hand the
 // callback a store of this same type.
 type AdminStore interface {
+	UpdateUserFullName(ctx context.Context, userId string, fullName string) error
 	GetUsers(ctx context.Context, params db.GetUsersAdminParams) ([]db.GetUsersAdminRow, error)
 	CountUsers(ctx context.Context, params db.CountUsersAdminParams) (int64, error)
 	CountAdminAuditLogs(ctx context.Context, params pgtype.Text) (int64, error)
@@ -104,6 +105,17 @@ func (r *AdminRepository) GetUserByID(ctx context.Context, userId string) (db.Ge
 		return db.GetAdminUserByIDRow{}, fmt.Errorf("query admin user by ID: %w", err)
 	}
 	return row, nil
+}
+
+func (r *AdminRepository) UpdateUserFullName(ctx context.Context, userId string, fullName string) error {
+	pgUserId, err := util.GetValidatedUUID(userId)
+	if err != nil {
+		return err
+	}
+	if err := r.store.UpdateUserFullName(ctx, db.UpdateUserFullNameParams{ID: pgUserId, FullName: fullName}); err != nil {
+		return fmt.Errorf("update user full name: %w", err)
+	}
+	return nil
 }
 
 func (r *AdminRepository) UpdateUserStudentInfo(

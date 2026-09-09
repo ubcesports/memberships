@@ -53,6 +53,7 @@ export type UserResponse = {
   ones the admin actually changed.
 */
 export type UpdateUserRequest = {
+  full_name?: string;
   student_id?: string;
   is_student?: boolean;
   groups_add?: GroupType[];

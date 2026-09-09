@@ -30,8 +30,10 @@ type studentInfoUpdate struct {
 // fakeAdminStore is an in-memory repository.AdminStore for exercising the admin
 // service without a database.
 type fakeAdminStore struct {
-	user       db.GetAdminUserByIDRow
-	getUserErr error
+	fullNameUpdates   []string
+	updateFullNameErr error
+	user              db.GetAdminUserByIDRow
+	getUserErr        error
 
 	takenStudentIDs    map[string]bool
 	allStudentIDsTaken bool
@@ -52,6 +54,68 @@ type fakeAdminStore struct {
 }
 
 var _ repository.AdminStore = (*fakeAdminStore)(nil)
+
+func (f *fakeAdminStore) UpdateUserFullName(_ context.Context, _ string, fullName string) error {
+	if f.updateFullNameErr != nil {
+		return f.updateFullNameErr
+	}
+	f.fullNameUpdates = append(f.fullNameUpdates, fullName)
+	f.user.FullName = fullName
+	return nil
+}
+
+func TestUpdateUserFullName(t *testing.T) {
+	store := newFakeAdminStore(t, false, "N1234567", db.RoleTypeMember, "member")
+	svc := &AdminService{adminRepository: store}
+	profile, err := svc.UpdateUser(context.Background(), testActorID, testTargetID, testRequestID, UpdateUserRequest{FullName: ptr("  Renée O'Connor  ")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.FullName != "Renée O'Connor" || len(store.fullNameUpdates) != 1 {
+		t.Fatalf("expected trimmed name in updated profile, got %#v", profile)
+	}
+	assertAuditActions(t, store, db.AdminAuditOutcomeTypeSuccess, actionFullNameUpdated)
+	if store.auditLogs[0].Description.String != "Updated full name from \"Sudi Mango\" to \"Renée O'Connor\"" {
+		t.Fatalf("unexpected audit description: %v", store.auditLogs[0].Description)
+	}
+}
+
+func TestUpdateUserFullNameValidationAndNoOp(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		value   *string
+		invalid bool
+	}{
+		{"omitted", nil, false}, {"unchanged", ptr(" Sudi Mango "), false},
+		{"empty", ptr(""), true}, {"whitespace", ptr(" \t\n\u00a0"), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store := newFakeAdminStore(t, false, "N1234567", db.RoleTypeMember, "member")
+			err := updateUser(t, store, UpdateUserRequest{FullName: tc.value})
+			if tc.invalid {
+				if !errors.Is(err, ErrValidation) {
+					t.Fatalf("expected validation error, got %v", err)
+				}
+				assertAuditActions(t, store, db.AdminAuditOutcomeTypeFailed, actionFullNameUpdated)
+			} else if err != nil || len(store.auditLogs) != 0 {
+				t.Fatalf("expected no-op, got error %v and logs %v", err, store.auditLogs)
+			}
+			if len(store.fullNameUpdates) != 0 {
+				t.Fatal("unexpected name update")
+			}
+		})
+	}
+}
+
+func TestUpdateUserFullNamePersistenceFailure(t *testing.T) {
+	store := newFakeAdminStore(t, false, "N1234567", db.RoleTypeMember, "member")
+	store.updateFullNameErr = errors.New("database failure")
+	err := updateUser(t, store, UpdateUserRequest{FullName: ptr("New Name")})
+	if !errors.Is(err, store.updateFullNameErr) {
+		t.Fatalf("expected database error, got %v", err)
+	}
+	assertAuditActions(t, store, db.AdminAuditOutcomeTypeFailed, actionFullNameUpdated)
+}
 
 func (f *fakeAdminStore) GetUsers(context.Context, db.GetUsersAdminParams) ([]db.GetUsersAdminRow, error) {
 	return nil, nil
