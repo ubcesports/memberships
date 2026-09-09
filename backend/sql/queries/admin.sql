@@ -134,6 +134,11 @@ LEFT JOIN LATERAL (
 ) g ON true
 WHERE u.id = $1;
 
+-- name: UpdateUserFullName :exec
+UPDATE users
+SET full_name = sqlc.arg(full_name), updated_at = NOW()
+WHERE id = sqlc.arg(id);
+
 -- name: UpdateUserStudentInfo :exec
 UPDATE users
 SET

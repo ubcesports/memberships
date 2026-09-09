@@ -4,6 +4,8 @@ import { ActionButton } from "@/components/action-button";
 import type { StudentStatus } from "@/lib/types/user.types";
 
 type OnboardFormProps = {
+  fullName: string;
+  onFullNameChange: (value: string) => void;
   studentStatus: StudentStatus | null;
   studentId: string;
   inviteCode: string;
@@ -17,6 +19,8 @@ type OnboardFormProps = {
 };
 
 export function OnboardForm({
+  fullName,
+  onFullNameChange,
   studentStatus,
   studentId,
   inviteCode,
@@ -33,6 +37,30 @@ export function OnboardForm({
   return (
     <form className="px-5 py-5 sm:px-6" onSubmit={onSubmit}>
       <fieldset disabled={isPending} className="space-y-5 disabled:opacity-70">
+        <div>
+          <label htmlFor="full-name" className="text-sm font-medium text-brand-text">
+            Full name
+          </label>
+          <input
+            id="full-name"
+            name="full_name"
+            type="text"
+            autoComplete="name"
+            required
+            value={fullName}
+            onChange={(event) => onFullNameChange(event.target.value)}
+            className="mt-2 h-12 w-full border border-brand-border bg-white/3 px-4 text-base text-brand-text outline-none transition placeholder:text-brand-text-subtle focus:border-brand-primary disabled:cursor-not-allowed"
+            placeholder="Enter your full name"
+            aria-describedby={
+              validationError ? "full-name-help onboard-validation-error" : "full-name-help"
+            }
+          />
+          <p id="full-name-help" className="mt-2 text-sm leading-6 text-brand-text-subtle">
+            Enter your full name as recognized by UBC or as shown on your legal identification. You
+            cannot edit this name after completing onboarding.
+          </p>
+        </div>
+
         <div>
           <label className="text-sm font-medium text-brand-text">Are you a student?</label>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">

@@ -92,9 +92,10 @@ WITH onboarded AS (
     SET
         is_student = $2,
         student_id = $3,
+        full_name = $4,
         onboarding_completed_at = NOW(),
         updated_at = NOW()
-    WHERE id = $4
+    WHERE id = $5
       AND onboarding_completed_at IS NULL
     RETURNING id
 )
@@ -109,6 +110,7 @@ type OnboardUserByUserIdParams struct {
 	IsExecutive bool
 	IsStudent   bool
 	StudentID   pgtype.Text
+	FullName    string
 	ID          pgtype.UUID
 }
 
@@ -117,6 +119,7 @@ func (q *Queries) OnboardUserByUserId(ctx context.Context, arg OnboardUserByUser
 		arg.IsExecutive,
 		arg.IsStudent,
 		arg.StudentID,
+		arg.FullName,
 		arg.ID,
 	)
 	return err

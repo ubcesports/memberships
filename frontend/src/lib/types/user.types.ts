@@ -25,6 +25,6 @@ export type OAuthAuthorizeResponse = RedirectUrlResponse;
 
 export type CompleteOnboardingPayload = (
   { is_student: true; student_id: string } | { is_student: false }
-) & { invite_code?: string };
+) & { full_name: string; invite_code?: string };
 
 export type StudentStatus = "student" | "not_student";

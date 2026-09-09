@@ -38,6 +38,7 @@ WITH onboarded AS (
     SET
         is_student = sqlc.arg(is_student),
         student_id = sqlc.arg(student_id),
+        full_name = sqlc.arg(full_name),
         onboarding_completed_at = NOW(),
         updated_at = NOW()
     WHERE id = sqlc.arg(id)

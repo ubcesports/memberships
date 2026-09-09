@@ -47,6 +47,11 @@ func (s *ProfileService) GetProfileByUserID(ctx context.Context, userID string) 
 }
 
 func (s *ProfileService) OnboardUser(ctx context.Context, userId string, onboardUserRequest dto.OnboardUserRequest) error {
+	fullName := strings.TrimSpace(onboardUserRequest.FullName)
+	if fullName == "" {
+		return fmt.Errorf("%w: full name is required", ErrValidation)
+	}
+
 	var studentID string
 
 	// Get user profile
@@ -89,6 +94,7 @@ func (s *ProfileService) OnboardUser(ctx context.Context, userId string, onboard
 	if err := s.profileRepository.OnboardUserByUserId(
 		ctx,
 		userId,
+		fullName,
 		onboardUserRequest.IsStudent,
 		studentID,
 		isExec,

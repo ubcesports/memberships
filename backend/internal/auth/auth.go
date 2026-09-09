@@ -78,6 +78,7 @@ func NewLimen(db *sql.DB) (*limen.Limen, error) {
 				}),
 				oauth.WithMapProfileToUser(func(info *limen.OAuthAccountProfile) map[string]any {
 					return map[string]any{
+						// Initial provider name is replaced by the user's onboarding input.
 						"full_name":  info.Name,
 						"avatar_url": info.AvatarURL,
 					}
@@ -113,10 +114,9 @@ WITH target_user AS (
 UPDATE users
 SET
     email = $3,
-    full_name = COALESCE(NULLIF($4, ''), full_name),
-    avatar_url = NULLIF($5, ''),
+    avatar_url = NULLIF($4, ''),
     email_verified_at = CASE
-        WHEN $6 THEN
+        WHEN $5 THEN
             CASE
                 WHEN email IS DISTINCT FROM $3 OR email_verified_at IS NULL THEN NOW()
                 ELSE email_verified_at
@@ -126,7 +126,7 @@ SET
     updated_at = NOW()
 WHERE id = (SELECT id FROM target_user)`
 
-	if _, err := db.ExecContext(ctx, query, provider, info.ID, info.Email, info.Name, info.AvatarURL, info.EmailVerified); err != nil {
+	if _, err := db.ExecContext(ctx, query, provider, info.ID, info.Email, info.AvatarURL, info.EmailVerified); err != nil {
 		return fmt.Errorf("sync oauth user profile: %w", err)
 	}
 

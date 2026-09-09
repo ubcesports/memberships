@@ -26,6 +26,7 @@ type UserProfilePanelProps = {
 };
 
 export type Draft = {
+  fullName: string;
   isStudent: boolean;
   studentId: string;
   role: RoleType;
@@ -34,6 +35,7 @@ export type Draft = {
 
 function toDraft(user: User): Draft {
   return {
+    fullName: user.full_name,
     isStudent: user.is_student,
     studentId: user.student_id ?? "",
     role: user.role,
@@ -60,6 +62,10 @@ function OptionalTime({ value }: { value: string | null }) {
 */
 export function buildUpdateBody(user: User, draft: Draft): UpdateUserRequest {
   const body: UpdateUserRequest = {};
+  const trimmedFullName = draft.fullName.trim();
+  if (trimmedFullName !== user.full_name) {
+    body.full_name = trimmedFullName;
+  }
   const trimmedStudentId = draft.studentId.trim();
 
   if (draft.isStudent !== user.is_student) {
@@ -95,6 +101,9 @@ export function buildUpdateBody(user: User, draft: Draft): UpdateUserRequest {
 }
 
 export function validateDraft(draft: Draft): string | null {
+  if (!draft.fullName.trim()) {
+    return "Full name is required.";
+  }
   if (draft.isStudent && !STUDENT_ID_PATTERN.test(draft.studentId.trim())) {
     return "Student ID must be an 8 digit number.";
   }
@@ -201,6 +210,23 @@ export function UserProfilePanel({ user, onSave, isSaving }: UserProfilePanelPro
       </div>
 
       <dl>
+        <DetailRow label="Full name">
+          {isEditing ? (
+            <input
+              type="text"
+              aria-label="Full name"
+              value={draft.fullName}
+              disabled={isSaving}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, fullName: event.target.value }))
+              }
+              className={`${FIELD_CLASS_NAME} w-full max-w-sm`}
+            />
+          ) : (
+            user.full_name
+          )}
+        </DetailRow>
+
         <DetailRow label="Student">
           {isEditing ? (
             <label className="flex items-center gap-2 text-sm text-brand-text">
