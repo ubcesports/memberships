@@ -10,17 +10,19 @@ import type { CompleteOnboardingPayload, StudentStatus } from "@/lib/types/user.
 const STUDENT_ID_PATTERN = /^\d{8}$/;
 
 export default function OnboardPage() {
+  const [fullName, setFullName] = useState("");
   const [studentStatus, setStudentStatus] = useState<StudentStatus | null>(null);
   const [studentId, setStudentId] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const isStudent = studentStatus === "student";
+  const normalizedFullName = fullName.trim();
   const normalizedStudentId = studentId.trim();
   const normalizedInviteCode = inviteCode.trim();
 
   const canSubmit = useMemo(() => {
-    if (!studentStatus) {
+    if (!normalizedFullName || !studentStatus) {
       return false;
     }
 
@@ -29,13 +31,13 @@ export default function OnboardPage() {
     }
 
     return true;
-  }, [isStudent, normalizedStudentId, studentStatus]);
+  }, [isStudent, normalizedFullName, normalizedStudentId, studentStatus]);
 
   const { mutate: submitOnboarding, isPending } = useMutation({
     mutationFn: async () => {
       const studentPayload: CompleteOnboardingPayload = isStudent
-        ? { is_student: true, student_id: normalizedStudentId }
-        : { is_student: false };
+        ? { full_name: normalizedFullName, is_student: true, student_id: normalizedStudentId }
+        : { full_name: normalizedFullName, is_student: false };
       const payload: CompleteOnboardingPayload = normalizedInviteCode
         ? { ...studentPayload, invite_code: normalizedInviteCode }
         : studentPayload;
@@ -61,6 +63,11 @@ export default function OnboardPage() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (!normalizedFullName) {
+      setValidationError("Enter your full name.");
+      return;
+    }
+
     if (!studentStatus) {
       setValidationError("Select whether you are a student.");
       return;
@@ -82,11 +89,16 @@ export default function OnboardPage() {
           <div className="border-b border-brand-border px-5 py-5 sm:px-6">
             <h1 className="mt-3 text-2xl font-semibold text-brand-text">Complete your profile</h1>
             <p className="mt-2 text-sm leading-6 text-brand-text-muted">
-              Confirm your student status before continuing.
+              Enter your full name and confirm your student status before continuing.
             </p>
           </div>
 
           <OnboardForm
+            fullName={fullName}
+            onFullNameChange={(value) => {
+              setFullName(value);
+              setValidationError(null);
+            }}
             studentStatus={studentStatus}
             studentId={studentId}
             inviteCode={inviteCode}

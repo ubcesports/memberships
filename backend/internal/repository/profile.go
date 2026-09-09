@@ -34,6 +34,7 @@ func (r *ProfileRepository) GetProfileByUserID(ctx context.Context, userId strin
 func (r *ProfileRepository) OnboardUserByUserId(
 	ctx context.Context,
 	userId string,
+	fullName string,
 	isStudent bool,
 	studentId string,
 	isExec bool,
@@ -46,6 +47,7 @@ func (r *ProfileRepository) OnboardUserByUserId(
 
 	err = r.store.OnboardUserByUserId(ctx, db.OnboardUserByUserIdParams{
 		ID:        pgUserId,
+		FullName:  fullName,
 		IsStudent: isStudent,
 		StudentID: pgtype.Text{
 			String: studentId,
