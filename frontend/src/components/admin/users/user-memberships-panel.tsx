@@ -1,18 +1,19 @@
 "use client";
 
 import { Ban, Loader2 } from "lucide-react";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useState } from "react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/action-button";
 import { DetailRow } from "@/components/detail-row";
 import { StatusBadge } from "@/components/status-badge";
 import { SurfacePanel } from "@/components/surface-panel";
+import { OfflineMembershipForm } from "@/components/admin/users/offline-membership-form";
 import type { UpdateUserRequest } from "@/lib/types/admin.types";
-import { useMembershipCatalog } from "@/lib/membership.hook";
 import { formatDate, formatTime } from "@/lib/utils/formatting";
 import { titleCase } from "@/lib/utils/groups";
 
 type UserMembershipsPanelProps = {
+  userId: string;
   memberships: Membership[];
   onSave: (body: UpdateUserRequest) => Promise<unknown>;
   isSaving: boolean;
@@ -65,7 +66,7 @@ function TransactionDetails({ membership }: { membership: Membership }) {
           <div>{titleCase(tx.purchase_type)}</div>
         </div>
         <div>
-          <div className="font-medium text-brand-text">Purchase type</div>
+          <div className="font-medium text-brand-text">Payment method</div>
           <div>{titleCase(tx.payment_method)}</div>
         </div>
         <div>
@@ -77,8 +78,12 @@ function TransactionDetails({ membership }: { membership: Membership }) {
   );
 }
 
-export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMembershipsPanelProps) {
-  const { data: catalog } = useMembershipCatalog();
+export function UserMembershipsPanel({
+  userId,
+  memberships,
+  onSave,
+  isSaving,
+}: UserMembershipsPanelProps) {
   const [pendingCancellationId, setPendingCancellationId] = useState<string | null>(null);
 
   const activeMemberships = memberships.filter(
@@ -106,6 +111,8 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
 
   return (
     <div className="flex flex-col gap-4">
+      <OfflineMembershipForm userId={userId} />
+
       <SurfacePanel className="bg-transparent">
         <div className="border-b border-brand-border px-5 py-4">
           <h2 className="text-base font-semibold text-brand-text">Current memberships</h2>

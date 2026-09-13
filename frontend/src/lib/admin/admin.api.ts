@@ -7,9 +7,10 @@ import type {
   UserResponse,
   UsersResponse,
   AuditLogResponse,
+  AddOfflineMembershipRequest,
 } from "@/lib/types/admin.types";
 import type { User } from "@/lib/types/user.types";
-import { Membership } from "../types/membership.types";
+import type { EligibleMembershipTier, Membership } from "../types/membership.types";
 
 export function buildAdminUserParams(
   appliedSearch: AppliedSearch,
@@ -71,6 +72,25 @@ export async function fetchUserMemberships(
   });
 
   return response.data ?? [];
+}
+
+export async function fetchEligibleMembershipsForUser(
+  userId: string,
+  signal?: AbortSignal,
+): Promise<EligibleMembershipTier[]> {
+  const response = await apiClient.get<EligibleMembershipTier[]>(
+    `/admin/memberships/eligible/${userId}`,
+    { signal },
+  );
+
+  return response.data ?? [];
+}
+
+export async function addOfflineMembership(
+  userId: string,
+  body: AddOfflineMembershipRequest,
+): Promise<void> {
+  await apiClient.post(`/admin/membership/add/${userId}`, body);
 }
 
 export async function updateUser(userId: string, body: UpdateUserRequest): Promise<User> {
