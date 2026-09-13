@@ -82,6 +82,8 @@ func provideRouter(params RouterParams) *chi.Mux {
 		r.Patch("/admin/users/{id}", params.AdminHandler.UpdateUser)
 		r.Get("/admin/audit-logs", params.AdminHandler.GetAdminAuditLogs)
 		r.Get("/admin/audit-logs/export", params.AdminHandler.ExportAuditLogsCSV)
+		r.Post("/admin/membership/add/{id}", params.AdminHandler.AddMembershipToUser)
+		r.Get("/admin/memberships/eligible/{id}", params.AdminHandler.GetEligibleTiersWithPricesById)
 	})
 
 	return r

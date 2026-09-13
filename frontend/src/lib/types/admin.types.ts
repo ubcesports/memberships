@@ -1,5 +1,5 @@
 import type { GroupType, RoleType, User } from "./user.types";
-import type { Membership, Transaction } from "./membership.types";
+import type { PaymentMethod } from "./membership.types";
 
 export type SearchMode = "full_name" | "email" | "student_id";
 
@@ -60,6 +60,13 @@ export type UpdateUserRequest = {
   groups_remove?: GroupType[];
   role?: RoleType;
   cancel_membership_id?: string;
+};
+
+export type OfflinePaymentMethod = Exclude<PaymentMethod, "stripe">;
+
+export type AddOfflineMembershipRequest = {
+  tier_id: string;
+  payment_method: OfflinePaymentMethod;
 };
 
 export type AdminPagination = {

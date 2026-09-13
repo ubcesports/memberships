@@ -142,6 +142,49 @@ func (ns NullMembershipExpirationType) Value() (driver.Value, error) {
 	return string(ns.MembershipExpirationType), nil
 }
 
+type PaymentMethodType string
+
+const (
+	PaymentMethodTypeStripe    PaymentMethodType = "stripe"
+	PaymentMethodTypeCash      PaymentMethodType = "cash"
+	PaymentMethodTypeEtransfer PaymentMethodType = "etransfer"
+)
+
+func (e *PaymentMethodType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PaymentMethodType(s)
+	case string:
+		*e = PaymentMethodType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PaymentMethodType: %T", src)
+	}
+	return nil
+}
+
+type NullPaymentMethodType struct {
+	PaymentMethodType PaymentMethodType
+	Valid             bool // Valid is true if PaymentMethodType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPaymentMethodType) Scan(value interface{}) error {
+	if value == nil {
+		ns.PaymentMethodType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PaymentMethodType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPaymentMethodType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PaymentMethodType), nil
+}
+
 type PurchaseType string
 
 const (
@@ -361,6 +404,7 @@ type Transaction struct {
 	PurchaseType            NullPurchaseType
 	StripeCheckoutSessionID pgtype.Text
 	TierID                  pgtype.UUID
+	PaymentMethod           PaymentMethodType
 }
 
 type User struct {

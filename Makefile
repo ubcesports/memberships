@@ -3,7 +3,7 @@ ifneq (,$(wildcard backend/.env))
     export
 endif
 
-.PHONY: be fe dev build-be build-fe sqlc migration-new migration-up migration-down seed DB_CHECK
+.PHONY: be fe dev stripe-webhook build-be build-fe sqlc migration-new migration-up migration-down seed DB_CHECK
 
 # nextjs commands
 
@@ -21,11 +21,18 @@ be:
 build-be:
 	cd backend && go build -o bin/api cmd/api/main.go
 
+# stripe related
+
+stripe-webhook:
+	stripe listen --forward-to localhost:8080/webhooks/stripe
+
 # run both backend + frontend
 dev:
 	npx concurrently \
 		"make be" \
-		"make fe"
+		"make fe" \
+		"make stripe-webhook"
+
 
 # sqlc commands
 

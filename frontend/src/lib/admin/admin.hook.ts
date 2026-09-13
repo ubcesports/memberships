@@ -5,8 +5,11 @@ import {
   fetchUsers,
   updateUser,
   fetchAuditLogs,
+  fetchEligibleMembershipsForUser,
+  addOfflineMembership,
 } from "./admin.api";
 import type {
+  AddOfflineMembershipRequest,
   AdminUserFilters,
   AdminPagination,
   AppliedSearch,
@@ -44,6 +47,34 @@ export function useUserMemberships(userId: string, options?: { enabled?: boolean
     queryFn: ({ signal }) => fetchUserMemberships(userId, signal),
     enabled: (options?.enabled ?? true) && Boolean(userId),
     retry: false,
+  });
+}
+
+export function useAdminEligibleMemberships(userId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ["admin", "user", userId, "eligible-memberships"],
+    queryFn: ({ signal }) => fetchEligibleMembershipsForUser(userId, signal),
+    enabled: (options?.enabled ?? true) && Boolean(userId),
+    retry: false,
+  });
+}
+
+export function useAddOfflineMembership(userId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: AddOfflineMembershipRequest) => addOfflineMembership(userId, body),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["admin", "user", userId, "memberships"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["admin", "user", userId, "eligible-memberships"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
+      ]);
+    },
   });
 }
 

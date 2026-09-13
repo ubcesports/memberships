@@ -60,6 +60,7 @@ SELECT
     t.student_at_purchase,
     t.stripe_payment_intent_id,
     t.group_at_purchase,
+    t.payment_method,
     mp.id AS program_id,
     mp.program_name
 FROM memberships m
@@ -91,6 +92,7 @@ SELECT
     t.purchase_type,
     t.stripe_payment_intent_id,
     t.group_at_purchase,
+    t.payment_method,
     mp.id AS program_id,
     mp.program_name
 FROM memberships m
@@ -192,6 +194,7 @@ INSERT INTO transactions (
     group_at_purchase,
     student_at_purchase,
     purchase_type,
+    payment_method,
     status
 )
 VALUES (
@@ -200,16 +203,18 @@ VALUES (
     $3,
     $4,
     $5,
+    $6,
     'pending'
 )
 RETURNING id;
 
--- name: PutStripeCheckoutSessionId :exec
+-- name: PutStripeCheckoutSessionId :execrows
 UPDATE transactions
 SET
     stripe_checkout_session_id = $2,
     updated_at = NOW()
-WHERE id = $1;
+WHERE id = $1
+  AND status = 'pending';
 
 -- name: UpdateTransactionStatusById :exec
 UPDATE transactions
@@ -240,6 +245,23 @@ FROM transactions AS t
 JOIN membership_tiers AS mt
     ON mt.id = t.tier_id
 WHERE t.stripe_checkout_session_id = $1
+FOR UPDATE OF t;
+
+-- name: GetTransactionByTransactionIdForUpdate :one
+SELECT
+    t.id,
+    t.user_id,
+    t.membership_id,
+    t.tier_id,
+    t.status,
+    t.purchase_type,
+    t.stripe_checkout_session_id,
+    mt.program_id,
+    mt.expiration_type
+FROM transactions AS t
+JOIN membership_tiers AS mt
+    ON mt.id = t.tier_id
+WHERE t.id = $1
 FOR UPDATE OF t;
 
 -- name: CompleteTransaction :exec

@@ -49,3 +49,11 @@ const (
 	MembershipExpirationYear     MembershipExpirationType = "year"
 	MembershipExpirationDay      MembershipExpirationType = "day"
 )
+
+type PaymentMethodType string
+
+const (
+	PaymentMethodStripe    PaymentMethodType = "stripe"
+	PaymentMethodCash      PaymentMethodType = "cash"
+	PaymentMethodEtransfer PaymentMethodType = "etransfer"
+)
