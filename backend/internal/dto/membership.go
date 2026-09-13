@@ -63,6 +63,7 @@ type TransactionDTO struct {
 	PurchaseType          PurchaseType          `json:"purchase_type"`
 	StripePaymentIntentId string                `json:"stripe_payment_intent_id"`
 	StudentAtPurchase     bool                  `json:"student_at_purchase"`
+	PaymentMethod         PaymentMethodType     `json:"payment_method"`
 	AmountPaidCents       int64                 `json:"-"`
 }
 

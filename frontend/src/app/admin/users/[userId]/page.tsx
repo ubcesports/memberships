@@ -124,6 +124,7 @@ export default function AdminUserDetailPage({ params }: AdminUserDetailPageProps
             />
           ) : (
             <UserMembershipsPanel
+              userId={userId}
               memberships={memberships ?? []}
               onSave={handleSave}
               isSaving={isSaving}

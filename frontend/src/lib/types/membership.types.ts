@@ -7,6 +7,8 @@ export type MembershipStatus = "active" | "expired" | "cancelled";
 
 export type PurchaseType = "new" | "upgrade";
 
+export type PaymentMethod = "stripe" | "cash" | "etransfer";
+
 export type MembershipExpirationType = "day" | "semester" | "year";
 
 export type MembershipTierPrice = {
@@ -42,6 +44,7 @@ export type Transaction = {
   student_at_purchase: boolean;
   stripe_payment_intent_id: string;
   purchase_type: PurchaseType;
+  payment_method: PaymentMethod;
 };
 
 export type Membership = {
