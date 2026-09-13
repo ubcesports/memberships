@@ -29,6 +29,15 @@ type CreateMembershipParams struct {
 	ExpiresAt time.Time
 }
 
+type CreateMembershipAuditLogParams struct {
+	ActorUserId  string
+	TargetUserId string
+	Action       string
+	Outcome      db.AdminAuditOutcomeType
+	RequestId    string
+	Description  string
+}
+
 type CompleteTransactionParams struct {
 	TransactionId         string
 	MembershipId          string
@@ -131,6 +140,7 @@ func (r *MembershipRepository) GetCurrentMembershipsWithTransactions(ctx context
 			CancelledAt: util.TimestampPointer(m.CancelledAt),
 			ProgramName: m.ProgramName,
 			ProgramId:   m.ProgramID.String(),
+			Slug:        m.Slug.String,
 			Transaction: dto.TransactionDTO{
 				ID:                    m.TransactionID.String(),
 				AmountPaid:            fmt.Sprintf("%.2f", float64(m.AmountPaidCents.Int64)/100),
@@ -139,6 +149,7 @@ func (r *MembershipRepository) GetCurrentMembershipsWithTransactions(ctx context
 				StudentAtPurchase:     m.StudentAtPurchase.Bool,
 				StripePaymentIntentId: m.StripePaymentIntentID.String,
 				PurchaseType:          dto.PurchaseType(m.PurchaseType.PurchaseType),
+				AmountPaidCents:       m.AmountPaidCents.Int64,
 			},
 		}
 	}
@@ -186,11 +197,14 @@ func (r *MembershipRepository) ExpirePendingTransactionById(ctx context.Context,
 	return r.store.ExpirePendingTransactionById(ctx, pgTransactionId)
 }
 
-func (r *MembershipRepository) PutStripeCheckoutSessionId(ctx context.Context, transactionId string, stripeCheckoutSessionId string) error {
+func (r *MembershipRepository) PutStripeCheckoutSessionId(
+	ctx context.Context,
+	transactionId string,
+	stripeCheckoutSessionId string,
+) (int64, error) {
 	var pgTransactionId pgtype.UUID
-
 	if err := pgTransactionId.Scan(transactionId); err != nil {
-		return err
+		return 0, err
 	}
 
 	return r.store.PutStripeCheckoutSessionId(ctx, db.PutStripeCheckoutSessionIdParams{
@@ -326,6 +340,30 @@ func (r *MembershipRepository) CompleteTransaction(ctx context.Context, params C
 		AmountPaidCents: pgtype.Int8{
 			Int64: params.AmountPaidCents,
 			Valid: true,
+		},
+	})
+}
+
+func (r *MembershipRepository) CreateMembershipAuditLog(ctx context.Context, params CreateMembershipAuditLogParams) error {
+	actorUserId, err := util.GetValidatedUUID(params.ActorUserId)
+	if err != nil {
+		return fmt.Errorf("invalid audit actor user ID: %w", err)
+	}
+
+	targetUserId, err := util.GetValidatedUUID(params.TargetUserId)
+	if err != nil {
+		return fmt.Errorf("invalid audit target user ID: %w", err)
+	}
+
+	return r.store.CreateAdminAuditLog(ctx, db.CreateAdminAuditLogParams{
+		ActorUserID:  actorUserId,
+		Action:       params.Action,
+		TargetUserID: targetUserId,
+		Outcome:      params.Outcome,
+		RequestID:    params.RequestId,
+		Description: pgtype.Text{
+			String: params.Description,
+			Valid:  params.Description != "",
 		},
 	})
 }

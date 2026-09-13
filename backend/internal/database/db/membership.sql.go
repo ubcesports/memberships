@@ -734,12 +734,13 @@ func (q *Queries) GetTransactionByTransactionIdForUpdate(ctx context.Context, id
 	return i, err
 }
 
-const putStripeCheckoutSessionId = `-- name: PutStripeCheckoutSessionId :exec
+const putStripeCheckoutSessionId = `-- name: PutStripeCheckoutSessionId :execrows
 UPDATE transactions
 SET
     stripe_checkout_session_id = $2,
     updated_at = NOW()
 WHERE id = $1
+  AND status = 'pending'
 `
 
 type PutStripeCheckoutSessionIdParams struct {
@@ -747,9 +748,12 @@ type PutStripeCheckoutSessionIdParams struct {
 	StripeCheckoutSessionID pgtype.Text
 }
 
-func (q *Queries) PutStripeCheckoutSessionId(ctx context.Context, arg PutStripeCheckoutSessionIdParams) error {
-	_, err := q.db.Exec(ctx, putStripeCheckoutSessionId, arg.ID, arg.StripeCheckoutSessionID)
-	return err
+func (q *Queries) PutStripeCheckoutSessionId(ctx context.Context, arg PutStripeCheckoutSessionIdParams) (int64, error) {
+	result, err := q.db.Exec(ctx, putStripeCheckoutSessionId, arg.ID, arg.StripeCheckoutSessionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updatePendingTransactionStatusByCheckoutId = `-- name: UpdatePendingTransactionStatusByCheckoutId :exec

@@ -558,9 +558,11 @@ Returns:
 
 Raises:
 
-	400: invalid request body/id
+	400: invalid request body, user ID, tier ID, or payment method
 	401: user is not authenticated
 	403: user is not an admin
+	403: selected membership tier is unavailable or purchases are closed
+	409: an already-paid checkout is still being processed
 	500: membership could not be added to user
 */
 func (h *AdminHandler) AddMembershipToUser(w http.ResponseWriter, r *http.Request) {
@@ -594,28 +596,102 @@ func (h *AdminHandler) AddMembershipToUser(w http.ResponseWriter, r *http.Reques
 	)
 	if err != nil {
 		switch {
-		case errors.Is(err, service.ErrValidation):
-			util.WriteApiResponse(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), requestId)
+		case errors.Is(err, service.ErrOfflinePaymentMethod):
+			util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_PAYMENT_METHOD", service.ErrOfflinePaymentMethod.Error(), requestId)
 
-		case errors.Is(err, service.ErrNotFound):
-			util.WriteApiResponse(w, http.StatusNotFound, "NOT_FOUND", err.Error(), requestId)
+		case errors.Is(err, service.ErrInvalidMembershipTier):
+			util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_TIER_ID", service.ErrInvalidMembershipTier.Error(), requestId)
 
-		case errors.Is(err, service.ErrConflict):
-			util.WriteApiResponse(w, http.StatusConflict, "CONFLICT", err.Error(), requestId)
+		case errors.Is(err, service.ErrTierNotEligible):
+			util.WriteApiResponse(w, http.StatusForbidden, "TIER_NOT_AVAILABLE", service.ErrTierNotEligible.Error(), requestId)
+
+		case errors.Is(err, service.ErrMembershipPurchaseClosed):
+			util.WriteApiResponse(w, http.StatusForbidden, "MEMBERSHIP_PURCHASE_CLOSED", service.ErrMembershipPurchaseClosed.Error(), requestId)
+
+		case errors.Is(err, service.ErrPendingCheckoutAlreadyPaid):
+			util.WriteApiResponse(w, http.StatusConflict, "CHECKOUT_ALREADY_PAID", service.ErrPendingCheckoutAlreadyPaid.Error(), requestId)
 
 		default:
-			slog.ErrorContext(r.Context(), "unable to update user",
+			slog.ErrorContext(r.Context(), "unable to add membership to user",
 				"error", err,
 				"request_id", requestId,
 				"user_id", targetUserId,
 			)
-			util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to update user. Please try again.", requestId)
+			util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to add membership. Please try again.", requestId)
 		}
 
 		return
 	}
 
 	util.WriteJson(w, http.StatusOK, nil)
+}
+
+/*
+Returns membership tiers and prices the target user
+
+For exec/director/board members:
+
+	Executive Pass
+
+For competitive team players:
+
+	Competitive Team Pass
+
+For regular UBC students:
+
+	Day pass with student price
+	Basic pass with student price
+	Lounge pass with student price
+
+For regular non-students:
+
+	Day pass with non-student price
+	Basic pass with non-student price
+	Lounge pass with non-student price
+
+API URL: GET /admin/membership/eligible/{id}
+
+Args:
+
+	auth.Session user id
+	id (query param): id of the user to fetch the eligible memberships of
+
+Returns:
+
+	[]dto.EligibleMembershipTierDTO (HTTP 200)
+
+Raises:
+
+	401: user is not authenticated
+	500: eligible membership tiers and prices could not be retrieved
+*/
+func (h *AdminHandler) GetEligibleTiersWithPricesById(w http.ResponseWriter, r *http.Request) {
+	requestId := middleware.GetReqID(r.Context())
+
+	_, ok := util.CurrentUserID(r)
+	if !ok {
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestId)
+		return
+	}
+
+	targetUserId := chi.URLParam(r, "id")
+	if _, err := util.GetValidatedUUID(targetUserId); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid user ID.", requestId)
+		return
+	}
+
+	tiers, err := h.membershipService.GetEligibleTiersWithPrices(r.Context(), targetUserId)
+	if err != nil {
+		slog.ErrorContext(r.Context(), "unable to load eligible membership tiers", "error", err, "request_id", requestId, "user_id", targetUserId)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to load eligible membership tiers", requestId)
+		return
+	}
+
+	if tiers != nil {
+		util.WriteJson(w, 200, tiers)
+	} else {
+		util.WriteJson(w, 200, nil)
+	}
 }
 
 /*

@@ -208,12 +208,13 @@ VALUES (
 )
 RETURNING id;
 
--- name: PutStripeCheckoutSessionId :exec
+-- name: PutStripeCheckoutSessionId :execrows
 UPDATE transactions
 SET
     stripe_checkout_session_id = $2,
     updated_at = NOW()
-WHERE id = $1;
+WHERE id = $1
+  AND status = 'pending';
 
 -- name: UpdateTransactionStatusById :exec
 UPDATE transactions
