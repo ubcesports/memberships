@@ -90,16 +90,16 @@ function BenefitList({ benefits, limitations }: { benefits: string[]; limitation
 
   return (
     <ul className="mt-4 grid gap-2 text-sm text-brand-text-muted">
-      {limitations.map((limitation) => (
-        <li key={limitation} className="flex gap-3">
-          <X aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-red-300" />
-          <span>{limitation}</span>
-        </li>
-      ))}
       {benefits.map((benefit) => (
         <li key={benefit} className="flex gap-3">
           <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-blue-200" />
           <span>{benefit}</span>
+        </li>
+      ))}
+      {limitations.map((limitation) => (
+        <li key={limitation} className="flex gap-3">
+          <X aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-red-300" />
+          <span>{limitation}</span>
         </li>
       ))}
     </ul>

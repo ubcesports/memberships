@@ -26,16 +26,16 @@ export function AssignedPassCard({ tier, checkoutPending, onCheckout }: Assigned
           </p>
           {tier.benefits.length > 0 || tier.limitations.length > 0 ? (
             <ul className="mt-4 grid gap-2 text-sm text-brand-text-muted">
-              {tier.limitations.map((limitation) => (
-                <li key={limitation} className="flex gap-3">
-                  <X aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-red-300" />
-                  <span>{limitation}</span>
-                </li>
-              ))}
               {tier.benefits.map((benefit) => (
                 <li key={benefit} className="flex gap-3">
                   <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-blue-200" />
                   <span>{benefit}</span>
+                </li>
+              ))}
+              {tier.limitations.map((limitation) => (
+                <li key={limitation} className="flex gap-3">
+                  <X aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-red-300" />
+                  <span>{limitation}</span>
                 </li>
               ))}
             </ul>
