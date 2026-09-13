@@ -29,3 +29,8 @@ type AdminAuditLogActor struct {
 	ActorFullName  string `json:"actor_full_name"`
 	ActorAvatarURL string `json:"actor_avatar_url"`
 }
+
+type AdminAddMembershipToUserRequest struct {
+	TierId        string            `json:"tier_id"`
+	PaymentMethod PaymentMethodType `json:"payment_method"`
+}

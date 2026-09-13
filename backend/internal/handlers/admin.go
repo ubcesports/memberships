@@ -19,15 +19,16 @@ import (
 )
 
 type AdminHandler struct {
-	adminService *service.AdminService
+	adminService      *service.AdminService
+	membershipService *service.MembershipService
 }
 
 /*
 	Public functions
 */
 
-func NewAdminHandler(adminService *service.AdminService) *AdminHandler {
-	return &AdminHandler{adminService: adminService}
+func NewAdminHandler(adminService *service.AdminService, membershipService *service.MembershipService) *AdminHandler {
+	return &AdminHandler{adminService: adminService, membershipService: membershipService}
 }
 
 /*
@@ -539,6 +540,82 @@ func (h *AdminHandler) ExportAuditLogsCSV(w http.ResponseWriter, r *http.Request
 		)
 		return
 	}
+}
+
+/*
+Creates a new cash/etransfer membership for a user
+
+API URL: POST /admin/membership/add/{id}
+
+Args:
+
+	id (query param): user id of person to add the membership to
+	AdminAddMembershipToUserRequest (request body): as seen in dto/admin.go
+
+Returns:
+
+	None: (HTTP 200)
+
+Raises:
+
+	400: invalid request body/id
+	401: user is not authenticated
+	403: user is not an admin
+	500: membership could not be added to user
+*/
+func (h *AdminHandler) AddMembershipToUser(w http.ResponseWriter, r *http.Request) {
+	requestId := middleware.GetReqID(r.Context())
+
+	// Get current user id
+	actorId, ok := util.CurrentUserID(r)
+	if !ok {
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestId)
+		return
+	}
+
+	targetUserId := chi.URLParam(r, "id")
+	if _, err := util.GetValidatedUUID(targetUserId); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid user ID.", requestId)
+		return
+	}
+
+	var addMembershipRequest dto.AdminAddMembershipToUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&addMembershipRequest); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again.", requestId)
+		return
+	}
+
+	err := h.membershipService.AddMembershipToUser(
+		r.Context(),
+		actorId,
+		targetUserId,
+		requestId,
+		addMembershipRequest,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrValidation):
+			util.WriteApiResponse(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), requestId)
+
+		case errors.Is(err, service.ErrNotFound):
+			util.WriteApiResponse(w, http.StatusNotFound, "NOT_FOUND", err.Error(), requestId)
+
+		case errors.Is(err, service.ErrConflict):
+			util.WriteApiResponse(w, http.StatusConflict, "CONFLICT", err.Error(), requestId)
+
+		default:
+			slog.ErrorContext(r.Context(), "unable to update user",
+				"error", err,
+				"request_id", requestId,
+				"user_id", targetUserId,
+			)
+			util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to update user. Please try again.", requestId)
+		}
+
+		return
+	}
+
+	util.WriteJson(w, http.StatusOK, nil)
 }
 
 /*

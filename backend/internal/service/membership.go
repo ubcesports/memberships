@@ -137,6 +137,7 @@ func (s *MembershipService) GetAllMembershipsWithTransactions(ctx context.Contex
 				StudentAtPurchase:     membership.StudentAtPurchase.Bool,
 				StripePaymentIntentId: membership.StripePaymentIntentID.String,
 				PurchaseType:          dto.PurchaseType(membership.PurchaseType.PurchaseType),
+				PaymentMethod:         dto.PaymentMethodType(membership.PaymentMethod),
 			},
 		}
 		returnMemberships = append(returnMemberships, membershipDto)
@@ -232,6 +233,7 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 		GroupAtPurchase:   getGroupAtPurchase(profile.Groups),
 		StudentAtPurchase: profile.IsStudent,
 		PurchaseType:      selectedTier.PurchaseType,
+		PaymentMethod:     dto.PaymentMethodStripe,
 	})
 	if err != nil {
 		return nil, err
@@ -256,7 +258,7 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 		return nil, err
 	}
 
-	// Put strile checkout session id into pending transaction
+	// Put stripe checkout session id into pending transaction
 	err = s.membershipRepo.PutStripeCheckoutSessionId(ctx, transactionId, session.ID)
 	if err != nil {
 		_, expireErr := s.stripeClient.ExpireCheckoutSession(ctx, session.ID)
@@ -268,6 +270,124 @@ func (s *MembershipService) CreateCheckoutSession(ctx context.Context, userId st
 	}
 
 	return &dto.CheckoutSessionResponse{Url: session.URL}, nil
+}
+
+func (s *MembershipService) AddMembershipToUser(ctx context.Context, actorId string, targetUserId string, requestId string, addMembershipRequest dto.AdminAddMembershipToUserRequest) error {
+	var fulfilled *fulfilledPurchase
+
+	// 1. Let the centralized eligibility service determine whether the
+	// requested tier can be purchased, its purchase type, and final price.
+	eligibleTiers, err := s.eligibilityService.GetEligibleTiers(
+		ctx,
+		targetUserId,
+	)
+	if err != nil {
+		return err
+	}
+
+	// 2. Check if user is eligible for this tier
+	var selectedTier *dto.EligibleMembershipTierDTO
+	for _, t := range eligibleTiers {
+		if addMembershipRequest.TierId == t.ID {
+			selectedTier = &t
+			break
+		}
+	}
+	if selectedTier == nil {
+		return ErrTierNotEligible
+	}
+
+	// 3. Check whether purchases are currently closed.
+	isClosed, err := membershippolicy.IsPurchaseClosed(time.Now(), selectedTier.ExpirationType)
+	if err != nil {
+		return err
+	}
+	if isClosed {
+		return ErrMembershipPurchaseClosed
+	}
+
+	// 4. If there is a pending transaction, then expire it
+	err = s.membershipRepo.WithTx(ctx, func(mr *repository.MembershipRepository) error {
+		pending, err := mr.GetPendingTransactionForUpdate(ctx, targetUserId)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		err = mr.ExpirePendingTransactionById(ctx, pending.ID.String())
+		if err != nil {
+			return err
+		}
+
+		// 5. Create new membership and transaction
+
+		// Get user profile to create checkout session with their email
+		profile, err := s.profileService.GetProfileByUserID(ctx, targetUserId)
+		if err != nil {
+			return err
+		}
+
+		// Create new pending transaction
+		transactionId, err := s.membershipRepo.CreatePendingTransaction(ctx, repository.CreatePendingTransactionParams{
+			UserId:            targetUserId,
+			TierId:            selectedTier.ID,
+			GroupAtPurchase:   getGroupAtPurchase(profile.Groups),
+			StudentAtPurchase: profile.IsStudent,
+			PurchaseType:      selectedTier.PurchaseType,
+			PaymentMethod:     addMembershipRequest.PaymentMethod,
+		})
+		if err != nil {
+			return err
+		}
+
+		transaction, err := mr.GetTransactionByTransactionIdForUpdate(ctx, transactionId)
+		if err != nil {
+			return err
+		}
+
+		// 7. Create the fulfilled membership.
+		expiresAt, err := membershippolicy.MembershipExpiresAt(time.Now(), dto.MembershipExpirationType(transaction.ExpirationType))
+		if err != nil {
+			return err
+		}
+		membershipId, err := mr.CreateMembership(ctx, repository.CreateMembershipParams{
+			UserId:    transaction.UserID.String(),
+			TierId:    transaction.TierID.String(),
+			StartedAt: time.Now(),
+			ExpiresAt: expiresAt,
+		})
+		if err != nil {
+			return err
+		}
+
+		// 8. Record payment details and mark the transaction completed.
+		if err := mr.CompleteTransaction(ctx, repository.CompleteTransactionParams{
+			TransactionId:         transaction.ID.String(),
+			MembershipId:          membershipId,
+			StripePaymentIntentId: "",
+			AmountPaidCents:       int64(selectedTier.Price.Price * 100),
+		}); err != nil {
+			return err
+		}
+
+		fulfilled = &fulfilledPurchase{
+			userId:       transaction.UserID.String(),
+			tierId:       transaction.TierID.String(),
+			purchaseType: transaction.PurchaseType.PurchaseType,
+			amountCents:  int64(selectedTier.Price.Price * 100),
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if fulfilled != nil {
+		s.sendPurchaseEmail(ctx, *fulfilled)
+	}
+	return nil
 }
 
 /*

@@ -19,6 +19,7 @@ type CreatePendingTransactionParams struct {
 	GroupAtPurchase   dto.GroupType
 	StudentAtPurchase bool
 	PurchaseType      dto.PurchaseType
+	PaymentMethod     dto.PaymentMethodType
 }
 
 type CreateMembershipParams struct {
@@ -249,6 +250,7 @@ func (r *MembershipRepository) CreatePendingTransaction(ctx context.Context, par
 			PurchaseType: db.PurchaseType(params.PurchaseType),
 			Valid:        true,
 		},
+		PaymentMethod: db.PaymentMethodType(params.PaymentMethod),
 	}
 
 	id, err := r.store.CreatePendingTransaction(ctx, dbParams)
@@ -264,6 +266,15 @@ func (r *MembershipRepository) GetTransactionByCheckoutSessionIdForUpdate(ctx co
 		String: checkoutId,
 		Valid:  true,
 	})
+}
+
+func (r *MembershipRepository) GetTransactionByTransactionIdForUpdate(ctx context.Context, transactionId string) (db.GetTransactionByTransactionIdForUpdateRow, error) {
+	var pgTransactionId pgtype.UUID
+	if err := pgTransactionId.Scan(transactionId); err != nil {
+		return db.GetTransactionByTransactionIdForUpdateRow{}, err
+	}
+
+	return r.store.GetTransactionByTransactionIdForUpdate(ctx, pgTransactionId)
 }
 
 func (r *MembershipRepository) CreateMembership(ctx context.Context, params CreateMembershipParams) (string, error) {

@@ -41,6 +41,10 @@ function TransactionDetails({ membership }: { membership: Membership }) {
     <div className="px-5 py-4 text-sm text-brand-text-muted">
       <div className="grid grid-cols-2 gap-4">
         <div>
+          <div className="font-medium text-brand-text">Membership ID</div>
+          <div>{membership.id}</div>
+        </div>
+        <div>
           <div className="font-medium text-brand-text">Transaction ID</div>
           <div>{tx.id}</div>
         </div>
@@ -59,6 +63,10 @@ function TransactionDetails({ membership }: { membership: Membership }) {
         <div>
           <div className="font-medium text-brand-text">Purchase type</div>
           <div>{titleCase(tx.purchase_type)}</div>
+        </div>
+        <div>
+          <div className="font-medium text-brand-text">Purchase type</div>
+          <div>{titleCase(tx.payment_method)}</div>
         </div>
         <div>
           <div className="font-medium text-brand-text">Stripe payment intent ID</div>
