@@ -237,6 +237,7 @@ SELECT
     mt.title,
     mt.description,
     mt.benefits,
+    mt.limitations,
     mt.stripe_product_id,
     mt.slug,
     mt."group" AS required_group,
@@ -262,6 +263,7 @@ type GetActiveTiersWithPricesRow struct {
 	Title             string
 	Description       pgtype.Text
 	Benefits          []string
+	Limitations       []string
 	StripeProductID   pgtype.Text
 	Slug              pgtype.Text
 	RequiredGroup     NullGroupType
@@ -287,6 +289,7 @@ func (q *Queries) GetActiveTiersWithPrices(ctx context.Context) ([]GetActiveTier
 			&i.Title,
 			&i.Description,
 			&i.Benefits,
+			&i.Limitations,
 			&i.StripeProductID,
 			&i.Slug,
 			&i.RequiredGroup,
@@ -509,6 +512,7 @@ SELECT
     mt.title,
     mt.description,
     mt.benefits,
+    mt.limitations,
     mt.slug,
     mt.stripe_product_id,
     mt.expiration_type,
@@ -530,6 +534,7 @@ type GetPublicTiersAndPricesRow struct {
 	Title             string
 	Description       pgtype.Text
 	Benefits          []string
+	Limitations       []string
 	Slug              pgtype.Text
 	StripeProductID   pgtype.Text
 	ExpirationType    MembershipExpirationType
@@ -554,6 +559,7 @@ func (q *Queries) GetPublicTiersAndPrices(ctx context.Context) ([]GetPublicTiers
 			&i.Title,
 			&i.Description,
 			&i.Benefits,
+			&i.Limitations,
 			&i.Slug,
 			&i.StripeProductID,
 			&i.ExpirationType,
@@ -579,6 +585,7 @@ SELECT
     mt.title,
     mt.description,
     mt.benefits,
+    mt.limitations,
     mt.slug,
     mt.stripe_product_id,
     mt.expiration_type,
@@ -600,6 +607,7 @@ type GetTierByTierIdRow struct {
 	Title             string
 	Description       pgtype.Text
 	Benefits          []string
+	Limitations       []string
 	Slug              pgtype.Text
 	StripeProductID   pgtype.Text
 	ExpirationType    MembershipExpirationType
@@ -618,6 +626,7 @@ func (q *Queries) GetTierByTierId(ctx context.Context, id pgtype.UUID) (GetTierB
 		&i.Title,
 		&i.Description,
 		&i.Benefits,
+		&i.Limitations,
 		&i.Slug,
 		&i.StripeProductID,
 		&i.ExpirationType,

@@ -1,4 +1,4 @@
-import { CalendarDays, Check, Ticket } from "lucide-react";
+import { CalendarDays, Check, Ticket, X } from "lucide-react";
 import { PurchaseButton } from "@/components/membership/purchase-button";
 import {
   formatMembershipExpiration,
@@ -40,7 +40,7 @@ export function AdditionalTierCard({
           <p className="mt-2 max-w-2xl text-sm leading-6 text-brand-text-muted">
             {tier.description || `${tier.title} UBCEA membership pass.`}
           </p>
-          <BenefitList benefits={tier.benefits} />
+          <BenefitList limitations={tier.limitations} benefits={tier.benefits} />
           {!eligibleTier ? <InlinePublicPrices tier={tier} /> : null}
         </div>
       </div>
@@ -83,13 +83,19 @@ export function AdditionalTierCard({
   );
 }
 
-function BenefitList({ benefits }: { benefits: string[] }) {
-  if (benefits.length === 0) {
+function BenefitList({ benefits, limitations }: { benefits: string[]; limitations: string[] }) {
+  if (benefits.length === 0 && limitations.length === 0) {
     return null;
   }
 
   return (
     <ul className="mt-4 grid gap-2 text-sm text-brand-text-muted">
+      {limitations.map((limitation) => (
+        <li key={limitation} className="flex gap-3">
+          <X aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-red-300" />
+          <span>{limitation}</span>
+        </li>
+      ))}
       {benefits.map((benefit) => (
         <li key={benefit} className="flex gap-3">
           <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-blue-200" />
