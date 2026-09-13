@@ -172,11 +172,11 @@ export function OfflineMembershipForm({ userId }: OfflineMembershipFormProps) {
           </div>
         ) : null}
 
-        {!eligibilityFailed && !isLoadingEligibility && eligibleMemberships.length === 0 ? (
+        {!eligibilityFailed && !isLoadingEligibility && eligibleMemberships.length === 0 && (
           <p className="mt-3 text-sm text-brand-text-muted" role="status">
             This user currently has no membership options they are eligible to receive.
           </p>
-        ) : null}
+        )}
       </form>
     </SurfacePanel>
   );
