@@ -53,7 +53,8 @@ WITH args AS (
         $3::text AS email,
         $4::role_type AS role,
         $5::boolean AS is_student,
-        $6::group_type AS "group"
+        $6::text[] AS groups,
+        $7::text[] AS membership_tier_ids
 )
 SELECT COUNT(*)
 FROM users u
@@ -79,23 +80,36 @@ AND (
     OR u.is_student = a.is_student
 )
 AND (
-    a."group" IS NULL
-    OR EXISTS (
-        SELECT 1
+    a.groups IS NULL
+    OR ARRAY(
+        SELECT filter_group."group"::text
         FROM user_groups filter_group
         WHERE filter_group.user_id = u.id
-          AND filter_group."group" = a."group"
-    )
+        ORDER BY filter_group."group"::text
+    ) = a.groups
+)
+AND (
+    a.membership_tier_ids IS NULL
+    OR ARRAY(
+        SELECT DISTINCT filter_tier.tier_id::text
+        FROM memberships filter_tier
+        WHERE filter_tier.user_id = u.id
+          AND filter_tier.cancelled_at IS NULL
+          AND filter_tier.started_at <= NOW()
+          AND filter_tier.expires_at > NOW()
+        ORDER BY filter_tier.tier_id::text
+    ) = a.membership_tier_ids
 )
 `
 
 type CountUsersAdminParams struct {
-	FullName  pgtype.Text
-	StudentID pgtype.Text
-	Email     pgtype.Text
-	Role      NullRoleType
-	IsStudent pgtype.Bool
-	Group     NullGroupType
+	FullName          pgtype.Text
+	StudentID         pgtype.Text
+	Email             pgtype.Text
+	Role              NullRoleType
+	IsStudent         pgtype.Bool
+	Groups            []string
+	MembershipTierIds []string
 }
 
 func (q *Queries) CountUsersAdmin(ctx context.Context, arg CountUsersAdminParams) (int64, error) {
@@ -105,7 +119,8 @@ func (q *Queries) CountUsersAdmin(ctx context.Context, arg CountUsersAdminParams
 		arg.Email,
 		arg.Role,
 		arg.IsStudent,
-		arg.Group,
+		arg.Groups,
+		arg.MembershipTierIds,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -242,6 +257,42 @@ func (q *Queries) GetAdminAuditLogs(ctx context.Context, arg GetAdminAuditLogsPa
 	return items, nil
 }
 
+const getAdminMembershipTierOptions = `-- name: GetAdminMembershipTierOptions :many
+SELECT
+    mt.id,
+    mt.title,
+    mp.program_name
+FROM membership_tiers mt
+JOIN membership_programs mp ON mp.id = mt.program_id
+ORDER BY mp.program_name, mt.title, mt.id
+`
+
+type GetAdminMembershipTierOptionsRow struct {
+	ID          pgtype.UUID
+	Title       string
+	ProgramName string
+}
+
+func (q *Queries) GetAdminMembershipTierOptions(ctx context.Context) ([]GetAdminMembershipTierOptionsRow, error) {
+	rows, err := q.db.Query(ctx, getAdminMembershipTierOptions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAdminMembershipTierOptionsRow
+	for rows.Next() {
+		var i GetAdminMembershipTierOptionsRow
+		if err := rows.Scan(&i.ID, &i.Title, &i.ProgramName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAdminUserByID = `-- name: GetAdminUserByID :one
 SELECT
     u.id,
@@ -311,9 +362,10 @@ WITH args AS (
         $3::text AS email,
         $4::role_type AS role,
         $5::boolean AS is_student,
-        $6::group_type AS "group",
-        $7::integer AS "limit",
-        $8::integer AS "offset"
+        $6::text[] AS groups,
+        $7::text[] AS membership_tier_ids,
+        $8::integer AS "limit",
+        $9::integer AS "offset"
 )
 SELECT
     u.id,
@@ -327,7 +379,8 @@ SELECT
     u.is_student,
     u.onboarding_completed_at,
     u.avatar_url,
-    COALESCE(g.groups, '{}'::text[])::text[] AS groups
+    COALESCE(g.groups, '{}'::text[])::text[] AS groups,
+    COALESCE(am.tier_titles, '{}'::text[])::text[] AS active_membership_tier_titles
 FROM users u
 CROSS JOIN args a
 LEFT JOIN LATERAL (
@@ -338,6 +391,16 @@ LEFT JOIN LATERAL (
     FROM user_groups ug
     WHERE ug.user_id = u.id
 ) g ON true
+LEFT JOIN LATERAL (
+    SELECT
+        array_agg(mt.title ORDER BY mt.title, mt.id) AS tier_titles
+    FROM memberships m
+    JOIN membership_tiers mt ON mt.id = m.tier_id
+    WHERE m.user_id = u.id
+      AND m.cancelled_at IS NULL
+      AND m.started_at <= NOW()
+      AND m.expires_at > NOW()
+) am ON true
 WHERE (
     a.full_name IS NULL
     OR u.full_name ILIKE '%' || a.full_name || '%'
@@ -359,13 +422,25 @@ AND (
     OR u.is_student = a.is_student
 )
 AND (
-    a."group" IS NULL
-    OR EXISTS (
-        SELECT 1
+    a.groups IS NULL
+    OR ARRAY(
+        SELECT filter_group."group"::text
         FROM user_groups filter_group
         WHERE filter_group.user_id = u.id
-          AND filter_group."group" = a."group"
-    )
+        ORDER BY filter_group."group"::text
+    ) = a.groups
+)
+AND (
+    a.membership_tier_ids IS NULL
+    OR ARRAY(
+        SELECT DISTINCT filter_tier.tier_id::text
+        FROM memberships filter_tier
+        WHERE filter_tier.user_id = u.id
+          AND filter_tier.cancelled_at IS NULL
+          AND filter_tier.started_at <= NOW()
+          AND filter_tier.expires_at > NOW()
+        ORDER BY filter_tier.tier_id::text
+    ) = a.membership_tier_ids
 )
 ORDER BY u.created_at DESC
 LIMIT (SELECT "limit" FROM args)
@@ -373,29 +448,31 @@ OFFSET (SELECT "offset" FROM args)
 `
 
 type GetUsersAdminParams struct {
-	FullName  pgtype.Text
-	StudentID pgtype.Text
-	Email     pgtype.Text
-	Role      NullRoleType
-	IsStudent pgtype.Bool
-	Group     NullGroupType
-	Limit     pgtype.Int4
-	Offset    pgtype.Int4
+	FullName          pgtype.Text
+	StudentID         pgtype.Text
+	Email             pgtype.Text
+	Role              NullRoleType
+	IsStudent         pgtype.Bool
+	Groups            []string
+	MembershipTierIds []string
+	Limit             pgtype.Int4
+	Offset            pgtype.Int4
 }
 
 type GetUsersAdminRow struct {
-	ID                    pgtype.UUID
-	Email                 string
-	StudentID             pgtype.Text
-	Role                  RoleType
-	CreatedAt             pgtype.Timestamptz
-	UpdatedAt             pgtype.Timestamptz
-	FullName              string
-	EmailVerifiedAt       pgtype.Timestamptz
-	IsStudent             bool
-	OnboardingCompletedAt pgtype.Timestamptz
-	AvatarUrl             pgtype.Text
-	Groups                []string
+	ID                         pgtype.UUID
+	Email                      string
+	StudentID                  pgtype.Text
+	Role                       RoleType
+	CreatedAt                  pgtype.Timestamptz
+	UpdatedAt                  pgtype.Timestamptz
+	FullName                   string
+	EmailVerifiedAt            pgtype.Timestamptz
+	IsStudent                  bool
+	OnboardingCompletedAt      pgtype.Timestamptz
+	AvatarUrl                  pgtype.Text
+	Groups                     []string
+	ActiveMembershipTierTitles []string
 }
 
 func (q *Queries) GetUsersAdmin(ctx context.Context, arg GetUsersAdminParams) ([]GetUsersAdminRow, error) {
@@ -405,7 +482,8 @@ func (q *Queries) GetUsersAdmin(ctx context.Context, arg GetUsersAdminParams) ([
 		arg.Email,
 		arg.Role,
 		arg.IsStudent,
-		arg.Group,
+		arg.Groups,
+		arg.MembershipTierIds,
 		arg.Limit,
 		arg.Offset,
 	)
@@ -429,6 +507,7 @@ func (q *Queries) GetUsersAdmin(ctx context.Context, arg GetUsersAdminParams) ([
 			&i.OnboardingCompletedAt,
 			&i.AvatarUrl,
 			&i.Groups,
+			&i.ActiveMembershipTierTitles,
 		); err != nil {
 			return nil, err
 		}

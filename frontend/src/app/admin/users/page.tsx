@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { UsersTable } from "@/components/admin/users/users-table";
 import { UsersToolbar } from "@/components/admin/users/users-toolbar";
 import { downloadCSVBlob, exportUsersCSV } from "@/lib/admin/admin.api";
-import { useUsers } from "@/lib/admin/admin.hook";
+import { useAdminMembershipTierOptions, useUsers } from "@/lib/admin/admin.hook";
 import type { AdminUserFilters, AppliedSearch, SearchMode } from "@/lib/types/admin.types";
 import type { GroupType, RoleType } from "@/lib/types/user.types";
 import type { IsStudentFilter } from "@/lib/types/admin.types";
@@ -43,6 +43,9 @@ export default function UsersPage() {
       enabled: isAdmin,
     },
   );
+  const { data: membershipTierOptions = [] } = useAdminMembershipTierOptions({
+    enabled: isAdmin,
+  });
 
   const { mutate: exportUsers, isPending: isExporting } = useMutation({
     mutationFn: () => exportUsersCSV(appliedSearch, filters),
@@ -57,8 +60,16 @@ export default function UsersPage() {
     resetOffset();
   };
 
-  const handleGroupChange = (group: GroupType | undefined) => {
-    setFilters((current) => ({ ...current, group }));
+  const handleGroupChange = (groups: GroupType[]) => {
+    setFilters((current) => ({ ...current, groups: groups.length > 0 ? groups : undefined }));
+    resetOffset();
+  };
+
+  const handleMembershipTierChange = (membershipTierIds: string[]) => {
+    setFilters((current) => ({
+      ...current,
+      membershipTierIds: membershipTierIds.length > 0 ? membershipTierIds : undefined,
+    }));
     resetOffset();
   };
 
@@ -90,12 +101,14 @@ export default function UsersPage() {
           searchInput={searchInput}
           filters={filters}
           total={total}
+          membershipTierOptions={membershipTierOptions}
           isExporting={isExporting}
           onSearchModeChange={setSearchMode}
           onSearchInputChange={setSearchInput}
           onResetSearch={() => setSearchInput("")}
           onRoleChange={handleRoleChange}
           onGroupChange={handleGroupChange}
+          onMembershipTierChange={handleMembershipTierChange}
           onIsStudentChange={handleIsStudentChange}
           onResetFilters={handleResetFilters}
           onExport={() => exportUsers()}

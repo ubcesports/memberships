@@ -2,6 +2,21 @@ package dto
 
 import "time"
 
+type AdminUserDTO struct {
+	ProfileDTO
+	ActiveMemberships []AdminActiveMembershipSummary `json:"active_memberships"`
+}
+
+type AdminActiveMembershipSummary struct {
+	TierTitle string `json:"tier_title"`
+}
+
+type AdminMembershipTierOption struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	ProgramName string `json:"program_name"`
+}
+
 type AdminAuditLogResponse struct {
 	Actor       AdminAuditLogActor       `json:"actor"`
 	OccuredAt   time.Time                `json:"occured_at"`

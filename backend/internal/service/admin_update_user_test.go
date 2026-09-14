@@ -125,6 +125,10 @@ func (f *fakeAdminStore) CountUsers(context.Context, db.CountUsersAdminParams) (
 	return 0, nil
 }
 
+func (f *fakeAdminStore) GetAdminMembershipTierOptions(context.Context) ([]db.GetAdminMembershipTierOptionsRow, error) {
+	return nil, nil
+}
+
 func (f *fakeAdminStore) CreateAdminAuditLog(_ context.Context, params db.CreateAdminAuditLogParams) error {
 	f.auditLogs = append(f.auditLogs, params)
 	return nil

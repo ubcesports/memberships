@@ -20,6 +20,7 @@ type AdminStore interface {
 	UpdateUserFullName(ctx context.Context, userId string, fullName string) error
 	GetUsers(ctx context.Context, params db.GetUsersAdminParams) ([]db.GetUsersAdminRow, error)
 	CountUsers(ctx context.Context, params db.CountUsersAdminParams) (int64, error)
+	GetAdminMembershipTierOptions(ctx context.Context) ([]db.GetAdminMembershipTierOptionsRow, error)
 	CountAdminAuditLogs(ctx context.Context, params pgtype.Text) (int64, error)
 	CreateAdminAuditLog(ctx context.Context, params db.CreateAdminAuditLogParams) error
 	GetAdminAuditLogs(ctx context.Context, params db.GetAdminAuditLogsParams) ([]db.GetAdminAuditLogsRow, error)
@@ -33,6 +34,16 @@ type AdminStore interface {
 	HasActiveMembership(ctx context.Context, userId string) (bool, error)
 	CancelActiveMembershipByUserIdAndMembershipId(ctx context.Context, userId string, membershipId string, occurredAt time.Time) (bool, error)
 	WithTx(ctx context.Context, fn func(AdminStore) error) error
+}
+
+func (r *AdminRepository) GetAdminMembershipTierOptions(
+	ctx context.Context,
+) ([]db.GetAdminMembershipTierOptionsRow, error) {
+	rows, err := r.store.GetAdminMembershipTierOptions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("query admin membership tier options: %w", err)
+	}
+	return rows, nil
 }
 
 type AdminRepository struct {

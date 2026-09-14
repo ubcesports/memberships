@@ -5,17 +5,18 @@ import { useRouter } from "next/navigation";
 import { DataTable, type Column } from "../admin-data-table";
 import { AvatarCell, EmptyValue, formatOptionalTime } from "../admin-table-cells";
 import { StatusBadge } from "@/components/status-badge";
-import type { User } from "@/lib/types/user.types";
+import type { AdminUser } from "@/lib/types/admin.types";
 import { formatTime } from "@/lib/utils/formatting";
 import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
+import { SummaryDropdown } from "./summary-dropdown";
 
 type UsersTableProps = {
-  users: User[];
+  users: AdminUser[];
   isLoading: boolean;
   isFetching: boolean;
 };
 
-const columns: Column<User>[] = [
+const columns: Column<AdminUser>[] = [
   {
     header: "Full name",
     cellClassName: "whitespace-nowrap px-4 py-3 font-medium text-brand-text",
@@ -55,13 +56,35 @@ const columns: Column<User>[] = [
     cellClassName: "px-4 py-3",
     cell: (user) =>
       user.groups.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
+        <SummaryDropdown
+          summary={`${user.groups.length} ${user.groups.length === 1 ? "group" : "groups"}`}
+        >
           {user.groups.map((group) => (
             <StatusBadge key={group} tone="default" className={getGroupBadgeClass(group)}>
               {titleCase(group)}
             </StatusBadge>
           ))}
-        </div>
+        </SummaryDropdown>
+      ) : (
+        <EmptyValue />
+      ),
+  },
+  {
+    header: "Active memberships",
+    cellClassName: "px-4 py-3",
+    cell: (user) =>
+      user.active_memberships.length > 0 ? (
+        <SummaryDropdown
+          summary={`${user.active_memberships.length} ${
+            user.active_memberships.length === 1 ? "membership" : "memberships"
+          }`}
+        >
+          {user.active_memberships.map((membership, index) => (
+            <StatusBadge key={`${membership.tier_title}-${index}`} tone="success">
+              {membership.tier_title}
+            </StatusBadge>
+          ))}
+        </SummaryDropdown>
       ) : (
         <EmptyValue />
       ),

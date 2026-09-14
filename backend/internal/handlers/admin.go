@@ -43,7 +43,8 @@ Args (query params):
 	email: optional case-insensitive email substring
 	role: optional role (member or admin)
 	is_student: optional boolean student status
-	group: optional group membership
+	group: optional repeated group values; matches the user's exact group set
+	membership_tier_id: optional repeated tier UUIDs; matches the user's exact active tier set
 	limit: optional page size (default 25, maximum 100)
 	offset: optional number of users to skip (default 0)
 
@@ -75,12 +76,29 @@ func (h *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unable to load users", http.StatusInternalServerError)
 		return
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"users": users,
 		"total": total,
 	})
+}
+
+// GetMembershipTierOptions returns the tier metadata used to build the admin
+// membership filter. Tier IDs are stable request values; titles and program
+// names are display labels.
+func (h *AdminHandler) GetMembershipTierOptions(w http.ResponseWriter, r *http.Request) {
+	requestID := middleware.GetReqID(r.Context())
+	options, err := h.adminService.GetAdminMembershipTierOptions(r.Context())
+	if err != nil {
+		slog.ErrorContext(r.Context(), "unable to load admin membership tier options",
+			"error", err,
+			"request_id", requestID,
+		)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to load membership tier options.", requestID)
+		return
+	}
+
+	util.WriteJson(w, http.StatusOK, options)
 }
 
 /*
@@ -95,7 +113,8 @@ Args (query params):
 	email: optional case-insensitive email substring
 	role: optional role (member or admin)
 	is_student: optional boolean student status
-	group: optional group membership
+	group: optional repeated group values; matches the user's exact group set
+	membership_tier_id: optional repeated tier UUIDs; matches the user's exact active tier set
 
 Returns:
 
@@ -146,6 +165,7 @@ func (h *AdminHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request) {
 		"Role",
 		"Is Student",
 		"Groups",
+		"Active Memberships",
 		"Created At",
 		"Updated At",
 		"Email Verified At",
@@ -164,6 +184,10 @@ func (h *AdminHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request) {
 		for _, group := range user.Groups {
 			groups = append(groups, string(group))
 		}
+		membershipTitles := make([]string, 0, len(user.ActiveMemberships))
+		for _, membership := range user.ActiveMemberships {
+			membershipTitles = append(membershipTitles, membership.TierTitle)
+		}
 
 		if err := writer.Write([]string{
 			user.ID,
@@ -173,6 +197,7 @@ func (h *AdminHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request) {
 			string(user.Role),
 			strconv.FormatBool(user.IsStudent),
 			strings.Join(groups, ";"),
+			strings.Join(membershipTitles, ";"),
 			user.CreatedAt.Format(time.RFC3339),
 			user.UpdatedAt.Format(time.RFC3339),
 			optionalTime(user.EmailVerifiedAt),
@@ -752,12 +777,13 @@ func parseAdminAuditLogFilters(r *http.Request) (service.AdminAuditLogFilters, e
 func parseAdminUserFilters(r *http.Request, includePagination bool) (service.AdminUserFilters, error) {
 	query := r.URL.Query()
 	filters := service.AdminUserFilters{
-		FullName:  query.Get("full_name"),
-		StudentID: query.Get("student_id"),
-		Email:     query.Get("email"),
-		Role:      query.Get("role"),
-		Group:     query.Get("group"),
-		Limit:     25,
+		FullName:          query.Get("full_name"),
+		StudentID:         query.Get("student_id"),
+		Email:             query.Get("email"),
+		Role:              query.Get("role"),
+		Groups:            query["group"],
+		MembershipTierIDs: query["membership_tier_id"],
+		Limit:             25,
 	}
 
 	if value := query.Get("is_student"); value != "" {
@@ -776,8 +802,8 @@ func parseAdminUserFilters(r *http.Request, includePagination bool) (service.Adm
 		}
 	}
 
-	if filters.Group != "" {
-		switch dto.GroupType(filters.Group) {
+	for _, group := range filters.Groups {
+		switch dto.GroupType(group) {
 		case dto.GroupMember,
 			dto.GroupCompetitiveTeam,
 			dto.GroupExecutive,
@@ -785,6 +811,12 @@ func parseAdminUserFilters(r *http.Request, includePagination bool) (service.Adm
 			dto.GroupBoard:
 		default:
 			return service.AdminUserFilters{}, errors.New("invalid group")
+		}
+	}
+
+	for _, tierID := range filters.MembershipTierIDs {
+		if _, err := util.GetValidatedUUID(tierID); err != nil {
+			return service.AdminUserFilters{}, errors.New("invalid membership tier ID")
 		}
 	}
 

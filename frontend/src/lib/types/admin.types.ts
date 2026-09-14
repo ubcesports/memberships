@@ -12,8 +12,23 @@ export type AppliedSearch = {
 
 export type AdminUserFilters = {
   role?: RoleType;
-  group?: GroupType;
+  groups?: GroupType[];
+  membershipTierIds?: string[];
   isStudent?: boolean;
+};
+
+export type AdminActiveMembership = {
+  tier_title: string;
+};
+
+export type AdminUser = User & {
+  active_memberships: AdminActiveMembership[];
+};
+
+export type AdminMembershipTierOption = {
+  id: string;
+  title: string;
+  program_name: string;
 };
 
 export type AuditLogActor = {
@@ -40,7 +55,7 @@ export type AuditLogEntry = {
 };
 
 export type UsersResponse = {
-  users: User[];
+  users: AdminUser[];
   total: number;
 };
 
