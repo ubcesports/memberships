@@ -83,9 +83,25 @@ func (h *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetMembershipTierOptions returns the tier metadata used to build the admin
-// membership filter. Tier IDs are stable request values; titles and program
-// names are display labels.
+/*
+Returns membership tier options used by the admin user filter.
+
+API URL: GET /admin/membership-tiers
+
+Args:
+
+	None
+
+Returns:
+
+	[]dto.AdminMembershipTierOption (HTTP 200)
+
+Raises:
+
+	401: user is not authenticated
+	403: user is not an admin
+	500: membership tier options could not be retrieved
+*/
 func (h *AdminHandler) GetMembershipTierOptions(w http.ResponseWriter, r *http.Request) {
 	requestID := middleware.GetReqID(r.Context())
 	options, err := h.adminService.GetAdminMembershipTierOptions(r.Context())
