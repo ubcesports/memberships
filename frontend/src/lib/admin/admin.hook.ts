@@ -7,6 +7,7 @@ import {
   fetchAuditLogs,
   fetchEligibleMembershipsForUser,
   addOfflineMembership,
+  fetchAdminMembershipTierOptions,
 } from "./admin.api";
 import type {
   AddOfflineMembershipRequest,
@@ -27,6 +28,14 @@ export function useUsers(
     queryKey: ["admin", "users", { appliedSearch, filters, pagination }],
     queryFn: ({ signal }) => fetchUsers(appliedSearch, filters, pagination, signal),
     placeholderData: keepPreviousData,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useAdminMembershipTierOptions(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ["admin", "membership-tier-options"],
+    queryFn: ({ signal }) => fetchAdminMembershipTierOptions(signal),
     enabled: options?.enabled ?? true,
   });
 }

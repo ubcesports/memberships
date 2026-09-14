@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,14 +24,15 @@ import (
 const pgUniqueViolationCode = "23505"
 
 type AdminUserFilters struct {
-	FullName  string
-	StudentID string
-	Email     string
-	Role      string
-	IsStudent *bool
-	Group     string
-	Limit     int32
-	Offset    int32
+	FullName          string
+	StudentID         string
+	Email             string
+	Role              string
+	IsStudent         *bool
+	Groups            []string
+	MembershipTierIDs []string
+	Limit             int32
+	Offset            int32
 }
 
 type AdminAuditLogFilters struct {
@@ -119,7 +121,7 @@ func NewAdminService(adminRepository *repository.AdminRepository) *AdminService 
 	return &AdminService{adminRepository: adminRepository}
 }
 
-func (s *AdminService) GetUsers(ctx context.Context, filters AdminUserFilters) ([]dto.ProfileDTO, int64, error) {
+func (s *AdminService) GetUsers(ctx context.Context, filters AdminUserFilters) ([]dto.AdminUserDTO, int64, error) {
 	if filters.Limit <= 0 {
 		filters.Limit = 25
 	}
@@ -135,12 +137,13 @@ func (s *AdminService) GetUsers(ctx context.Context, filters AdminUserFilters) (
 	params.Offset = pgtype.Int4{Int32: filters.Offset, Valid: true}
 
 	total, err := s.adminRepository.CountUsers(ctx, db.CountUsersAdminParams{
-		FullName:  params.FullName,
-		StudentID: params.StudentID,
-		Email:     params.Email,
-		Role:      params.Role,
-		IsStudent: params.IsStudent,
-		Group:     params.Group,
+		FullName:          params.FullName,
+		StudentID:         params.StudentID,
+		Email:             params.Email,
+		Role:              params.Role,
+		IsStudent:         params.IsStudent,
+		Groups:            params.Groups,
+		MembershipTierIds: params.MembershipTierIds,
 	})
 	if err != nil {
 		return nil, 0, err
@@ -159,7 +162,7 @@ func (s *AdminService) ExportUsers(
 	filters AdminUserFilters,
 	actorId string,
 	requestId string,
-) ([]dto.ProfileDTO, error) {
+) ([]dto.AdminUserDTO, error) {
 	users, exportErr := s.getUsers(ctx, buildAdminQueryParams(filters))
 
 	outcome := db.AdminAuditOutcomeTypeSuccess
@@ -191,6 +194,25 @@ func (s *AdminService) ExportUsers(
 	}
 
 	return users, nil
+}
+
+func (s *AdminService) GetAdminMembershipTierOptions(
+	ctx context.Context,
+) ([]dto.AdminMembershipTierOption, error) {
+	rows, err := s.adminRepository.GetAdminMembershipTierOptions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	options := make([]dto.AdminMembershipTierOption, 0, len(rows))
+	for _, row := range rows {
+		options = append(options, dto.AdminMembershipTierOption{
+			ID:          row.ID.String(),
+			Title:       row.Title,
+			ProgramName: row.ProgramName,
+		})
+	}
+	return options, nil
 }
 
 // GetUserByID returns a single user's profile for the admin detail view.
@@ -1019,6 +1041,9 @@ func buildAdminQueryParams(filters AdminUserFilters) db.GetUsersAdminParams {
 		}
 	}
 
+	groups := normalizedStrings(filters.Groups)
+	membershipTierIDs := normalizedStrings(filters.MembershipTierIDs)
+
 	return db.GetUsersAdminParams{
 		FullName: pgtype.Text{
 			String: filters.FullName,
@@ -1036,28 +1061,58 @@ func buildAdminQueryParams(filters AdminUserFilters) db.GetUsersAdminParams {
 			RoleType: db.RoleType(filters.Role),
 			Valid:    filters.Role != "",
 		},
-		IsStudent: isStudent,
-		Group: db.NullGroupType{
-			GroupType: db.GroupType(filters.Group),
-			Valid:     filters.Group != "",
-		},
+		IsStudent:         isStudent,
+		Groups:            groups,
+		MembershipTierIds: membershipTierIDs,
 	}
 }
 
-func (s *AdminService) getUsers(ctx context.Context, params db.GetUsersAdminParams) ([]dto.ProfileDTO, error) {
+func normalizedStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	sort.Strings(result)
+	return result
+}
+
+func (s *AdminService) getUsers(ctx context.Context, params db.GetUsersAdminParams) ([]dto.AdminUserDTO, error) {
 	rows, err := s.adminRepository.GetUsers(ctx, params)
 	if err != nil {
 		return nil, err
 	}
 
-	users := make([]dto.ProfileDTO, 0, len(rows))
+	users := make([]dto.AdminUserDTO, 0, len(rows))
 	for _, row := range rows {
 		groups := make([]dto.GroupType, 0, len(row.Groups))
 		for _, group := range row.Groups {
 			groups = append(groups, dto.GroupType(group))
 		}
 
-		users = append(users, dto.ProfileDTO{
+		activeMemberships := make([]dto.AdminActiveMembershipSummary, 0, len(row.ActiveMembershipTierTitles))
+		for _, tierTitle := range row.ActiveMembershipTierTitles {
+			activeMemberships = append(activeMemberships, dto.AdminActiveMembershipSummary{
+				TierTitle: tierTitle,
+			})
+		}
+
+		users = append(users, dto.AdminUserDTO{ProfileDTO: dto.ProfileDTO{
 			ID:                    row.ID.String(),
 			Email:                 row.Email,
 			StudentID:             util.TextPointer(row.StudentID),
@@ -1070,7 +1125,7 @@ func (s *AdminService) getUsers(ctx context.Context, params db.GetUsersAdminPara
 			OnboardingCompletedAt: util.TimestampPointer(row.OnboardingCompletedAt),
 			AvatarURL:             util.TextPointer(row.AvatarUrl),
 			Groups:                groups,
-		})
+		}, ActiveMemberships: activeMemberships})
 	}
 
 	return users, nil
