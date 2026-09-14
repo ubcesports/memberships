@@ -246,7 +246,7 @@ INSERT INTO exec_profile (
     sqlc.narg('user_id')::uuid,
     sqlc.narg('title')::text,
     sqlc.narg('display_order')::int,
-    sqlc.narg('display_group')::group_type
+    sqlc.narg('display_group')::exec_display_group_type
 );
 
 -- name: HasExecProfileForUser :one
@@ -261,7 +261,7 @@ SELECT EXISTS (
     SELECT 1 
     FROM user_groups
     WHERE user_id = $1
-        AND "group" IN ('executive', 'central_director', 'game_director', 'board')
+        AND "group" IN ('executive', 'director', 'board')
 );
 
 -- name: RemoveExecProfile :exec

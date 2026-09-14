@@ -54,6 +54,51 @@ func (ns NullAdminAuditOutcomeType) Value() (driver.Value, error) {
 	return string(ns.AdminAuditOutcomeType), nil
 }
 
+type ExecDisplayGroupType string
+
+const (
+	ExecDisplayGroupTypePresident       ExecDisplayGroupType = "president"
+	ExecDisplayGroupTypeBoard           ExecDisplayGroupType = "board"
+	ExecDisplayGroupTypeCentralDirector ExecDisplayGroupType = "central_director"
+	ExecDisplayGroupTypeGameDirector    ExecDisplayGroupType = "game_director"
+	ExecDisplayGroupTypeExecutive       ExecDisplayGroupType = "executive"
+)
+
+func (e *ExecDisplayGroupType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ExecDisplayGroupType(s)
+	case string:
+		*e = ExecDisplayGroupType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ExecDisplayGroupType: %T", src)
+	}
+	return nil
+}
+
+type NullExecDisplayGroupType struct {
+	ExecDisplayGroupType ExecDisplayGroupType
+	Valid                bool // Valid is true if ExecDisplayGroupType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullExecDisplayGroupType) Scan(value interface{}) error {
+	if value == nil {
+		ns.ExecDisplayGroupType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ExecDisplayGroupType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullExecDisplayGroupType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ExecDisplayGroupType), nil
+}
+
 type ExecSocialPlatformType string
 
 const (
@@ -106,8 +151,7 @@ const (
 	GroupTypeMember          GroupType = "member"
 	GroupTypeCompetitiveTeam GroupType = "competitive_team"
 	GroupTypeExecutive       GroupType = "executive"
-	GroupTypeCentralDirector GroupType = "central_director"
-	GroupTypeGameDirector    GroupType = "game_director"
+	GroupTypeDirector        GroupType = "director"
 	GroupTypeBoard           GroupType = "board"
 	GroupTypePresident       GroupType = "president"
 )
@@ -305,7 +349,7 @@ type ExecProfile struct {
 	UserID       pgtype.UUID
 	Title        string
 	DisplayOrder int32
-	DisplayGroup GroupType
+	DisplayGroup ExecDisplayGroupType
 	UpdatedAt    pgtype.Timestamptz
 }
 

@@ -48,6 +48,7 @@ func provideRouter(params RouterParams) *chi.Mux {
 	r.Get("/health", params.HealthHandler.IsDatabaseHealthy)
 	r.Get("/membership/tiers", params.MembershipHandler.GetPublicTiersWithPrices)
 	r.Post("/webhooks/stripe", params.StripeWebhookHandler.Handle)
+	r.Get("/exec-profiles", params.ExecProfileHandler.GetExecProfiles)
 
 	// All protected routes
 	r.Group(func(r chi.Router) {
@@ -89,9 +90,8 @@ func provideRouter(params RouterParams) *chi.Mux {
 	// All exec profile routes
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAuth(params.Limen))
-		r.Use(auth.RequireRole("admin"))
+		r.Use(auth.RequireExecGroup())
 
-		r.Get("/exec-profile", params.ExecProfileHandler.GetExecProfiles)
 		r.Post("/exec-profile/social-links", params.ExecProfileHandler.AddExecSocialLink)
 		r.Patch("/exec-profile/social-links", params.ExecProfileHandler.UpdateExecSocialLink)
 		r.Delete("/exec-profile/social-links", params.ExecProfileHandler.DeleteExecSocialLink)

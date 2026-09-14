@@ -27,11 +27,11 @@ type AdminStore interface {
 	StudentIDExists(ctx context.Context, studentId string) (bool, error)
 	UpdateUserRole(ctx context.Context, userId string, role db.RoleType) error
 	AddUserGroup(ctx context.Context, userId string, group db.GroupType) error
-	CreateExecProfile(ctx context.Context, userId string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullGroupType) error
+	CreateExecProfile(ctx context.Context, userId string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullExecDisplayGroupType) error
 	HasExecProfile(ctx context.Context, userId string) (bool, error)
 	HasExecGroup(ctx context.Context, userId string) (bool, error)
 	RemoveExecProfile(ctx context.Context, userId string) error
-	UpdateExecProfile(ctx context.Context, userId string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullGroupType) (db.GetExecProfileByUserIDRow, error)
+	UpdateExecProfile(ctx context.Context, userId string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullExecDisplayGroupType) (db.GetExecProfileByUserIDRow, error)
 	RemoveUserGroup(ctx context.Context, userId string, group db.GroupType) error
 	GetUserMemberships(ctx context.Context, userId string) ([]db.GetAllMembershipsWithTransactionsRow, error)
 	HasActiveMembership(ctx context.Context, userId string) (bool, error)
@@ -179,7 +179,7 @@ func (r *AdminRepository) AddUserGroup(ctx context.Context, userId string, group
 	return nil
 }
 
-func (r *AdminRepository) CreateExecProfile(ctx context.Context, userId string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullGroupType) error {
+func (r *AdminRepository) CreateExecProfile(ctx context.Context, userId string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullExecDisplayGroupType) error {
 	pgUserId, err := util.GetValidatedUUID(userId)
 	if err != nil {
 		return err
@@ -231,7 +231,7 @@ func (r *AdminRepository) RemoveExecProfile(ctx context.Context, userId string) 
 	return r.store.RemoveExecProfile(ctx, pgUserId)
 }
 
-func (r *AdminRepository) UpdateExecProfile(ctx context.Context, userId string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullGroupType) (db.GetExecProfileByUserIDRow, error) {
+func (r *AdminRepository) UpdateExecProfile(ctx context.Context, userId string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullExecDisplayGroupType) (db.GetExecProfileByUserIDRow, error) {
 	pgUserId, err := util.GetValidatedUUID(userId)
 	if err != nil {
 		return db.GetExecProfileByUserIDRow{}, err

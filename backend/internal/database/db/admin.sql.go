@@ -161,7 +161,7 @@ INSERT INTO exec_profile (
     $1::uuid,
     $2::text,
     $3::int,
-    $4::group_type
+    $4::exec_display_group_type
 )
 `
 
@@ -169,7 +169,7 @@ type CreateExecProfileParams struct {
 	UserID       pgtype.UUID
 	Title        pgtype.Text
 	DisplayOrder pgtype.Int4
-	DisplayGroup NullGroupType
+	DisplayGroup NullExecDisplayGroupType
 }
 
 func (q *Queries) CreateExecProfile(ctx context.Context, arg CreateExecProfileParams) error {
@@ -348,7 +348,7 @@ type GetExecProfileByUserIDRow struct {
 	UserID       pgtype.UUID
 	Title        string
 	DisplayOrder int32
-	DisplayGroup GroupType
+	DisplayGroup ExecDisplayGroupType
 }
 
 func (q *Queries) GetExecProfileByUserID(ctx context.Context, userID pgtype.UUID) (GetExecProfileByUserIDRow, error) {
@@ -521,7 +521,7 @@ SELECT EXISTS (
     SELECT 1 
     FROM user_groups
     WHERE user_id = $1
-        AND "group" IN ('executive', 'central_director', 'game_director', 'board')
+        AND "group" IN ('executive', 'director', 'board')
 )
 `
 
@@ -600,7 +600,7 @@ WHERE user_id = $4
 type UpdateExecProfileParams struct {
 	Title        pgtype.Text
 	DisplayOrder pgtype.Int4
-	DisplayGroup NullGroupType
+	DisplayGroup NullExecDisplayGroupType
 	UserID       pgtype.UUID
 }
 

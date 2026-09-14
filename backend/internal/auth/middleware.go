@@ -82,6 +82,35 @@ func RequireOnboarded(next http.Handler) http.Handler {
 	})
 }
 
+func RequireExecGroup() func(http.Handler) http.Handler {
+	allowed := map[string]bool{
+		"executive": true,
+		"director":  true,
+		"board":     true,
+		"president": true,
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			session := SessionFromContext((r.Context()))
+			if session == nil || session.User == nil {
+				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
+				return
+			}
+
+			groups, _ := session.User.Raw()["groups"].([]any)
+			for _, g := range groups {
+				if name, ok := g.(string); ok && allowed[name] {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			writeError(w, http.StatusForbidden, "FORBIDDEN", "Forbidden")
+		})
+	}
+}
+
 func isUserOnboarded(user *limen.User) bool {
 	if user == nil {
 		return false

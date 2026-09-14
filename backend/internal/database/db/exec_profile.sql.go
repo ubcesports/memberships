@@ -69,7 +69,7 @@ type GetExecProfilesRow struct {
 	UserID       pgtype.UUID
 	Title        string
 	DisplayOrder int32
-	DisplayGroup GroupType
+	DisplayGroup ExecDisplayGroupType
 	FullName     string
 	AvatarUrl    pgtype.Text
 	SocialLinks  []byte

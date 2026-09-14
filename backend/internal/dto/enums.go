@@ -13,8 +13,7 @@ const (
 	GroupMember          GroupType = "member"
 	GroupCompetitiveTeam GroupType = "competitive_team"
 	GroupExecutive       GroupType = "executive"
-	GroupCentralDirector GroupType = "central_director"
-	GroupGameDirector    GroupType = "game_director"
+	GroupDirector        GroupType = "director"
 	GroupBoard           GroupType = "board"
 	GroupPresident       GroupType = "president"
 )

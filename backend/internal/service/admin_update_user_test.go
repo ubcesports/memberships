@@ -99,7 +99,7 @@ func (f *fakeAdminStore) AddUserGroup(_ context.Context, _ string, group db.Grou
 	return nil
 }
 
-func (f *fakeAdminStore) CreateExecProfile(ctx context.Context, userId string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullGroupType) error {
+func (f *fakeAdminStore) CreateExecProfile(ctx context.Context, userId string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullExecDisplayGroupType) error {
 	return nil
 }
 func (f *fakeAdminStore) HasExecProfile(ctx context.Context, userId string) (bool, error) {
@@ -113,7 +113,7 @@ func (f *fakeAdminStore) RemoveExecProfile(_ context.Context, _ string) error {
 	return nil
 }
 
-func (f *fakeAdminStore) UpdateExecProfile(_ context.Context, _ string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullGroupType) (db.GetExecProfileByUserIDRow, error) {
+func (f *fakeAdminStore) UpdateExecProfile(_ context.Context, _ string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullExecDisplayGroupType) (db.GetExecProfileByUserIDRow, error) {
 	return db.GetExecProfileByUserIDRow{}, nil
 }
 

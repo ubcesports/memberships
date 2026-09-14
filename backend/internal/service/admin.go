@@ -19,6 +19,13 @@ import (
 // Postgres error code for a unique constraint violation.
 const pgUniqueViolationCode = "23505"
 
+var defaultDisplayGroupType = map[db.GroupType]db.ExecDisplayGroupType{
+	"executive": db.ExecDisplayGroupTypeExecutive,
+	"board":     db.ExecDisplayGroupTypeBoard,
+	"director":  db.ExecDisplayGroupTypeGameDirector,
+	"president": db.ExecDisplayGroupTypePresident,
+}
+
 type AdminUserFilters struct {
 	FullName  string
 	StudentID string
@@ -194,7 +201,12 @@ func (s *AdminService) GetUserByID(ctx context.Context, userId string) (*dto.Pro
 }
 
 func (s *AdminService) UpdateExecProfile(ctx context.Context, actorId string, targetId string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullGroupType, requestId string) (db.GetExecProfileByUserIDRow, error) {
-	updatedProfile, err := s.adminRepository.UpdateExecProfile(ctx, targetId, title, displayOrder, displayGroup)
+	nullDisplayGroup := db.NullExecDisplayGroupType{
+		ExecDisplayGroupType: defaultDisplayGroupType[displayGroup.GroupType],
+		Valid:                true,
+	}
+
+	updatedProfile, err := s.adminRepository.UpdateExecProfile(ctx, targetId, title, displayOrder, nullDisplayGroup)
 
 	description := fmt.Sprintf("Updated exec profile for user %s", targetId)
 	outcome := db.AdminAuditOutcomeTypeSuccess
@@ -601,9 +613,9 @@ func (s *AdminService) applyGroupUpdates(
 			}, pgtype.Int4{
 				Int32: 0,
 				Valid: true,
-			}, db.NullGroupType{
-				GroupType: group,
-				Valid:     true,
+			}, db.NullExecDisplayGroupType{
+				ExecDisplayGroupType: defaultDisplayGroupType[group],
+				Valid:                true,
 			})
 		}
 
@@ -789,8 +801,7 @@ func isValidGroup(group db.GroupType) bool {
 	case db.GroupTypeMember,
 		db.GroupTypeCompetitiveTeam,
 		db.GroupTypeExecutive,
-		db.GroupTypeCentralDirector,
-		db.GroupTypeGameDirector,
+		db.GroupTypeDirector,
 		db.GroupTypeBoard,
 		db.GroupTypePresident:
 		return true

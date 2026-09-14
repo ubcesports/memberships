@@ -712,8 +712,7 @@ func parseAdminUserFilters(r *http.Request, includePagination bool) (service.Adm
 		case dto.GroupMember,
 			dto.GroupCompetitiveTeam,
 			dto.GroupExecutive,
-			dto.GroupCentralDirector,
-			dto.GroupGameDirector,
+			dto.GroupDirector,
 			dto.GroupBoard,
 			dto.GroupPresident:
 		default:
