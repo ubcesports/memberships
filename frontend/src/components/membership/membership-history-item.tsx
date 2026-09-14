@@ -56,17 +56,20 @@ export function MembershipHistoryItem({ membership }: MembershipHistoryItemProps
           <TransactionDetail label="Membership ID">
             <span className="break-all font-mono text-xs">{membership.id}</span>
           </TransactionDetail>
-          <TransactionDetail label="Membership program">
-            <span>{membership.program_name}</span>
-          </TransactionDetail>
           <TransactionDetail label="Transaction ID">
             <span className="break-all font-mono text-xs">{membership.transaction.id}</span>
+          </TransactionDetail>
+          <TransactionDetail label="Membership program">
+            <span>{membership.program_name}</span>
           </TransactionDetail>
           <TransactionDetail label="Amount paid">
             ${membership.transaction.amount_paid} CAD
           </TransactionDetail>
           <TransactionDetail label="Purchase type">
             {titleCase(membership.transaction.purchase_type)}
+          </TransactionDetail>
+          <TransactionDetail label="Payment method">
+            {titleCase(membership.transaction.payment_method)}
           </TransactionDetail>
           <TransactionDetail label="Group at purchase">
             {titleCase(membership.transaction.group_at_purchase)}

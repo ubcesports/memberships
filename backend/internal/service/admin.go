@@ -245,6 +245,7 @@ func (s *AdminService) GetUserMemberships(ctx context.Context, userId string) ([
 				StudentAtPurchase:     row.StudentAtPurchase.Bool,
 				StripePaymentIntentId: row.StripePaymentIntentID.String,
 				PurchaseType:          dto.PurchaseType(row.PurchaseType.PurchaseType),
+				PaymentMethod:         dto.PaymentMethodType(row.PaymentMethod),
 			},
 		})
 	}

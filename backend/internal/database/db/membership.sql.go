@@ -132,6 +132,7 @@ INSERT INTO transactions (
     group_at_purchase,
     student_at_purchase,
     purchase_type,
+    payment_method,
     status
 )
 VALUES (
@@ -140,6 +141,7 @@ VALUES (
     $3,
     $4,
     $5,
+    $6,
     'pending'
 )
 RETURNING id
@@ -151,6 +153,7 @@ type CreatePendingTransactionParams struct {
 	GroupAtPurchase   NullGroupType
 	StudentAtPurchase pgtype.Bool
 	PurchaseType      NullPurchaseType
+	PaymentMethod     PaymentMethodType
 }
 
 func (q *Queries) CreatePendingTransaction(ctx context.Context, arg CreatePendingTransactionParams) (pgtype.UUID, error) {
@@ -160,6 +163,7 @@ func (q *Queries) CreatePendingTransaction(ctx context.Context, arg CreatePendin
 		arg.GroupAtPurchase,
 		arg.StudentAtPurchase,
 		arg.PurchaseType,
+		arg.PaymentMethod,
 	)
 	var id pgtype.UUID
 	err := row.Scan(&id)
@@ -323,6 +327,7 @@ SELECT
     t.purchase_type,
     t.stripe_payment_intent_id,
     t.group_at_purchase,
+    t.payment_method,
     mp.id AS program_id,
     mp.program_name
 FROM memberships m
@@ -351,6 +356,7 @@ type GetAllMembershipsWithTransactionsRow struct {
 	PurchaseType          NullPurchaseType
 	StripePaymentIntentID pgtype.Text
 	GroupAtPurchase       NullGroupType
+	PaymentMethod         PaymentMethodType
 	ProgramID             pgtype.UUID
 	ProgramName           string
 }
@@ -379,6 +385,7 @@ func (q *Queries) GetAllMembershipsWithTransactions(ctx context.Context, userID 
 			&i.PurchaseType,
 			&i.StripePaymentIntentID,
 			&i.GroupAtPurchase,
+			&i.PaymentMethod,
 			&i.ProgramID,
 			&i.ProgramName,
 		); err != nil {
@@ -408,6 +415,7 @@ SELECT
     t.student_at_purchase,
     t.stripe_payment_intent_id,
     t.group_at_purchase,
+    t.payment_method,
     mp.id AS program_id,
     mp.program_name
 FROM memberships m
@@ -439,6 +447,7 @@ type GetCurrentMembershipsWithTransactionsRow struct {
 	StudentAtPurchase     pgtype.Bool
 	StripePaymentIntentID pgtype.Text
 	GroupAtPurchase       NullGroupType
+	PaymentMethod         PaymentMethodType
 	ProgramID             pgtype.UUID
 	ProgramName           string
 }
@@ -467,6 +476,7 @@ func (q *Queries) GetCurrentMembershipsWithTransactions(ctx context.Context, use
 			&i.StudentAtPurchase,
 			&i.StripePaymentIntentID,
 			&i.GroupAtPurchase,
+			&i.PaymentMethod,
 			&i.ProgramID,
 			&i.ProgramName,
 		); err != nil {
@@ -677,12 +687,60 @@ func (q *Queries) GetTransactionByCheckoutSessionIdForUpdate(ctx context.Context
 	return i, err
 }
 
-const putStripeCheckoutSessionId = `-- name: PutStripeCheckoutSessionId :exec
+const getTransactionByTransactionIdForUpdate = `-- name: GetTransactionByTransactionIdForUpdate :one
+SELECT
+    t.id,
+    t.user_id,
+    t.membership_id,
+    t.tier_id,
+    t.status,
+    t.purchase_type,
+    t.stripe_checkout_session_id,
+    mt.program_id,
+    mt.expiration_type
+FROM transactions AS t
+JOIN membership_tiers AS mt
+    ON mt.id = t.tier_id
+WHERE t.id = $1
+FOR UPDATE OF t
+`
+
+type GetTransactionByTransactionIdForUpdateRow struct {
+	ID                      pgtype.UUID
+	UserID                  pgtype.UUID
+	MembershipID            pgtype.UUID
+	TierID                  pgtype.UUID
+	Status                  TransactionStatusType
+	PurchaseType            NullPurchaseType
+	StripeCheckoutSessionID pgtype.Text
+	ProgramID               pgtype.UUID
+	ExpirationType          MembershipExpirationType
+}
+
+func (q *Queries) GetTransactionByTransactionIdForUpdate(ctx context.Context, id pgtype.UUID) (GetTransactionByTransactionIdForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getTransactionByTransactionIdForUpdate, id)
+	var i GetTransactionByTransactionIdForUpdateRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.MembershipID,
+		&i.TierID,
+		&i.Status,
+		&i.PurchaseType,
+		&i.StripeCheckoutSessionID,
+		&i.ProgramID,
+		&i.ExpirationType,
+	)
+	return i, err
+}
+
+const putStripeCheckoutSessionId = `-- name: PutStripeCheckoutSessionId :execrows
 UPDATE transactions
 SET
     stripe_checkout_session_id = $2,
     updated_at = NOW()
 WHERE id = $1
+  AND status = 'pending'
 `
 
 type PutStripeCheckoutSessionIdParams struct {
@@ -690,9 +748,12 @@ type PutStripeCheckoutSessionIdParams struct {
 	StripeCheckoutSessionID pgtype.Text
 }
 
-func (q *Queries) PutStripeCheckoutSessionId(ctx context.Context, arg PutStripeCheckoutSessionIdParams) error {
-	_, err := q.db.Exec(ctx, putStripeCheckoutSessionId, arg.ID, arg.StripeCheckoutSessionID)
-	return err
+func (q *Queries) PutStripeCheckoutSessionId(ctx context.Context, arg PutStripeCheckoutSessionIdParams) (int64, error) {
+	result, err := q.db.Exec(ctx, putStripeCheckoutSessionId, arg.ID, arg.StripeCheckoutSessionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updatePendingTransactionStatusByCheckoutId = `-- name: UpdatePendingTransactionStatusByCheckoutId :exec
