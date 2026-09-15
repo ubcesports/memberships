@@ -760,10 +760,6 @@ func (s *AdminService) applyGroupUpdates(
 			})
 		}
 
-		if !hasExecGroup && hasExecProfile {
-			store.RemoveExecProfile(ctx, user.ID.String())
-		}
-
 		current[group] = struct{}{}
 		entries = append(entries, pendingAuditLog{
 			action:      actionGroupAdded,
@@ -786,6 +782,20 @@ func (s *AdminService) applyGroupUpdates(
 
 		if err := store.RemoveUserGroup(ctx, user.ID.String(), group); err != nil {
 			return nil, auditable(actionGroupRemoved, fmt.Sprintf("Failed to remove group %s", group), err)
+		}
+
+		hasExecGroup, err := store.HasExecGroup(ctx, user.ID.String())
+		if err != nil {
+			return nil, auditable(actionGroupRemoved, "Failed to remove group: "+err.Error(), err)
+		}
+
+		hasExecProfile, err := store.HasExecProfile(ctx, user.ID.String())
+		if err != nil {
+			return nil, auditable(actionGroupRemoved, "Failed to add group: "+err.Error(), err)
+		}
+
+		if !hasExecGroup && hasExecProfile {
+			store.RemoveExecProfile(ctx, user.ID.String())
 		}
 
 		delete(current, group)
