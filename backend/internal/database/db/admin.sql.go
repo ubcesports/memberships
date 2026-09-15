@@ -666,22 +666,6 @@ func (q *Queries) StudentIDExists(ctx context.Context, studentID pgtype.Text) (b
 	return exists, err
 }
 
-const updateUserFullName = `-- name: UpdateUserFullName :exec
-UPDATE users
-SET full_name = $1, updated_at = NOW()
-WHERE id = $2
-`
-
-type UpdateUserFullNameParams struct {
-	FullName string
-	ID       pgtype.UUID
-}
-
-func (q *Queries) UpdateUserFullName(ctx context.Context, arg UpdateUserFullNameParams) error {
-	_, err := q.db.Exec(ctx, updateUserFullName, arg.FullName, arg.ID)
-	return err
-}
-
 const updateExecProfile = `-- name: UpdateExecProfile :exec
 UPDATE exec_profile
 SET
@@ -706,6 +690,22 @@ func (q *Queries) UpdateExecProfile(ctx context.Context, arg UpdateExecProfilePa
 		arg.DisplayGroup,
 		arg.UserID,
 	)
+	return err
+}
+
+const updateUserFullName = `-- name: UpdateUserFullName :exec
+UPDATE users
+SET full_name = $1, updated_at = NOW()
+WHERE id = $2
+`
+
+type UpdateUserFullNameParams struct {
+	FullName string
+	ID       pgtype.UUID
+}
+
+func (q *Queries) UpdateUserFullName(ctx context.Context, arg UpdateUserFullNameParams) error {
+	_, err := q.db.Exec(ctx, updateUserFullName, arg.FullName, arg.ID)
 	return err
 }
 
