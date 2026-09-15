@@ -97,8 +97,7 @@ export const GROUP_OPTIONS: { value: GroupType; label: string }[] = [
   { value: "member", label: "Member" },
   { value: "competitive_team", label: "Competitive Team" },
   { value: "executive", label: "Executive" },
-  { value: "central_director", label: "Central Director" },
-  { value: "game_director", label: "Game Director" },
+  { value: "director", label: "Director" },
   { value: "board", label: "Board" },
 ];
 
