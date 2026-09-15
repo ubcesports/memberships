@@ -23,7 +23,7 @@ export function AdminTablePage({
   return (
     <BasePage>
       <div className="flex flex-1 items-center py-6">
-        <section className="mx-auto flex min-h-[85vh] w-full max-h-[calc(100vh-3rem)] flex-col">
+        <section className="mx-auto flex min-h-[85vh] w-full flex-col">
           {isLoading ? (
             <div className="flex items-center gap-3 text-brand-text-muted">
               <Loader2 aria-hidden="true" className="size-5 animate-spin" />

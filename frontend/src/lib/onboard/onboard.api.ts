@@ -1,6 +1,6 @@
 import apiClient from "@/lib/client";
-import type { ApiErrorResponse } from "@/lib/client";
-import type { CompleteOnboardingPayload } from "./onboard.types";
+import type { ApiErrorResponse } from "@/lib/types/api.types";
+import type { CompleteOnboardingPayload } from "@/lib/types/user.types";
 
 export const ONBOARDING_REQUIRED = "ONBOARDING_REQUIRED";
 

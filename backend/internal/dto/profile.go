@@ -18,6 +18,8 @@ type ProfileDTO struct {
 }
 
 type OnboardUserRequest struct {
-	IsStudent bool    `json:"is_student"`
-	StudentID *string `json:"student_id"`
+	FullName   string  `json:"full_name"`
+	IsStudent  bool    `json:"is_student"`
+	StudentID  *string `json:"student_id"`
+	InviteCode *string `json:"invite_code"`
 }

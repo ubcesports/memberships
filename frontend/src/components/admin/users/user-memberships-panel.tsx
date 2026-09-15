@@ -1,26 +1,27 @@
 "use client";
 
-import { Loader2, Ban } from "lucide-react";
-import { Fragment, useMemo, useState } from "react";
+import { Ban, Loader2 } from "lucide-react";
+import { Fragment, useState } from "react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/action-button";
 import { DetailRow } from "@/components/detail-row";
 import { StatusBadge } from "@/components/status-badge";
 import { SurfacePanel } from "@/components/surface-panel";
-import type { Membership, UpdateUserRequest } from "@/lib/admin/admin.types";
-import { useMembershipCatalog } from "@/lib/membership.hook";
+import { OfflineMembershipForm } from "@/components/admin/users/offline-membership-form";
+import type { UpdateUserRequest } from "@/lib/types/admin.types";
 import { formatDate, formatTime } from "@/lib/utils/formatting";
-import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
+import { titleCase } from "@/lib/utils/groups";
 
 type UserMembershipsPanelProps = {
+  userId: string;
   memberships: Membership[];
   onSave: (body: UpdateUserRequest) => Promise<unknown>;
   isSaving: boolean;
 };
 
-type MembershipState = "active" | "cancelled" | "expired";
+import type { Membership, MembershipStatus } from "@/lib/types/membership.types";
 
-function getMembershipState(membership: Membership): MembershipState {
+function getMembershipState(membership: Membership): MembershipStatus {
   if (membership.cancelled_at) {
     return "cancelled";
   }
@@ -34,14 +35,6 @@ const STATE_TONE = {
   expired: "muted",
 } as const;
 
-function TransactionSummary({ membership }: { membership: Membership }) {
-  return (
-    <span className="text-brand-text-muted">
-      ${membership.transaction.amount_paid} · {titleCase(membership.transaction.status)}
-    </span>
-  );
-}
-
 function TransactionDetails({ membership }: { membership: Membership }) {
   const tx = membership.transaction;
 
@@ -49,86 +42,55 @@ function TransactionDetails({ membership }: { membership: Membership }) {
     <div className="px-5 py-4 text-sm text-brand-text-muted">
       <div className="grid grid-cols-2 gap-4">
         <div>
+          <div className="font-medium text-brand-text">Membership ID</div>
+          <div>{membership.id}</div>
+        </div>
+        <div>
           <div className="font-medium text-brand-text">Transaction ID</div>
-          <div>{tx.id ?? "—"}</div>
+          <div>{tx.id}</div>
         </div>
         <div>
-          <div className="font-medium text-brand-text">Status</div>
-          <div>{titleCase(tx.status ?? "unknown")}</div>
+          <div className="font-medium text-brand-text">Amount Paid</div>
+          <div>${tx.amount_paid} CAD</div>
         </div>
         <div>
-          <div className="font-medium text-brand-text">Amount</div>
-          <div>
-            {tx.currency ? `${tx.currency.toUpperCase()} ` : ""}
-            {tx.amount_paid ?? "—"}
-          </div>
+          <div className="font-medium text-brand-text">Group at purchase</div>
+          <div>{titleCase(tx.group_at_purchase)}</div>
         </div>
         <div>
-          <div className="font-medium text-brand-text">Customer</div>
-          <div>{tx.customer_id ?? "—"}</div>
+          <div className="font-medium text-brand-text">Student at purchase</div>
+          <div>{titleCase(tx.student_at_purchase.toString())}</div>
         </div>
         <div>
-          <div className="font-medium text-brand-text">Payment intent</div>
-          <div>{tx.payment_intent ?? "—"}</div>
+          <div className="font-medium text-brand-text">Purchase type</div>
+          <div>{titleCase(tx.purchase_type)}</div>
         </div>
         <div>
-          <div className="font-medium text-brand-text">Charge</div>
-          <div>{tx.charge_id ?? "—"}</div>
+          <div className="font-medium text-brand-text">Payment method</div>
+          <div>{titleCase(tx.payment_method)}</div>
         </div>
-        <div className="col-span-2">
-          <div className="font-medium text-brand-text">Created</div>
-          <div>{tx.created_at ? formatDate(tx.created_at) : "—"}</div>
+        <div>
+          <div className="font-medium text-brand-text">Stripe payment intent ID</div>
+          <div>{tx.stripe_payment_intent_id}</div>
         </div>
-        {tx.metadata ? (
-          <div className="col-span-2">
-            <div className="font-medium text-brand-text">Metadata</div>
-            <pre className="whitespace-pre-wrap break-words text-xs">
-              {JSON.stringify(tx.metadata)}
-            </pre>
-          </div>
-        ) : null}
       </div>
     </div>
   );
 }
 
-export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMembershipsPanelProps) {
-  const [pendingAction, setPendingAction] = useState<"cancel" | null>(null);
-  const { data: catalog } = useMembershipCatalog();
+export function UserMembershipsPanel({
+  userId,
+  memberships,
+  onSave,
+  isSaving,
+}: UserMembershipsPanelProps) {
+  const [pendingCancellationId, setPendingCancellationId] = useState<string | null>(null);
 
-  const tierTitleById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const tier of catalog ?? []) {
-      map.set(tier.id, tier.title);
-    }
-    return map;
-  }, [catalog]);
-
-  const tierTitle = (tierId: string) => tierTitleById.get(tierId) ?? "Unknown tier";
-
-  const tierTitleForMembership = (membership: Membership) => {
-    // Prefer server-provided title when available (joined on membership_tiers).
-    if (membership.tier_title) return membership.tier_title;
-
-    return tierTitle(membership.tier_id);
-  };
-
-  const current =
-    memberships.find(
-      (membership) => !membership.cancelled_at && new Date(membership.expires_at) > new Date(),
-    ) ?? null;
-  const past = memberships.filter((membership) => membership.id !== current?.id);
-
-  const runAction = async (body: UpdateUserRequest, message: string) => {
-    try {
-      await onSave(body);
-      toast.success(message);
-    } catch {
-      // The API client already surfaces the error message as a toast.
-    } finally {
-      setPendingAction(null);
-    }
-  };
+  const activeMemberships = memberships.filter(
+    (membership) => getMembershipState(membership) === "active",
+  );
+  const activeMembershipIds = new Set(activeMemberships.map((membership) => membership.id));
+  const past = memberships.filter((membership) => !activeMembershipIds.has(membership.id));
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -136,79 +98,105 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const cancelMembership = async (membership: Membership) => {
+    try {
+      await onSave({ cancel_membership_id: membership.id });
+      toast.success(`${membership.tier_title} membership cancelled`);
+    } catch {
+      // The API client already surfaces the error message as a toast.
+    } finally {
+      setPendingCancellationId(null);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
-      <SurfacePanel className="bg-transparent">
-        <div className="flex flex-col gap-3 border-b border-brand-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-brand-text">Current membership</h2>
-            <p className="mt-1 text-sm text-brand-text-subtle">
-              The membership this user holds right now.
-            </p>
-          </div>
+      <OfflineMembershipForm userId={userId} />
 
-          <div className="flex shrink-0 gap-2">
-            {current ? (
-              pendingAction === "cancel" ? (
-                <>
-                  <ActionButton
-                    onClick={() => runAction({ cancel_membership: true }, "Membership cancelled")}
-                    loading={isSaving}
-                    loadingIcon={<Loader2 aria-hidden="true" className="size-4 animate-spin" />}
-                    className="border-amber-300/40 text-amber-100"
-                  >
-                    Confirm cancel
-                  </ActionButton>
-                  <ActionButton onClick={() => setPendingAction(null)} disabled={isSaving}>
-                    Keep
-                  </ActionButton>
-                </>
-              ) : (
-                <ActionButton
-                  onClick={() => setPendingAction("cancel")}
-                  icon={<Ban aria-hidden="true" className="size-4" />}
-                >
-                  Cancel membership
-                </ActionButton>
-              )
-            ) : null}
-          </div>
+      <SurfacePanel className="bg-transparent">
+        <div className="border-b border-brand-border px-5 py-4">
+          <h2 className="text-base font-semibold text-brand-text">Current memberships</h2>
+          <p className="mt-1 text-sm text-brand-text-subtle">
+            The active memberships this user holds across all programs.
+          </p>
         </div>
 
-        {current ? (
-          <>
-            <dl>
-              <DetailRow label="Tier">{tierTitleForMembership(current)}</DetailRow>
-              <DetailRow label="Started">{formatTime(current.started_at)}</DetailRow>
-              <DetailRow label="Expires">{formatTime(current.expires_at)}</DetailRow>
-              <DetailRow label="Amount paid">${current.transaction.amount_paid}</DetailRow>
-              <DetailRow label="Transaction">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge tone="muted">{titleCase(current.transaction.status)}</StatusBadge>
-                    {current.transaction.group_at_purchase ? (
-                      <StatusBadge
-                        className={getGroupBadgeClass(current.transaction.group_at_purchase)}
-                      >
-                        {titleCase(current.transaction.group_at_purchase)}
-                      </StatusBadge>
-                    ) : null}
+        {activeMemberships.length > 0 ? (
+          <div className="divide-y divide-brand-border">
+            {activeMemberships.map((membership) => (
+              <section key={membership.id} aria-labelledby={`active-membership-${membership.id}`}>
+                <div className="flex flex-wrap items-start justify-between gap-3 bg-white/2 px-5 py-4">
+                  <div>
+                    <h3
+                      id={`active-membership-${membership.id}`}
+                      className="mt-1 text-base font-semibold text-brand-text"
+                    >
+                      Tier: {membership.tier_title}
+                    </h3>
+                    <p className="text-sm font-semibold text-brand-text-subtle">
+                      Program: {membership.program_name}
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => toggleExpanded(current.id)}
-                    className="text-sm text-brand-primary underline"
-                  >
-                    {expanded[current.id] ? "Hide details" : "Details"}
-                  </button>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <StatusBadge tone="success">Active</StatusBadge>
+                    {pendingCancellationId === membership.id ? (
+                      <>
+                        <ActionButton
+                          onClick={() => cancelMembership(membership)}
+                          loading={isSaving}
+                          loadingIcon={
+                            <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                          }
+                          className="border-amber-300/40 text-amber-100"
+                        >
+                          Confirm cancel
+                        </ActionButton>
+                        <ActionButton
+                          onClick={() => setPendingCancellationId(null)}
+                          disabled={isSaving}
+                        >
+                          Keep membership
+                        </ActionButton>
+                      </>
+                    ) : (
+                      <ActionButton
+                        onClick={() => setPendingCancellationId(membership.id)}
+                        disabled={isSaving || pendingCancellationId !== null}
+                        icon={<Ban aria-hidden="true" className="size-4" />}
+                      >
+                        Cancel membership
+                      </ActionButton>
+                    )}
+                  </div>
                 </div>
-              </DetailRow>
-            </dl>
-            {expanded[current.id] ? <TransactionDetails membership={current} /> : null}
-          </>
+
+                <dl>
+                  <DetailRow label="Started">{formatTime(membership.started_at)}</DetailRow>
+                  <DetailRow label="Expires">{formatTime(membership.expires_at)}</DetailRow>
+                  <DetailRow label="Transaction">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge tone="muted">
+                          {titleCase(membership.transaction.status)}
+                        </StatusBadge>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(membership.id)}
+                        className="text-sm text-brand-primary underline"
+                      >
+                        {expanded[membership.id] ? "Hide details" : "Details"}
+                      </button>
+                    </div>
+                  </DetailRow>
+                </dl>
+                {expanded[membership.id] ? <TransactionDetails membership={membership} /> : null}
+              </section>
+            ))}
+          </div>
         ) : (
           <p className="px-5 py-6 text-sm text-brand-text-muted">
-            This user has no active membership.
+            This user has no active memberships.
           </p>
         )}
       </SurfacePanel>
@@ -225,10 +213,10 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
           <p className="px-5 py-6 text-sm text-brand-text-muted">No previous memberships.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[42rem] border-collapse text-left">
+            <table className="w-full min-w-2xl border-collapse text-left">
               <thead>
-                <tr className="border-b border-brand-border bg-white/[0.02]">
-                  {["Tier", "Status", "Started", "Expires", "Cancelled", "Transaction"].map(
+                <tr className="border-b border-brand-border bg-white/2">
+                  {["Program", "Tier", "Status", "Started", "Expires", "Cancelled"].map(
                     (header) => (
                       <th
                         key={header}
@@ -247,9 +235,10 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
                   return (
                     <Fragment key={membership.id}>
                       <tr className="border-b border-brand-border/70 text-sm last:border-b-0">
-                        <td className="px-4 py-3 text-brand-text">
-                          {tierTitleForMembership(membership)}
+                        <td className="px-4 py-3 text-brand-text-muted">
+                          {membership.program_name}
                         </td>
+                        <td className="px-4 py-3 text-brand-text">{membership.tier_title}</td>
                         <td className="px-4 py-3">
                           <StatusBadge tone={STATE_TONE[state]}>{titleCase(state)}</StatusBadge>
                         </td>
@@ -264,7 +253,6 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-between">
-                            <TransactionSummary membership={membership} />
                             <button
                               type="button"
                               onClick={() => toggleExpanded(membership.id)}
@@ -276,8 +264,8 @@ export function UserMembershipsPanel({ memberships, onSave, isSaving }: UserMemb
                         </td>
                       </tr>
                       {expanded[membership.id] ? (
-                        <tr key={`${membership.id}-details`} className="bg-white/[0.02]">
-                          <td colSpan={6} className="px-0">
+                        <tr key={`${membership.id}-details`} className="bg-white/2">
+                          <td colSpan={7} className="px-0">
                             <TransactionDetails membership={membership} />
                           </td>
                         </tr>

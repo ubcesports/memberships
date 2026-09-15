@@ -49,6 +49,7 @@ The VPS runs the app with Docker Compose. One-time server setup:
 | Variable | Description |
 | --- | --- |
 | `NEXT_PUBLIC_API_URL` | Public API URL baked into the frontend image at build time |
+| `NEXT_PUBLIC_SITE_URL` | Canonical frontend URL used by metadata, robots.txt, and sitemap.xml |
 
 ### Deploy flow
 

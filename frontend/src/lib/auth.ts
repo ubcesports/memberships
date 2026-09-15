@@ -1,21 +1,14 @@
-import axios from "axios";
-import { API_BASE } from "@/lib/client";
+import apiClient from "@/lib/client";
 
-type OAuthAuthorizeResponse = {
-  url: string;
-};
+import type { OAuthAuthorizeResponse } from "@/lib/types/user.types";
 
 export async function redirectToSignIn(returnTo: string) {
-  const response = await axios.get<OAuthAuthorizeResponse>(
-    `${API_BASE}/auth/oauth/zetrova/authorize`,
-    {
-      params: {
-        redirect_uri: returnTo,
-        error_redirect_uri: returnTo,
-      },
-      withCredentials: true,
+  const response = await apiClient.get<OAuthAuthorizeResponse>("/auth/oauth/zetrova/authorize", {
+    params: {
+      redirect_uri: returnTo,
+      error_redirect_uri: returnTo,
     },
-  );
+  });
 
   window.location.assign(response.data.url);
 }

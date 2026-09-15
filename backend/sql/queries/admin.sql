@@ -6,7 +6,8 @@ WITH args AS (
         sqlc.narg('email')::text AS email,
         sqlc.narg('role')::role_type AS role,
         sqlc.narg('is_student')::boolean AS is_student,
-        sqlc.narg('group')::group_type AS "group",
+        sqlc.narg('groups')::text[] AS groups,
+        sqlc.narg('membership_tier_ids')::text[] AS membership_tier_ids,
         sqlc.narg('limit')::integer AS "limit",
         sqlc.narg('offset')::integer AS "offset"
 )
@@ -22,7 +23,8 @@ SELECT
     u.is_student,
     u.onboarding_completed_at,
     u.avatar_url,
-    COALESCE(g.groups, '{}'::text[])::text[] AS groups
+    COALESCE(g.groups, '{}'::text[])::text[] AS groups,
+    COALESCE(am.tier_titles, '{}'::text[])::text[] AS active_membership_tier_titles
 FROM users u
 CROSS JOIN args a
 LEFT JOIN LATERAL (
@@ -33,6 +35,16 @@ LEFT JOIN LATERAL (
     FROM user_groups ug
     WHERE ug.user_id = u.id
 ) g ON true
+LEFT JOIN LATERAL (
+    SELECT
+        array_agg(mt.title ORDER BY mt.title, mt.id) AS tier_titles
+    FROM memberships m
+    JOIN membership_tiers mt ON mt.id = m.tier_id
+    WHERE m.user_id = u.id
+      AND m.cancelled_at IS NULL
+      AND m.started_at <= NOW()
+      AND m.expires_at > NOW()
+) am ON true
 WHERE (
     a.full_name IS NULL
     OR u.full_name ILIKE '%' || a.full_name || '%'
@@ -54,13 +66,25 @@ AND (
     OR u.is_student = a.is_student
 )
 AND (
-    a."group" IS NULL
-    OR EXISTS (
-        SELECT 1
+    a.groups IS NULL
+    OR ARRAY(
+        SELECT filter_group."group"::text
         FROM user_groups filter_group
         WHERE filter_group.user_id = u.id
-          AND filter_group."group" = a."group"
-    )
+        ORDER BY filter_group."group"::text
+    ) = a.groups
+)
+AND (
+    a.membership_tier_ids IS NULL
+    OR ARRAY(
+        SELECT DISTINCT filter_tier.tier_id::text
+        FROM memberships filter_tier
+        WHERE filter_tier.user_id = u.id
+          AND filter_tier.cancelled_at IS NULL
+          AND filter_tier.started_at <= NOW()
+          AND filter_tier.expires_at > NOW()
+        ORDER BY filter_tier.tier_id::text
+    ) = a.membership_tier_ids
 )
 ORDER BY u.created_at DESC
 LIMIT (SELECT "limit" FROM args)
@@ -74,7 +98,8 @@ WITH args AS (
         sqlc.narg('email')::text AS email,
         sqlc.narg('role')::role_type AS role,
         sqlc.narg('is_student')::boolean AS is_student,
-        sqlc.narg('group')::group_type AS "group"
+        sqlc.narg('groups')::text[] AS groups,
+        sqlc.narg('membership_tier_ids')::text[] AS membership_tier_ids
 )
 SELECT COUNT(*)
 FROM users u
@@ -100,14 +125,35 @@ AND (
     OR u.is_student = a.is_student
 )
 AND (
-    a."group" IS NULL
-    OR EXISTS (
-        SELECT 1
+    a.groups IS NULL
+    OR ARRAY(
+        SELECT filter_group."group"::text
         FROM user_groups filter_group
         WHERE filter_group.user_id = u.id
-          AND filter_group."group" = a."group"
-    )
+        ORDER BY filter_group."group"::text
+    ) = a.groups
+)
+AND (
+    a.membership_tier_ids IS NULL
+    OR ARRAY(
+        SELECT DISTINCT filter_tier.tier_id::text
+        FROM memberships filter_tier
+        WHERE filter_tier.user_id = u.id
+          AND filter_tier.cancelled_at IS NULL
+          AND filter_tier.started_at <= NOW()
+          AND filter_tier.expires_at > NOW()
+        ORDER BY filter_tier.tier_id::text
+    ) = a.membership_tier_ids
 );
+
+-- name: GetAdminMembershipTierOptions :many
+SELECT
+    mt.id,
+    mt.title,
+    mp.program_name
+FROM membership_tiers mt
+JOIN membership_programs mp ON mp.id = mt.program_id
+ORDER BY mp.program_name, mt.title, mt.id;
 
 -- name: GetAdminUserByID :one
 SELECT
@@ -133,6 +179,11 @@ LEFT JOIN LATERAL (
     WHERE ug.user_id = u.id
 ) g ON true
 WHERE u.id = $1;
+
+-- name: UpdateUserFullName :exec
+UPDATE users
+SET full_name = sqlc.arg(full_name), updated_at = NOW()
+WHERE id = sqlc.arg(id);
 
 -- name: UpdateUserStudentInfo :exec
 UPDATE users
@@ -235,6 +286,7 @@ WHERE (
     sqlc.narg(actor_name)::text IS NULL
     OR actor.full_name ILIKE '%' || sqlc.narg(actor_name)::text || '%'
 );
+
 
 -- name: CreateExecProfile :exec
 INSERT INTO exec_profile (

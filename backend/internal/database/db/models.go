@@ -191,6 +191,92 @@ func (ns NullGroupType) Value() (driver.Value, error) {
 	return string(ns.GroupType), nil
 }
 
+type MembershipExpirationType string
+
+const (
+	MembershipExpirationTypeSemester MembershipExpirationType = "semester"
+	MembershipExpirationTypeYear     MembershipExpirationType = "year"
+	MembershipExpirationTypeDay      MembershipExpirationType = "day"
+)
+
+func (e *MembershipExpirationType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = MembershipExpirationType(s)
+	case string:
+		*e = MembershipExpirationType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for MembershipExpirationType: %T", src)
+	}
+	return nil
+}
+
+type NullMembershipExpirationType struct {
+	MembershipExpirationType MembershipExpirationType
+	Valid                    bool // Valid is true if MembershipExpirationType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullMembershipExpirationType) Scan(value interface{}) error {
+	if value == nil {
+		ns.MembershipExpirationType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.MembershipExpirationType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullMembershipExpirationType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.MembershipExpirationType), nil
+}
+
+type PaymentMethodType string
+
+const (
+	PaymentMethodTypeStripe    PaymentMethodType = "stripe"
+	PaymentMethodTypeCash      PaymentMethodType = "cash"
+	PaymentMethodTypeEtransfer PaymentMethodType = "etransfer"
+)
+
+func (e *PaymentMethodType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PaymentMethodType(s)
+	case string:
+		*e = PaymentMethodType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PaymentMethodType: %T", src)
+	}
+	return nil
+}
+
+type NullPaymentMethodType struct {
+	PaymentMethodType PaymentMethodType
+	Valid             bool // Valid is true if PaymentMethodType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPaymentMethodType) Scan(value interface{}) error {
+	if value == nil {
+		ns.PaymentMethodType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PaymentMethodType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPaymentMethodType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PaymentMethodType), nil
+}
+
 type PurchaseType string
 
 const (
@@ -371,6 +457,11 @@ type Membership struct {
 	UpdatedAt   pgtype.Timestamptz
 }
 
+type MembershipProgram struct {
+	ID          pgtype.UUID
+	ProgramName string
+}
+
 type MembershipTier struct {
 	ID              pgtype.UUID
 	Title           string
@@ -382,6 +473,8 @@ type MembershipTier struct {
 	Slug            pgtype.Text
 	Group           NullGroupType
 	Benefits        []string
+	ProgramID       pgtype.UUID
+	ExpirationType  MembershipExpirationType
 }
 
 type MembershipTierPrice struct {
@@ -418,6 +511,7 @@ type Transaction struct {
 	PurchaseType            NullPurchaseType
 	StripeCheckoutSessionID pgtype.Text
 	TierID                  pgtype.UUID
+	PaymentMethod           PaymentMethodType
 }
 
 type User struct {

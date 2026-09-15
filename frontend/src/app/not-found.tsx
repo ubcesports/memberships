@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { BasePage } from "@/components/layout/base-page";
+import { NO_INDEX_ROBOTS } from "@/lib/site";
 import { StatusPage } from "../components/status-page";
 
 export const metadata: Metadata = {
   title: "Page Not Found",
+  robots: NO_INDEX_ROBOTS,
 };
 
 export default function NotFound() {

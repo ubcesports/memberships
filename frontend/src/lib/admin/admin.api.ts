@@ -1,42 +1,48 @@
 import apiClient from "../client";
 import type {
   AdminUserFilters,
+  AdminMembershipTierOption,
   AdminPagination,
   AppliedSearch,
-  Membership,
   UpdateUserRequest,
-  User,
   UserResponse,
   UsersResponse,
   AuditLogResponse,
-} from "./admin.types";
+  AddOfflineMembershipRequest,
+} from "@/lib/types/admin.types";
+import type { User } from "@/lib/types/user.types";
+import type { EligibleMembershipTier, Membership } from "../types/membership.types";
 
 export function buildAdminUserParams(
   appliedSearch: AppliedSearch,
   filters: AdminUserFilters,
   pagination?: AdminPagination,
-): Record<string, string | number | boolean> {
-  const params: Record<string, string | number | boolean> = {};
+): URLSearchParams {
+  const params = new URLSearchParams();
 
   if (appliedSearch?.value.trim()) {
-    params[appliedSearch.mode] = appliedSearch.value.trim();
+    params.set(appliedSearch.mode, appliedSearch.value.trim());
   }
 
   if (filters.role) {
-    params.role = filters.role;
+    params.set("role", filters.role);
   }
 
-  if (filters.group) {
-    params.group = filters.group;
+  for (const group of filters.groups ?? []) {
+    params.append("group", group);
+  }
+
+  for (const tierId of filters.membershipTierIds ?? []) {
+    params.append("membership_tier_id", tierId);
   }
 
   if (filters.isStudent !== undefined) {
-    params.is_student = filters.isStudent;
+    params.set("is_student", String(filters.isStudent));
   }
 
   if (pagination) {
-    params.limit = pagination.limit;
-    params.offset = pagination.offset;
+    params.set("limit", String(pagination.limit));
+    params.set("offset", String(pagination.offset));
   }
 
   return params;
@@ -56,6 +62,16 @@ export async function fetchUsers(
   return response.data;
 }
 
+export async function fetchAdminMembershipTierOptions(
+  signal?: AbortSignal,
+): Promise<AdminMembershipTierOption[]> {
+  const response = await apiClient.get<AdminMembershipTierOption[]>("/admin/membership-tiers", {
+    signal,
+  });
+
+  return response.data ?? [];
+}
+
 export async function fetchUser(userId: string, signal?: AbortSignal): Promise<User> {
   const response = await apiClient.get<UserResponse>(`/admin/users/${userId}`, { signal });
 
@@ -71,6 +87,25 @@ export async function fetchUserMemberships(
   });
 
   return response.data ?? [];
+}
+
+export async function fetchEligibleMembershipsForUser(
+  userId: string,
+  signal?: AbortSignal,
+): Promise<EligibleMembershipTier[]> {
+  const response = await apiClient.get<EligibleMembershipTier[]>(
+    `/admin/memberships/eligible/${userId}`,
+    { signal },
+  );
+
+  return response.data ?? [];
+}
+
+export async function addOfflineMembership(
+  userId: string,
+  body: AddOfflineMembershipRequest,
+): Promise<void> {
+  await apiClient.post(`/admin/membership/add/${userId}`, body);
 }
 
 export async function updateUser(userId: string, body: UpdateUserRequest): Promise<User> {

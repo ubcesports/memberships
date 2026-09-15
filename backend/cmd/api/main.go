@@ -14,7 +14,9 @@ import (
 	"github.com/ubcesports/memberships/internal/handlers"
 	"github.com/ubcesports/memberships/internal/logging"
 	"github.com/ubcesports/memberships/internal/mailer"
+	"github.com/ubcesports/memberships/internal/membershippolicy"
 	"github.com/ubcesports/memberships/internal/repository"
+	"github.com/ubcesports/memberships/internal/scheduler"
 	"github.com/ubcesports/memberships/internal/server"
 	"github.com/ubcesports/memberships/internal/service"
 	"github.com/ubcesports/memberships/internal/stripeclient"
@@ -37,5 +39,7 @@ func main() {
 		server.Module,
 		mailer.Module,
 		stripeclient.Module,
+		scheduler.Module,
+		membershippolicy.Module,
 	).Run()
 }

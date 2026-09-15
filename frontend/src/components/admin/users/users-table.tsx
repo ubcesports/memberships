@@ -1,21 +1,33 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DataTable, type Column } from "../admin-data-table";
 import { AvatarCell, EmptyValue, formatOptionalTime } from "../admin-table-cells";
 import { StatusBadge } from "@/components/status-badge";
-import type { User } from "@/lib/admin/admin.types";
+import type { AdminUser } from "@/lib/types/admin.types";
 import { formatTime } from "@/lib/utils/formatting";
 import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
+import { SummaryDropdown } from "./summary-dropdown";
 
 type UsersTableProps = {
-  users: User[];
+  users: AdminUser[];
   isLoading: boolean;
   isFetching: boolean;
 };
 
-const columns: Column<User>[] = [
+const columns: Column<AdminUser>[] = [
   {
     header: "Full name",
     cellClassName: "whitespace-nowrap px-4 py-3 font-medium text-brand-text",
-    cell: (user) => user.full_name,
+    cell: (user) => (
+      <Link
+        href={`/admin/users/${user.id}`}
+        className="underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+      >
+        {user.full_name}
+      </Link>
+    ),
   },
   { header: "Email", cell: (user) => user.email },
   {
@@ -44,13 +56,35 @@ const columns: Column<User>[] = [
     cellClassName: "px-4 py-3",
     cell: (user) =>
       user.groups.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
+        <SummaryDropdown
+          summary={`${user.groups.length} ${user.groups.length === 1 ? "group" : "groups"}`}
+        >
           {user.groups.map((group) => (
             <StatusBadge key={group} tone="default" className={getGroupBadgeClass(group)}>
               {titleCase(group)}
             </StatusBadge>
           ))}
-        </div>
+        </SummaryDropdown>
+      ) : (
+        <EmptyValue />
+      ),
+  },
+  {
+    header: "Active memberships",
+    cellClassName: "px-4 py-3",
+    cell: (user) =>
+      user.active_memberships.length > 0 ? (
+        <SummaryDropdown
+          summary={`${user.active_memberships.length} ${
+            user.active_memberships.length === 1 ? "membership" : "memberships"
+          }`}
+        >
+          {user.active_memberships.map((membership, index) => (
+            <StatusBadge key={`${membership.tier_title}-${index}`} tone="success">
+              {membership.tier_title}
+            </StatusBadge>
+          ))}
+        </SummaryDropdown>
       ) : (
         <EmptyValue />
       ),
@@ -74,6 +108,8 @@ const columns: Column<User>[] = [
 ];
 
 export function UsersTable({ users, isLoading, isFetching }: UsersTableProps) {
+  const router = useRouter();
+
   return (
     <DataTable
       data={users}
@@ -83,6 +119,7 @@ export function UsersTable({ users, isLoading, isFetching }: UsersTableProps) {
       isFetching={isFetching}
       loadingLabel="Loading users"
       emptyLabel="No users match your search and filters."
+      onRowClick={(user) => router.push(`/admin/users/${user.id}`)}
     />
   );
 }

@@ -19,3 +19,25 @@ func TestBuildAdminQueryParamsLeavesPaginationNullForExport(t *testing.T) {
 		t.Fatalf("expected null pagination, got limit=%#v offset=%#v", params.Limit, params.Offset)
 	}
 }
+
+func TestBuildAdminQueryParamsNormalizesExactSetFilters(t *testing.T) {
+	params := buildAdminQueryParams(AdminUserFilters{
+		Groups:            []string{"member", "executive", "member"},
+		MembershipTierIDs: []string{"b", "a", "b"},
+	})
+
+	if len(params.Groups) != 2 || params.Groups[0] != "executive" || params.Groups[1] != "member" {
+		t.Fatalf("expected sorted unique groups, got %#v", params.Groups)
+	}
+	if len(params.MembershipTierIds) != 2 || params.MembershipTierIds[0] != "a" || params.MembershipTierIds[1] != "b" {
+		t.Fatalf("expected sorted unique membership tiers, got %#v", params.MembershipTierIds)
+	}
+}
+
+func TestBuildAdminQueryParamsLeavesEmptySetsUnfiltered(t *testing.T) {
+	params := buildAdminQueryParams(AdminUserFilters{})
+
+	if params.Groups != nil || params.MembershipTierIds != nil {
+		t.Fatalf("expected omitted sets to remain nil, got groups=%#v tiers=%#v", params.Groups, params.MembershipTierIds)
+	}
+}

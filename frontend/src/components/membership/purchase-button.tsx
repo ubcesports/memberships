@@ -1,6 +1,6 @@
 import { ArrowRight, Loader2, LogIn } from "lucide-react";
 import { purchaseLabel } from "@/components/membership/pricing";
-import type { EligibleMembershipTier } from "@/lib/membership.hook";
+import type { EligibleMembershipTier } from "@/lib/types/membership.types";
 
 type PurchaseButtonProps = {
   tier?: EligibleMembershipTier;

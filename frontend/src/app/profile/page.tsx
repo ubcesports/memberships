@@ -7,6 +7,7 @@ import { ActionLink } from "@/components/action-link";
 import { DetailRow } from "@/components/detail-row";
 import { BasePage } from "@/components/layout/base-page";
 import { MembershipHistoryItem } from "@/components/membership/membership-history-item";
+import { MembershipLoadError } from "@/components/membership/membership-load-error";
 import { StatusBadge } from "@/components/status-badge";
 import { SummaryTile } from "@/components/summary-tile";
 import { SurfacePanel } from "@/components/surface-panel";
@@ -16,14 +17,60 @@ import { formatDate, getInitials } from "@/lib/utils/formatting";
 import { getGroupBadgeClass, titleCase } from "@/lib/utils/groups";
 import { useProfile } from "@/lib/profile.hook";
 import { useAllMemberships } from "@/lib/membership.hook";
+import type { Membership } from "@/lib/types/membership.types";
 import Image from "next/image";
 
 const ZETROVA_ACCOUNT_URL =
   process.env.NEXT_PUBLIC_ZETROVA_ACCOUNT_URL || "https://id.zetrova.com/dashboard";
 
+function isActiveMembership(membership: Membership) {
+  return !membership.cancelled_at && new Date(membership.expires_at) > new Date();
+}
+
+type MembershipSectionProps = {
+  title: string;
+  description: string;
+  memberships: Membership[];
+  emptyMessage: string;
+};
+
+function MembershipSection({
+  title,
+  description,
+  memberships,
+  emptyMessage,
+}: MembershipSectionProps) {
+  return (
+    <SurfacePanel>
+      <div className="px-5 py-4">
+        <h3 className="text-base font-semibold text-brand-text">{title}</h3>
+        <p className="mt-1 text-sm text-brand-text-subtle">{description}</p>
+      </div>
+
+      {memberships.length === 0 ? (
+        <p className="border-t border-brand-border px-5 py-6 text-sm text-brand-text-muted">
+          {emptyMessage}
+        </p>
+      ) : (
+        <ul className="divide-y divide-brand-border border-t border-brand-border">
+          {memberships.map((membership) => (
+            <MembershipHistoryItem key={membership.id} membership={membership} />
+          ))}
+        </ul>
+      )}
+    </SurfacePanel>
+  );
+}
+
 export default function ProfilePage() {
   const { data: profile, isPending } = useProfile();
-  const { data: memberships, isPending: membershipsPending } = useAllMemberships();
+  const {
+    data: memberships,
+    isPending: membershipsPending,
+    isError: membershipsError,
+    isFetching: membershipsFetching,
+    refetch: refetchMemberships,
+  } = useAllMemberships();
 
   const { mutate: signOut, error: signOutError, isPending: signOutPending } = useSignOut();
 
@@ -42,6 +89,9 @@ export default function ProfilePage() {
       : null;
 
   const displayName = profile?.name ?? profile?.email ?? "Profile";
+  const activeMemberships = memberships?.filter(isActiveMembership) ?? [];
+  const membershipHistory =
+    memberships?.filter((membership) => !isActiveMembership(membership)) ?? [];
 
   const studentBadge = profile?.isStudent ? (
     <StatusBadge tone="success">Student</StatusBadge>
@@ -52,7 +102,7 @@ export default function ProfilePage() {
   return (
     <BasePage>
       <div className="flex flex-1 items-center py-12">
-        <section className="mx-auto w-full max-w-4xl">
+        <section className="mx-auto w-full max-w-6xl">
           <div className="mt-10 border border-brand-border bg-brand-surface/80 shadow-2xl shadow-black/25">
             <div className="flex flex-col gap-4 border-b border-brand-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div>
@@ -100,14 +150,14 @@ export default function ProfilePage() {
                       )}
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="break-words text-2xl font-semibold text-brand-text">
+                          <h3 className="wrap-break-word text-2xl font-semibold text-brand-text">
                             {displayName}
                           </h3>
                           <StatusBadge tone={profile.role === "admin" ? "warning" : "default"}>
                             {titleCase(profile.role)}
                           </StatusBadge>
                         </div>
-                        <p className="mt-2 break-words text-sm text-brand-text-muted">
+                        <p className="mt-2 wrap-break-word text-sm text-brand-text-muted">
                           {profile.createdAt
                             ? `Member since ${formatDate(profile.createdAt)}`
                             : "Membership start date unavailable"}
@@ -146,12 +196,12 @@ export default function ProfilePage() {
                     </div>
                     <dl>
                       <DetailRow label="Email">
-                        <span className="break-words">{profile.email}</span>
+                        <span className="wrap-break-word">{profile.email}</span>
                       </DetailRow>
                       <DetailRow label="Student status">{studentBadge}</DetailRow>
                       <DetailRow label="Student ID">
                         {profile.studentId ? (
-                          <span className="break-words font-mono">{profile.studentId}</span>
+                          <span className="wrap-break-word font-mono">{profile.studentId}</span>
                         ) : (
                           <StatusBadge tone="muted">Not provided</StatusBadge>
                         )}
@@ -176,33 +226,39 @@ export default function ProfilePage() {
                   </SurfacePanel>
                 </div>
 
-                <SurfacePanel className="mt-6">
-                  <div className="px-5 py-4">
-                    <h3
-                      id="membership"
-                      className="scroll-mt-28 text-base font-semibold text-brand-text"
-                    >
-                      Membership History
-                    </h3>
-                  </div>
-
+                <div id="membership" className="mt-6 scroll-mt-28">
                   {membershipsPending ? (
-                    <div className="flex items-center gap-3 px-5 py-6 text-brand-text-muted">
-                      <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                      <span className="text-sm">Loading memberships</span>
-                    </div>
-                  ) : !memberships?.length ? (
-                    <p className="border-t border-brand-border px-5 py-6 text-sm text-brand-text-muted">
-                      No memberships found.
-                    </p>
+                    <SurfacePanel>
+                      <div className="px-5 py-4">
+                        <h3 className="text-base font-semibold text-brand-text">Memberships</h3>
+                      </div>
+                      <div className="flex items-center gap-3 border-t border-brand-border px-5 py-6 text-brand-text-muted">
+                        <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                        <span className="text-sm">Loading memberships</span>
+                      </div>
+                    </SurfacePanel>
+                  ) : membershipsError ? (
+                    <MembershipLoadError
+                      isRetrying={membershipsFetching}
+                      onRetry={() => void refetchMemberships()}
+                    />
                   ) : (
-                    <ul className="divide-y divide-brand-border border-t border-brand-border">
-                      {memberships.map((membership) => (
-                        <MembershipHistoryItem key={membership.id} membership={membership} />
-                      ))}
-                    </ul>
+                    <div className="grid gap-6">
+                      <MembershipSection
+                        title="Active memberships"
+                        description="Memberships that are currently available to your account."
+                        memberships={activeMemberships}
+                        emptyMessage="No active memberships."
+                      />
+                      <MembershipSection
+                        title="Membership history"
+                        description="Your expired and cancelled memberships."
+                        memberships={membershipHistory}
+                        emptyMessage="No expired or cancelled memberships."
+                      />
+                    </div>
                   )}
-                </SurfacePanel>
+                </div>
               </div>
             ) : (
               <div className="px-6 py-12 text-brand-text-muted">

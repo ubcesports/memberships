@@ -1,6 +1,5 @@
-export type RoleType = "member" | "admin";
-
-export type GroupType = "member" | "competitive_team" | "executive" | "central_director" | "game_director" | "board";
+import type { GroupType, RoleType, User } from "./user.types";
+import type { PaymentMethod } from "./membership.types";
 
 export type SearchMode = "full_name" | "email" | "student_id";
 
@@ -13,23 +12,23 @@ export type AppliedSearch = {
 
 export type AdminUserFilters = {
   role?: RoleType;
-  group?: GroupType;
+  groups?: GroupType[];
+  membershipTierIds?: string[];
   isStudent?: boolean;
 };
 
-export type User = {
+export type AdminActiveMembership = {
+  tier_title: string;
+};
+
+export type AdminUser = User & {
+  active_memberships: AdminActiveMembership[];
+};
+
+export type AdminMembershipTierOption = {
   id: string;
-  email: string;
-  student_id: string | null;
-  role: RoleType;
-  created_at: string;
-  updated_at: string;
-  full_name: string;
-  email_verified_at: string | null;
-  is_student: boolean;
-  onboarding_completed_at: string | null;
-  avatar_url: string | null;
-  groups: GroupType[];
+  title: string;
+  program_name: string;
 };
 
 export type AuditLogActor = {
@@ -56,7 +55,7 @@ export type AuditLogEntry = {
 };
 
 export type UsersResponse = {
-  users: User[];
+  users: AdminUser[];
   total: number;
 };
 
@@ -64,42 +63,25 @@ export type UserResponse = {
   user: User;
 };
 
-export type TransactionStatusType = "pending" | "completed" | "failed" | "refunded" | "expired";
-
-export type MembershipTransaction = {
-  id: string;
-  amount_paid: string;
-  status: TransactionStatusType;
-  group_at_purchase: GroupType;
-  currency?: string;
-  customer_id?: string;
-  payment_intent?: string;
-  charge_id?: string;
-  created_at?: string;
-  metadata?: Record<string, unknown> | null;
-};
-
-export type Membership = {
-  id: string;
-  tier_id: string;
-  tier_title?: string;
-  started_at: string;
-  expires_at: string;
-  cancelled_at: string | null;
-  transaction: MembershipTransaction;
-};
-
 /*
   Every field is optional. An absent field is left untouched, so only send the
   ones the admin actually changed.
 */
 export type UpdateUserRequest = {
+  full_name?: string;
   student_id?: string;
   is_student?: boolean;
   groups_add?: GroupType[];
   groups_remove?: GroupType[];
   role?: RoleType;
-  cancel_membership?: boolean;
+  cancel_membership_id?: string;
+};
+
+export type OfflinePaymentMethod = Exclude<PaymentMethod, "stripe">;
+
+export type AddOfflineMembershipRequest = {
+  tier_id: string;
+  payment_method: OfflinePaymentMethod;
 };
 
 export type AdminPagination = {
@@ -135,3 +117,5 @@ export const IS_STUDENT_OPTIONS: { value: IsStudent; label: string }[] = [
   { value: "yes", label: "Yes" },
   { value: "no", label: "No" },
 ];
+
+export type IsStudentFilter = "all" | IsStudent;

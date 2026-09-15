@@ -4,14 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ubcesports/memberships/internal/database/db"
 	"github.com/ubcesports/memberships/internal/dto"
+	"github.com/ubcesports/memberships/internal/mailer"
 	"github.com/ubcesports/memberships/internal/repository"
 	"github.com/ubcesports/memberships/internal/util"
 )
@@ -27,14 +31,15 @@ var defaultDisplayGroupType = map[db.GroupType]db.ExecDisplayGroupType{
 }
 
 type AdminUserFilters struct {
-	FullName  string
-	StudentID string
-	Email     string
-	Role      string
-	IsStudent *bool
-	Group     string
-	Limit     int32
-	Offset    int32
+	FullName          string
+	StudentID         string
+	Email             string
+	Role              string
+	IsStudent         *bool
+	Groups            []string
+	MembershipTierIDs []string
+	Limit             int32
+	Offset            int32
 }
 
 type AdminAuditLogFilters struct {
@@ -55,17 +60,19 @@ type AdminAuditLogInput struct {
 // UpdateUserRequest describes the edits an admin wants to apply to a user.
 // Every field is optional; only the ones that are set are acted on.
 type UpdateUserRequest struct {
-	StudentID        *string
-	IsStudent        *bool
-	GroupsAdd        []db.GroupType
-	GroupsRemove     []db.GroupType
-	Role             *db.RoleType
-	CancelMembership bool
+	FullName           *string
+	StudentID          *string
+	IsStudent          *bool
+	GroupsAdd          []db.GroupType
+	GroupsRemove       []db.GroupType
+	Role               *db.RoleType
+	CancelMembershipId *string
 }
 
 // Audit log actions emitted by UpdateUser.
 const (
 	actionUserUpdated          = "user.updated"
+	actionFullNameUpdated      = "user.full_name.updated"
 	actionStudentIDUpdated     = "user.student_id.updated"
 	actionStudentStatusUpdated = "user.student_status.updated"
 	actionRoleUpdated          = "user.role.updated"
@@ -82,6 +89,15 @@ const maxNonStudentIDAttempts = 5
 type pendingAuditLog struct {
 	action      string
 	description string
+	email       *pendingUserEmail // nil = no email for this entry
+}
+
+// pendingUserEmail is a fully rendered-content email earned by a successful
+// admin action, sent only after the enclosing transaction has committed.
+type pendingUserEmail struct {
+	heading    string
+	subheading string
+	rows       []mailer.Row
 }
 
 // auditableError attributes a failure to the action that caused it, so a
@@ -112,7 +128,7 @@ func NewAdminService(adminRepository *repository.AdminRepository) *AdminService 
 	return &AdminService{adminRepository: adminRepository}
 }
 
-func (s *AdminService) GetUsers(ctx context.Context, filters AdminUserFilters) ([]dto.ProfileDTO, int64, error) {
+func (s *AdminService) GetUsers(ctx context.Context, filters AdminUserFilters) ([]dto.AdminUserDTO, int64, error) {
 	if filters.Limit <= 0 {
 		filters.Limit = 25
 	}
@@ -128,12 +144,13 @@ func (s *AdminService) GetUsers(ctx context.Context, filters AdminUserFilters) (
 	params.Offset = pgtype.Int4{Int32: filters.Offset, Valid: true}
 
 	total, err := s.adminRepository.CountUsers(ctx, db.CountUsersAdminParams{
-		FullName:  params.FullName,
-		StudentID: params.StudentID,
-		Email:     params.Email,
-		Role:      params.Role,
-		IsStudent: params.IsStudent,
-		Group:     params.Group,
+		FullName:          params.FullName,
+		StudentID:         params.StudentID,
+		Email:             params.Email,
+		Role:              params.Role,
+		IsStudent:         params.IsStudent,
+		Groups:            params.Groups,
+		MembershipTierIds: params.MembershipTierIds,
 	})
 	if err != nil {
 		return nil, 0, err
@@ -152,7 +169,7 @@ func (s *AdminService) ExportUsers(
 	filters AdminUserFilters,
 	actorId string,
 	requestId string,
-) ([]dto.ProfileDTO, error) {
+) ([]dto.AdminUserDTO, error) {
 	users, exportErr := s.getUsers(ctx, buildAdminQueryParams(filters))
 
 	outcome := db.AdminAuditOutcomeTypeSuccess
@@ -184,6 +201,25 @@ func (s *AdminService) ExportUsers(
 	}
 
 	return users, nil
+}
+
+func (s *AdminService) GetAdminMembershipTierOptions(
+	ctx context.Context,
+) ([]dto.AdminMembershipTierOption, error) {
+	rows, err := s.adminRepository.GetAdminMembershipTierOptions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	options := make([]dto.AdminMembershipTierOption, 0, len(rows))
+	for _, row := range rows {
+		options = append(options, dto.AdminMembershipTierOption{
+			ID:          row.ID.String(),
+			Title:       row.Title,
+			ProgramName: row.ProgramName,
+		})
+	}
+	return options, nil
 }
 
 // GetUserByID returns a single user's profile for the admin detail view.
@@ -263,14 +299,21 @@ func (s *AdminService) GetUserMemberships(ctx context.Context, userId string) ([
 		memberships = append(memberships, dto.MembershipDTO{
 			ID:          row.ID.String(),
 			TierId:      row.TierID.String(),
+			TierTitle:   row.TierTitle,
 			StartedAt:   row.StartedAt.Time,
 			ExpiresAt:   row.ExpiresAt.Time,
 			CancelledAt: util.TimestampPointer(row.CancelledAt),
+			ProgramName: row.ProgramName,
+			ProgramId:   row.ProgramID.String(),
 			Transaction: dto.TransactionDTO{
-				ID:              row.TransactionID.String(),
-				AmountPaid:      fmt.Sprintf("%.2f", float64(row.AmountPaidCents.Int64)/100),
-				Status:          dto.TransactionStatusType(row.Status),
-				GroupAtPurchase: dto.GroupType(row.GroupAtPurchase.GroupType),
+				ID:                    row.TransactionID.String(),
+				AmountPaid:            fmt.Sprintf("%.2f", float64(row.AmountPaidCents.Int64)/100),
+				Status:                dto.TransactionStatusType(row.Status),
+				GroupAtPurchase:       dto.GroupType(row.GroupAtPurchase.GroupType),
+				StudentAtPurchase:     row.StudentAtPurchase.Bool,
+				StripePaymentIntentId: row.StripePaymentIntentID.String,
+				PurchaseType:          dto.PurchaseType(row.PurchaseType.PurchaseType),
+				PaymentMethod:         dto.PaymentMethodType(row.PaymentMethod),
 			},
 		})
 	}
@@ -292,6 +335,8 @@ func (s *AdminService) UpdateUser(
 	req UpdateUserRequest,
 ) (*dto.ProfileDTO, error) {
 	var profile *dto.ProfileDTO
+	var pendingEmails []pendingUserEmail
+	var targetEmail string
 
 	updateErr := s.adminRepository.WithTx(ctx, func(store repository.AdminStore) error {
 		user, err := store.GetUserByID(ctx, targetUserId)
@@ -305,6 +350,7 @@ func (s *AdminService) UpdateUser(
 			}
 			return err
 		}
+		targetEmail = user.Email
 
 		entries, err := s.applyUserUpdates(ctx, store, user, req)
 		if err != nil {
@@ -321,6 +367,9 @@ func (s *AdminService) UpdateUser(
 				Description:  entry.description,
 			}); err != nil {
 				return err
+			}
+			if entry.email != nil {
+				pendingEmails = append(pendingEmails, *entry.email)
 			}
 		}
 
@@ -360,7 +409,35 @@ func (s *AdminService) UpdateUser(
 		return nil, updateErr
 	}
 
+	for _, email := range pendingEmails {
+		s.sendUserEmail(ctx, targetEmail, targetUserId, email)
+	}
+
 	return profile, nil
+}
+
+// sendUserEmail renders and fires one admin-triggered email. The update it
+// describes has already committed, so a failure here is logged and
+// swallowed rather than surfaced to the caller.
+func (s *AdminService) sendUserEmail(ctx context.Context, targetEmail, targetUserId string, email pendingUserEmail) {
+	html, err := mailer.RenderEmail(mailer.EmailData{
+		Title:      email.heading,
+		Heading:    email.heading,
+		Subheading: email.subheading,
+		Rows:       email.rows,
+	})
+	if err != nil {
+		slog.Error("render admin-triggered email failed", "error", err, "user_id", targetUserId)
+		return
+	}
+
+	mailer.SendEmailAsync(
+		[]string{targetEmail},
+		email.heading,
+		html,
+		middleware.GetReqID(ctx),
+		targetUserId,
+	)
 }
 
 func (s *AdminService) GetAdminAuditLogs(ctx context.Context, filters AdminAuditLogFilters) ([]dto.AdminAuditLogResponse, int64, error) {
@@ -475,6 +552,12 @@ func (s *AdminService) applyUserUpdates(
 ) ([]pendingAuditLog, error) {
 	entries := make([]pendingAuditLog, 0)
 
+	nameEntries, err := s.applyFullNameUpdate(ctx, store, user, req)
+	if err != nil {
+		return nil, err
+	}
+	entries = append(entries, nameEntries...)
+
 	studentEntries, err := s.applyStudentUpdate(ctx, store, user, req)
 	if err != nil {
 		return nil, err
@@ -500,6 +583,27 @@ func (s *AdminService) applyUserUpdates(
 	entries = append(entries, membershipEntries...)
 
 	return entries, nil
+}
+
+func (s *AdminService) applyFullNameUpdate(ctx context.Context, store repository.AdminStore, user db.GetAdminUserByIDRow, req UpdateUserRequest) ([]pendingAuditLog, error) {
+	if req.FullName == nil {
+		return nil, nil
+	}
+	fullName := strings.TrimSpace(*req.FullName)
+	if fullName == "" {
+		return nil, auditable(actionFullNameUpdated, "Failed to update full name: full name is required", fmt.Errorf("%w: full name is required", ErrValidation))
+	}
+	if fullName == user.FullName {
+		return nil, nil
+	}
+	if err := store.UpdateUserFullName(ctx, user.ID.String(), fullName); err != nil {
+		return nil, auditable(actionFullNameUpdated, "Failed to update full name", err)
+	}
+	return []pendingAuditLog{{
+		action:      actionFullNameUpdated,
+		description: fmt.Sprintf("Updated full name from %q to %q", user.FullName, fullName),
+		email:       userInfoUpdateEmail("Full name", user.FullName, fullName),
+	}}, nil
 }
 
 func (s *AdminService) applyStudentUpdate(
@@ -533,6 +637,9 @@ func (s *AdminService) applyStudentUpdate(
 
 	currentStudentID := textOrEmpty(user.StudentID)
 	description := fmt.Sprintf("Updated student ID from %s to %s", displayValue(currentStudentID), studentID)
+	item := "Student ID"
+	oldValue := displayValue(currentStudentID)
+	newValue := studentID
 	if update.action == actionStudentStatusUpdated {
 		description = fmt.Sprintf(
 			"Updated student status from %s to %s (student ID %s to %s)",
@@ -541,9 +648,16 @@ func (s *AdminService) applyStudentUpdate(
 			displayValue(currentStudentID),
 			studentID,
 		)
+		item = "Student status"
+		oldValue = studentStatusLabel(user.IsStudent)
+		newValue = studentStatusLabel(update.isStudent)
 	}
 
-	return []pendingAuditLog{{action: update.action, description: description}}, nil
+	return []pendingAuditLog{{
+		action:      update.action,
+		description: description,
+		email:       userInfoUpdateEmail(item, oldValue, newValue),
+	}}, nil
 }
 
 func (s *AdminService) applyRoleUpdate(
@@ -567,7 +681,34 @@ func (s *AdminService) applyRoleUpdate(
 	return []pendingAuditLog{{
 		action:      actionRoleUpdated,
 		description: fmt.Sprintf("Updated role from %s to %s", user.Role, role),
+		email:       userInfoUpdateEmail("Role", string(user.Role), string(role)),
 	}}, nil
+}
+
+// userInfoUpdateEmail builds the "admin updated user info" email content for
+// a single changed field.
+func userInfoUpdateEmail(item, oldValue, newValue string) *pendingUserEmail {
+	return &pendingUserEmail{
+		heading:    "Your account information was updated",
+		subheading: fmt.Sprintf("An admin updated your %s.", strings.ToLower(item)),
+		rows: mailer.NewRows(
+			"Updated", item,
+			"Previous value", displayValue(oldValue),
+			"New value", newValue,
+		),
+	}
+}
+
+// cancellationEmail builds the "admin cancelled your membership" email content.
+func cancellationEmail(tierTitle string, cancelledAt time.Time) *pendingUserEmail {
+	return &pendingUserEmail{
+		heading:    "Your membership was cancelled",
+		subheading: "An admin cancelled your membership. Reach out to us at communications@ubcesports.ca if you think this was a mistake.",
+		rows: mailer.NewRows(
+			"Tier", tierTitle,
+			"Cancelled on", formatVancouverDate(cancelledAt),
+		),
+	}
 }
 
 func (s *AdminService) applyGroupUpdates(
@@ -663,29 +804,87 @@ func (s *AdminService) applyMembershipUpdates(
 	user db.GetAdminUserByIDRow,
 	req UpdateUserRequest,
 ) ([]pendingAuditLog, error) {
-	userID := user.ID.String()
-
-	if req.CancelMembership {
-		hasActive, err := store.HasActiveMembership(ctx, userID)
-		if err != nil {
-			return nil, auditable(actionMembershipCancelled, "Failed to cancel membership", err)
-		}
-		if !hasActive {
-			err := fmt.Errorf("%w: user has no active membership to cancel", ErrValidation)
-			return nil, auditable(actionMembershipCancelled, "Failed to cancel membership: no active membership", err)
-		}
-
-		if err := store.CancelActiveMembershipsByUserId(ctx, userID, time.Now()); err != nil {
-			return nil, auditable(actionMembershipCancelled, "Failed to cancel membership", err)
-		}
-
-		return []pendingAuditLog{{
-			action:      actionMembershipCancelled,
-			description: "Cancelled the user's active membership",
-		}}, nil
+	if req.CancelMembershipId == nil {
+		return nil, nil
 	}
 
-	return nil, nil
+	membershipID := strings.TrimSpace(
+		*req.CancelMembershipId,
+	)
+
+	if membershipID == "" {
+		err := fmt.Errorf(
+			"%w: membership ID is required",
+			ErrValidation,
+		)
+		return nil, auditable(
+			actionMembershipCancelled,
+			"Failed to cancel membership: membership ID is required",
+			err,
+		)
+	}
+
+	if _, err := util.GetValidatedUUID(membershipID); err != nil {
+		validationErr := fmt.Errorf(
+			"%w: invalid membership ID",
+			ErrValidation,
+		)
+		return nil, auditable(
+			actionMembershipCancelled,
+			"Failed to cancel membership: invalid membership ID",
+			validationErr,
+		)
+	}
+
+	// Best-effort lookup for the email; the cancellation itself only
+	// depends on the CancelActiveMembershipByUserIdAndMembershipId call below.
+	cancelledTierTitle := "your membership"
+	if memberships, err := store.GetUserMemberships(ctx, user.ID.String()); err != nil {
+		slog.Error("get user memberships for cancellation email failed", "error", err, "user_id", user.ID.String())
+	} else {
+		for _, membership := range memberships {
+			if membership.ID.String() == membershipID {
+				cancelledTierTitle = membership.TierTitle
+				break
+			}
+		}
+	}
+
+	cancelledAt := time.Now()
+	cancelled, err := s.adminRepository.CancelActiveMembershipByUserIdAndMembershipId(
+		ctx,
+		user.ID.String(),
+		membershipID,
+		cancelledAt,
+	)
+	if err != nil {
+		return nil, auditable(
+			actionMembershipCancelled,
+			"Failed to cancel membership",
+			err,
+		)
+	}
+
+	if !cancelled {
+		err := fmt.Errorf(
+			"%w: membership is not active or does not belong to this user",
+			ErrValidation,
+		)
+		return nil, auditable(
+			actionMembershipCancelled,
+			"Failed to cancel membership: no matching active membership",
+			err,
+		)
+	}
+
+	return []pendingAuditLog{{
+		action: actionMembershipCancelled,
+		description: fmt.Sprintf(
+			"Cancelled membership %s",
+			membershipID,
+		),
+		email: cancellationEmail(cancelledTierTitle, cancelledAt),
+	}}, nil
 }
 
 // studentUpdate is the resolved outcome of the student ID and student status
@@ -916,6 +1115,9 @@ func buildAdminQueryParams(filters AdminUserFilters) db.GetUsersAdminParams {
 		}
 	}
 
+	groups := normalizedStrings(filters.Groups)
+	membershipTierIDs := normalizedStrings(filters.MembershipTierIDs)
+
 	return db.GetUsersAdminParams{
 		FullName: pgtype.Text{
 			String: filters.FullName,
@@ -933,28 +1135,58 @@ func buildAdminQueryParams(filters AdminUserFilters) db.GetUsersAdminParams {
 			RoleType: db.RoleType(filters.Role),
 			Valid:    filters.Role != "",
 		},
-		IsStudent: isStudent,
-		Group: db.NullGroupType{
-			GroupType: db.GroupType(filters.Group),
-			Valid:     filters.Group != "",
-		},
+		IsStudent:         isStudent,
+		Groups:            groups,
+		MembershipTierIds: membershipTierIDs,
 	}
 }
 
-func (s *AdminService) getUsers(ctx context.Context, params db.GetUsersAdminParams) ([]dto.ProfileDTO, error) {
+func normalizedStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	sort.Strings(result)
+	return result
+}
+
+func (s *AdminService) getUsers(ctx context.Context, params db.GetUsersAdminParams) ([]dto.AdminUserDTO, error) {
 	rows, err := s.adminRepository.GetUsers(ctx, params)
 	if err != nil {
 		return nil, err
 	}
 
-	users := make([]dto.ProfileDTO, 0, len(rows))
+	users := make([]dto.AdminUserDTO, 0, len(rows))
 	for _, row := range rows {
 		groups := make([]dto.GroupType, 0, len(row.Groups))
 		for _, group := range row.Groups {
 			groups = append(groups, dto.GroupType(group))
 		}
 
-		users = append(users, dto.ProfileDTO{
+		activeMemberships := make([]dto.AdminActiveMembershipSummary, 0, len(row.ActiveMembershipTierTitles))
+		for _, tierTitle := range row.ActiveMembershipTierTitles {
+			activeMemberships = append(activeMemberships, dto.AdminActiveMembershipSummary{
+				TierTitle: tierTitle,
+			})
+		}
+
+		users = append(users, dto.AdminUserDTO{ProfileDTO: dto.ProfileDTO{
 			ID:                    row.ID.String(),
 			Email:                 row.Email,
 			StudentID:             util.TextPointer(row.StudentID),
@@ -967,7 +1199,7 @@ func (s *AdminService) getUsers(ctx context.Context, params db.GetUsersAdminPara
 			OnboardingCompletedAt: util.TimestampPointer(row.OnboardingCompletedAt),
 			AvatarURL:             util.TextPointer(row.AvatarUrl),
 			Groups:                groups,
-		})
+		}, ActiveMemberships: activeMemberships})
 	}
 
 	return users, nil

@@ -1,27 +1,35 @@
 import type { FormEvent, ReactNode } from "react";
 import { GraduationCap, Loader2, UserRound } from "lucide-react";
 import { ActionButton } from "@/components/action-button";
-import type { StudentStatus } from "@/lib/onboard/onboard.types";
+import type { StudentStatus } from "@/lib/types/user.types";
 
 type OnboardFormProps = {
+  fullName: string;
+  onFullNameChange: (value: string) => void;
   studentStatus: StudentStatus | null;
   studentId: string;
+  inviteCode: string;
   validationError: string | null;
   canSubmit: boolean;
   isPending: boolean;
   onStudentStatusChange: (status: StudentStatus) => void;
   onStudentIdChange: (value: string) => void;
+  onInviteCodeChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
 export function OnboardForm({
+  fullName,
+  onFullNameChange,
   studentStatus,
   studentId,
+  inviteCode,
   validationError,
   canSubmit,
   isPending,
   onStudentStatusChange,
   onStudentIdChange,
+  onInviteCodeChange,
   onSubmit,
 }: OnboardFormProps) {
   const isStudent = studentStatus === "student";
@@ -29,6 +37,30 @@ export function OnboardForm({
   return (
     <form className="px-5 py-5 sm:px-6" onSubmit={onSubmit}>
       <fieldset disabled={isPending} className="space-y-5 disabled:opacity-70">
+        <div>
+          <label htmlFor="full-name" className="text-sm font-medium text-brand-text">
+            Full name
+          </label>
+          <input
+            id="full-name"
+            name="full_name"
+            type="text"
+            autoComplete="name"
+            required
+            value={fullName}
+            onChange={(event) => onFullNameChange(event.target.value)}
+            className="mt-2 h-12 w-full border border-brand-border bg-white/3 px-4 text-base text-brand-text outline-none transition placeholder:text-brand-text-subtle focus:border-brand-primary disabled:cursor-not-allowed"
+            placeholder="Enter your full name"
+            aria-describedby={
+              validationError ? "full-name-help onboard-validation-error" : "full-name-help"
+            }
+          />
+          <p id="full-name-help" className="mt-2 text-sm leading-6 text-brand-text-subtle">
+            Enter your full name as recognized by UBC or as shown on your legal identification. You
+            cannot edit this name after completing onboarding.
+          </p>
+        </div>
+
         <div>
           <label className="text-sm font-medium text-brand-text">Are you a student?</label>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -82,6 +114,24 @@ export function OnboardForm({
             </p>
           </div>
         )}
+
+        <div>
+          <label htmlFor="invite-code" className="text-sm font-medium text-brand-text">
+            Invite code <span className="text-brand-text-subtle">(optional)</span>
+          </label>
+          <input
+            id="invite-code"
+            type="text"
+            autoComplete="off"
+            value={inviteCode}
+            onChange={(event) => onInviteCodeChange(event.target.value)}
+            className="mt-2 h-12 w-full border border-brand-border bg-white/3 px-4 font-mono text-base text-brand-text outline-none transition placeholder:text-brand-text-subtle focus:border-brand-primary disabled:cursor-not-allowed"
+            placeholder="Enter your code"
+          />
+          <p className="mt-2 text-sm leading-6 text-brand-text-subtle">
+            If you have an invite code, enter it here.
+          </p>
+        </div>
 
         {validationError ? (
           <p id="onboard-validation-error" className="text-sm leading-6 text-brand-warning">

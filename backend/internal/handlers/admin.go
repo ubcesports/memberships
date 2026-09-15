@@ -20,15 +20,16 @@ import (
 )
 
 type AdminHandler struct {
-	adminService *service.AdminService
+	adminService      *service.AdminService
+	membershipService *service.MembershipService
 }
 
 /*
 	Public functions
 */
 
-func NewAdminHandler(adminService *service.AdminService) *AdminHandler {
-	return &AdminHandler{adminService: adminService}
+func NewAdminHandler(adminService *service.AdminService, membershipService *service.MembershipService) *AdminHandler {
+	return &AdminHandler{adminService: adminService, membershipService: membershipService}
 }
 
 /*
@@ -43,7 +44,8 @@ Args (query params):
 	email: optional case-insensitive email substring
 	role: optional role (member or admin)
 	is_student: optional boolean student status
-	group: optional group membership
+	group: optional repeated group values; matches the user's exact group set
+	membership_tier_id: optional repeated tier UUIDs; matches the user's exact active tier set
 	limit: optional page size (default 25, maximum 100)
 	offset: optional number of users to skip (default 0)
 
@@ -75,12 +77,45 @@ func (h *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unable to load users", http.StatusInternalServerError)
 		return
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"users": users,
 		"total": total,
 	})
+}
+
+/*
+Returns membership tier options used by the admin user filter.
+
+API URL: GET /admin/membership-tiers
+
+Args:
+
+	None
+
+Returns:
+
+	[]dto.AdminMembershipTierOption (HTTP 200)
+
+Raises:
+
+	401: user is not authenticated
+	403: user is not an admin
+	500: membership tier options could not be retrieved
+*/
+func (h *AdminHandler) GetMembershipTierOptions(w http.ResponseWriter, r *http.Request) {
+	requestID := middleware.GetReqID(r.Context())
+	options, err := h.adminService.GetAdminMembershipTierOptions(r.Context())
+	if err != nil {
+		slog.ErrorContext(r.Context(), "unable to load admin membership tier options",
+			"error", err,
+			"request_id", requestID,
+		)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to load membership tier options.", requestID)
+		return
+	}
+
+	util.WriteJson(w, http.StatusOK, options)
 }
 
 /*
@@ -95,7 +130,8 @@ Args (query params):
 	email: optional case-insensitive email substring
 	role: optional role (member or admin)
 	is_student: optional boolean student status
-	group: optional group membership
+	group: optional repeated group values; matches the user's exact group set
+	membership_tier_id: optional repeated tier UUIDs; matches the user's exact active tier set
 
 Returns:
 
@@ -146,6 +182,7 @@ func (h *AdminHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request) {
 		"Role",
 		"Is Student",
 		"Groups",
+		"Active Memberships",
 		"Created At",
 		"Updated At",
 		"Email Verified At",
@@ -164,6 +201,10 @@ func (h *AdminHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request) {
 		for _, group := range user.Groups {
 			groups = append(groups, string(group))
 		}
+		membershipTitles := make([]string, 0, len(user.ActiveMemberships))
+		for _, membership := range user.ActiveMemberships {
+			membershipTitles = append(membershipTitles, membership.TierTitle)
+		}
 
 		if err := writer.Write([]string{
 			user.ID,
@@ -173,6 +214,7 @@ func (h *AdminHandler) ExportUsersCSV(w http.ResponseWriter, r *http.Request) {
 			string(user.Role),
 			strconv.FormatBool(user.IsStudent),
 			strings.Join(groups, ";"),
+			strings.Join(membershipTitles, ";"),
 			user.CreatedAt.Format(time.RFC3339),
 			user.UpdatedAt.Format(time.RFC3339),
 			optionalTime(user.EmailVerifiedAt),
@@ -310,12 +352,13 @@ API URL: PATCH /admin/users/{id}
 
 Args (JSON body, every field optional):
 
+	full_name: new nonblank full name
 	student_id: new student ID, only editable while the user is a student
 	is_student: new student status
 	groups_add: groups to add to the user
 	groups_remove: groups to remove from the user (member is always kept)
 	role: new role (member or admin), empty string floors the user to member
-	cancel_membership: cancels the user's active membership
+	cancel_membership_id: nullable membership id. not null means that membership will be cancelled
 
 Returns:
 
@@ -627,16 +670,169 @@ func (h *AdminHandler) ExportAuditLogsCSV(w http.ResponseWriter, r *http.Request
 }
 
 /*
+Creates a new cash/etransfer membership for a user
+
+API URL: POST /admin/membership/add/{id}
+
+Args:
+
+	id (query param): user id of person to add the membership to
+	AdminAddMembershipToUserRequest (request body): as seen in dto/admin.go
+
+Returns:
+
+	None: (HTTP 200)
+
+Raises:
+
+	400: invalid request body, user ID, tier ID, or payment method
+	401: user is not authenticated
+	403: user is not an admin
+	403: selected membership tier is unavailable or purchases are closed
+	409: an already-paid checkout is still being processed
+	500: membership could not be added to user
+*/
+func (h *AdminHandler) AddMembershipToUser(w http.ResponseWriter, r *http.Request) {
+	requestId := middleware.GetReqID(r.Context())
+
+	// Get current user id
+	actorId, ok := util.CurrentUserID(r)
+	if !ok {
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestId)
+		return
+	}
+
+	targetUserId := chi.URLParam(r, "id")
+	if _, err := util.GetValidatedUUID(targetUserId); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid user ID.", requestId)
+		return
+	}
+
+	var addMembershipRequest dto.AdminAddMembershipToUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&addMembershipRequest); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again.", requestId)
+		return
+	}
+
+	err := h.membershipService.AddMembershipToUser(
+		r.Context(),
+		actorId,
+		targetUserId,
+		requestId,
+		addMembershipRequest,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrOfflinePaymentMethod):
+			util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_PAYMENT_METHOD", service.ErrOfflinePaymentMethod.Error(), requestId)
+
+		case errors.Is(err, service.ErrInvalidMembershipTier):
+			util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_TIER_ID", service.ErrInvalidMembershipTier.Error(), requestId)
+
+		case errors.Is(err, service.ErrTierNotEligible):
+			util.WriteApiResponse(w, http.StatusForbidden, "TIER_NOT_AVAILABLE", service.ErrTierNotEligible.Error(), requestId)
+
+		case errors.Is(err, service.ErrMembershipPurchaseClosed):
+			util.WriteApiResponse(w, http.StatusForbidden, "MEMBERSHIP_PURCHASE_CLOSED", service.ErrMembershipPurchaseClosed.Error(), requestId)
+
+		case errors.Is(err, service.ErrPendingCheckoutAlreadyPaid):
+			util.WriteApiResponse(w, http.StatusConflict, "CHECKOUT_ALREADY_PAID", service.ErrPendingCheckoutAlreadyPaid.Error(), requestId)
+
+		default:
+			slog.ErrorContext(r.Context(), "unable to add membership to user",
+				"error", err,
+				"request_id", requestId,
+				"user_id", targetUserId,
+			)
+			util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to add membership. Please try again.", requestId)
+		}
+
+		return
+	}
+
+	util.WriteJson(w, http.StatusOK, nil)
+}
+
+/*
+Returns membership tiers and prices the target user
+
+For exec/director/board members:
+
+	Executive Pass
+
+For competitive team players:
+
+	Competitive Team Pass
+
+For regular UBC students:
+
+	Day pass with student price
+	Basic pass with student price
+	Lounge pass with student price
+
+For regular non-students:
+
+	Day pass with non-student price
+	Basic pass with non-student price
+	Lounge pass with non-student price
+
+API URL: GET /admin/membership/eligible/{id}
+
+Args:
+
+	auth.Session user id
+	id (query param): id of the user to fetch the eligible memberships of
+
+Returns:
+
+	[]dto.EligibleMembershipTierDTO (HTTP 200)
+
+Raises:
+
+	401: user is not authenticated
+	500: eligible membership tiers and prices could not be retrieved
+*/
+func (h *AdminHandler) GetEligibleTiersWithPricesById(w http.ResponseWriter, r *http.Request) {
+	requestId := middleware.GetReqID(r.Context())
+
+	_, ok := util.CurrentUserID(r)
+	if !ok {
+		util.WriteApiResponse(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized", requestId)
+		return
+	}
+
+	targetUserId := chi.URLParam(r, "id")
+	if _, err := util.GetValidatedUUID(targetUserId); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid user ID.", requestId)
+		return
+	}
+
+	tiers, err := h.membershipService.GetEligibleTiersWithPrices(r.Context(), targetUserId)
+	if err != nil {
+		slog.ErrorContext(r.Context(), "unable to load eligible membership tiers", "error", err, "request_id", requestId, "user_id", targetUserId)
+		util.WriteApiResponse(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to load eligible membership tiers", requestId)
+		return
+	}
+
+	if tiers != nil {
+		util.WriteJson(w, 200, tiers)
+	} else {
+		util.WriteJson(w, 200, nil)
+	}
+}
+
+/*
 	Private functions
 */
 
 func buildUpdateUserRequest(request dto.AdminUpdateUserRequest) service.UpdateUserRequest {
 	updateUserRequest := service.UpdateUserRequest{
-		StudentID:        request.StudentID,
-		IsStudent:        request.IsStudent,
-		GroupsAdd:        make([]db.GroupType, 0, len(request.GroupsAdd)),
-		GroupsRemove:     make([]db.GroupType, 0, len(request.GroupsRemove)),
-		CancelMembership: request.CancelMembership,
+		FullName:           request.FullName,
+		StudentID:          request.StudentID,
+		IsStudent:          request.IsStudent,
+		GroupsAdd:          make([]db.GroupType, 0, len(request.GroupsAdd)),
+		GroupsRemove:       make([]db.GroupType, 0, len(request.GroupsRemove)),
+		CancelMembershipId: request.CancelMembershipId,
 	}
 
 	if request.Role != nil {
@@ -683,12 +879,13 @@ func parseAdminAuditLogFilters(r *http.Request) (service.AdminAuditLogFilters, e
 func parseAdminUserFilters(r *http.Request, includePagination bool) (service.AdminUserFilters, error) {
 	query := r.URL.Query()
 	filters := service.AdminUserFilters{
-		FullName:  query.Get("full_name"),
-		StudentID: query.Get("student_id"),
-		Email:     query.Get("email"),
-		Role:      query.Get("role"),
-		Group:     query.Get("group"),
-		Limit:     25,
+		FullName:          query.Get("full_name"),
+		StudentID:         query.Get("student_id"),
+		Email:             query.Get("email"),
+		Role:              query.Get("role"),
+		Groups:            query["group"],
+		MembershipTierIDs: query["membership_tier_id"],
+		Limit:             25,
 	}
 
 	if value := query.Get("is_student"); value != "" {
@@ -707,8 +904,8 @@ func parseAdminUserFilters(r *http.Request, includePagination bool) (service.Adm
 		}
 	}
 
-	if filters.Group != "" {
-		switch dto.GroupType(filters.Group) {
+	for _, group := range filters.Groups {
+		switch dto.GroupType(group) {
 		case dto.GroupMember,
 			dto.GroupCompetitiveTeam,
 			dto.GroupExecutive,
@@ -717,6 +914,12 @@ func parseAdminUserFilters(r *http.Request, includePagination bool) (service.Adm
 			dto.GroupPresident:
 		default:
 			return service.AdminUserFilters{}, errors.New("invalid group")
+		}
+	}
+
+	for _, tierID := range filters.MembershipTierIDs {
+		if _, err := util.GetValidatedUUID(tierID); err != nil {
+			return service.AdminUserFilters{}, errors.New("invalid membership tier ID")
 		}
 	}
 

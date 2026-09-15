@@ -43,6 +43,22 @@ const (
 	AuditLogDenied  AdminAuditLogOutcomeType = "denied"
 )
 
+type MembershipExpirationType string
+
+const (
+	MembershipExpirationSemester MembershipExpirationType = "semester"
+	MembershipExpirationYear     MembershipExpirationType = "year"
+	MembershipExpirationDay      MembershipExpirationType = "day"
+)
+
+type PaymentMethodType string
+
+const (
+	PaymentMethodStripe    PaymentMethodType = "stripe"
+	PaymentMethodCash      PaymentMethodType = "cash"
+	PaymentMethodEtransfer PaymentMethodType = "etransfer"
+)
+
 type ExecSocialPlatformType string
 
 const (

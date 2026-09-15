@@ -2,22 +2,7 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 import { redirectToSignIn } from "./auth";
 import apiClient from "./client";
 
-type SessionResponse = {
-  user?: {
-    avatar_url: string | null;
-    created_at: string;
-    email: string;
-    email_verified_at: string | null;
-    full_name: string;
-    groups: string[];
-    id: string;
-    is_student: boolean;
-    onboarding_completed_at: string | null;
-    role: string;
-    student_id: string | null;
-    updated_at: string;
-  };
-};
+import type { SessionResponse } from "@/lib/types/user.types";
 
 async function fetchProfile(signal?: AbortSignal) {
   const response = await apiClient.get<SessionResponse>("/profile", {

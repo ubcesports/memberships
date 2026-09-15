@@ -17,8 +17,10 @@ import (
 // lives here rather than in the service package because WithTx has to hand the
 // callback a store of this same type.
 type AdminStore interface {
+	UpdateUserFullName(ctx context.Context, userId string, fullName string) error
 	GetUsers(ctx context.Context, params db.GetUsersAdminParams) ([]db.GetUsersAdminRow, error)
 	CountUsers(ctx context.Context, params db.CountUsersAdminParams) (int64, error)
+	GetAdminMembershipTierOptions(ctx context.Context) ([]db.GetAdminMembershipTierOptionsRow, error)
 	CountAdminAuditLogs(ctx context.Context, params pgtype.Text) (int64, error)
 	CreateAdminAuditLog(ctx context.Context, params db.CreateAdminAuditLogParams) error
 	GetAdminAuditLogs(ctx context.Context, params db.GetAdminAuditLogsParams) ([]db.GetAdminAuditLogsRow, error)
@@ -35,8 +37,18 @@ type AdminStore interface {
 	RemoveUserGroup(ctx context.Context, userId string, group db.GroupType) error
 	GetUserMemberships(ctx context.Context, userId string) ([]db.GetAllMembershipsWithTransactionsRow, error)
 	HasActiveMembership(ctx context.Context, userId string) (bool, error)
-	CancelActiveMembershipsByUserId(ctx context.Context, userId string, occurredAt time.Time) error
+	CancelActiveMembershipByUserIdAndMembershipId(ctx context.Context, userId string, membershipId string, occurredAt time.Time) (bool, error)
 	WithTx(ctx context.Context, fn func(AdminStore) error) error
+}
+
+func (r *AdminRepository) GetAdminMembershipTierOptions(
+	ctx context.Context,
+) ([]db.GetAdminMembershipTierOptionsRow, error) {
+	rows, err := r.store.GetAdminMembershipTierOptions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("query admin membership tier options: %w", err)
+	}
+	return rows, nil
 }
 
 type AdminRepository struct {
@@ -109,6 +121,17 @@ func (r *AdminRepository) GetUserByID(ctx context.Context, userId string) (db.Ge
 		return db.GetAdminUserByIDRow{}, fmt.Errorf("query admin user by ID: %w", err)
 	}
 	return row, nil
+}
+
+func (r *AdminRepository) UpdateUserFullName(ctx context.Context, userId string, fullName string) error {
+	pgUserId, err := util.GetValidatedUUID(userId)
+	if err != nil {
+		return err
+	}
+	if err := r.store.UpdateUserFullName(ctx, db.UpdateUserFullNameParams{ID: pgUserId, FullName: fullName}); err != nil {
+		return fmt.Errorf("update user full name: %w", err)
+	}
+	return nil
 }
 
 func (r *AdminRepository) UpdateUserStudentInfo(
@@ -301,27 +324,42 @@ func (r *AdminRepository) HasActiveMembership(ctx context.Context, userId string
 	return exists, nil
 }
 
-func (r *AdminRepository) CancelActiveMembershipsByUserId(
+func (r *AdminRepository) CancelActiveMembershipByUserIdAndMembershipId(
 	ctx context.Context,
 	userId string,
+	membershipId string,
 	occurredAt time.Time,
-) error {
-	pgUserId, err := util.GetValidatedUUID(userId)
+) (bool, error) {
+	pgUserID, err := util.GetValidatedUUID(userId)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	err = r.store.CancelActiveMembershipsByUserId(ctx, db.CancelActiveMembershipsByUserIdParams{
-		UserID: pgUserId,
-		CancelledAt: pgtype.Timestamptz{
-			Time:  occurredAt,
-			Valid: true,
-		},
-	})
+	pgMembershipID, err := util.GetValidatedUUID(membershipId)
 	if err != nil {
-		return fmt.Errorf("cancel active memberships: %w", err)
+		return false, err
 	}
-	return nil
+
+	rowsAffected, err :=
+		r.store.CancelActiveMembershipByUserIdAndMembershipId(
+			ctx,
+			db.CancelActiveMembershipByUserIdAndMembershipIdParams{
+				UserID: pgUserID,
+				ID:     pgMembershipID,
+				CancelledAt: pgtype.Timestamptz{
+					Time:  occurredAt,
+					Valid: true,
+				},
+			},
+		)
+	if err != nil {
+		return false, fmt.Errorf(
+			"cancel active membership: %w",
+			err,
+		)
+	}
+
+	return rowsAffected == 1, nil
 }
 
 // executes fn within a database transaction.

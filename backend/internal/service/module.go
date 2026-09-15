@@ -1,13 +1,24 @@
 package service
 
-import "go.uber.org/fx"
+import (
+	"github.com/ubcesports/memberships/internal/membershippolicy"
+	"go.uber.org/fx"
+)
 
-var Module = fx.Module("repository",
+func provideProfileReader(
+	profileService *ProfileService,
+) membershippolicy.ProfileReader {
+	return profileService
+}
+
+var Module = fx.Module("service",
 	fx.Provide(
 		NewHealthService,
 		NewProfileService,
 		NewAdminService,
 		NewExecProfileService,
 		NewMembershipService,
+
+		provideProfileReader,
 	),
 )

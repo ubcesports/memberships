@@ -12,7 +12,7 @@ import (
 func TestParseAdminFiltersForExportIgnoresPagination(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/admin/users/export?full_name=dip&role=member&group=competitive_team&is_student=false&limit=invalid",
+		"/admin/users/export?full_name=dip&role=member&group=competitive_team&group=member&is_student=false&limit=invalid",
 		nil,
 	)
 
@@ -20,7 +20,7 @@ func TestParseAdminFiltersForExportIgnoresPagination(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected valid filters, got %v", err)
 	}
-	if filters.FullName != "dip" || filters.Role != "member" || filters.Group != "competitive_team" {
+	if filters.FullName != "dip" || filters.Role != "member" || len(filters.Groups) != 2 || filters.Groups[0] != "competitive_team" || filters.Groups[1] != "member" {
 		t.Fatalf("unexpected filters: %#v", filters)
 	}
 	if filters.IsStudent == nil || *filters.IsStudent {
@@ -28,6 +28,28 @@ func TestParseAdminFiltersForExportIgnoresPagination(t *testing.T) {
 	}
 	if filters.Limit != 0 || filters.Offset != 0 {
 		t.Fatalf("expected export pagination to be disabled, got limit=%d offset=%d", filters.Limit, filters.Offset)
+	}
+}
+
+func TestParseAdminFiltersAcceptsRepeatedMembershipTiers(t *testing.T) {
+	first := "2d746a56-c977-49e0-a04c-20504cdb07c0"
+	second := "3c2b1a09-8765-4321-abcd-0123456789ab"
+	req := httptest.NewRequest(http.MethodGet, "/admin/users?membership_tier_id="+first+"&membership_tier_id="+second, nil)
+
+	filters, err := parseAdminUserFilters(req, true)
+	if err != nil {
+		t.Fatalf("expected valid filters, got %v", err)
+	}
+	if len(filters.MembershipTierIDs) != 2 || filters.MembershipTierIDs[0] != first || filters.MembershipTierIDs[1] != second {
+		t.Fatalf("unexpected tier filters: %#v", filters.MembershipTierIDs)
+	}
+}
+
+func TestParseAdminFiltersRejectsInvalidMembershipTier(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/admin/users?membership_tier_id=invalid", nil)
+
+	if _, err := parseAdminUserFilters(req, true); err == nil {
+		t.Fatal("expected invalid membership tier error")
 	}
 }
 
@@ -67,16 +89,17 @@ func TestParseAdminAuditLogFiltersRejectsInvalidPagination(t *testing.T) {
 
 func TestBuildUpdateUserRequestMapsBodyToServiceTypes(t *testing.T) {
 	studentID := "12345678"
+	membershipID := "2d746a56-c977-49e0-a04c-20504cdb07c0"
 	isStudent := true
 	role := dto.RoleAdmin
 
 	request := buildUpdateUserRequest(dto.AdminUpdateUserRequest{
-		StudentID:        &studentID,
-		IsStudent:        &isStudent,
-		GroupsAdd:        []dto.GroupType{dto.GroupBoard},
-		GroupsRemove:     []dto.GroupType{dto.GroupMember, dto.GroupExecutive},
-		Role:             &role,
-		CancelMembership: true,
+		StudentID:          &studentID,
+		IsStudent:          &isStudent,
+		GroupsAdd:          []dto.GroupType{dto.GroupBoard},
+		GroupsRemove:       []dto.GroupType{dto.GroupMember, dto.GroupExecutive},
+		Role:               &role,
+		CancelMembershipId: &membershipID,
 	})
 
 	if request.StudentID == nil || *request.StudentID != "12345678" {
@@ -94,8 +117,8 @@ func TestBuildUpdateUserRequestMapsBodyToServiceTypes(t *testing.T) {
 	if len(request.GroupsRemove) != 2 || request.GroupsRemove[1] != db.GroupTypeExecutive {
 		t.Fatalf("unexpected groups to remove: %v", request.GroupsRemove)
 	}
-	if !request.CancelMembership {
-		t.Fatalf("unexpected membership flags: %#v", request)
+	if request.CancelMembershipId == nil || *request.CancelMembershipId != membershipID {
+		t.Fatalf("expected membership ID to be carried over, got %#v", request.CancelMembershipId)
 	}
 }
 

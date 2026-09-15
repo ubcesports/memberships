@@ -86,12 +86,13 @@ func buildCheckoutSessionParams(request CheckoutSessionRequest, successUrl strin
 		lineItem.Price = stripe.String(request.PriceID)
 	}
 	return &stripe.CheckoutSessionCreateParams{
-		Mode:              stripe.String(string(stripe.CheckoutSessionModePayment)),
-		SuccessURL:        stripe.String(successUrl),
-		CancelURL:         stripe.String(cancelUrl),
-		ClientReferenceID: stripe.String(request.UserID),
-		CustomerEmail:     stripe.String(request.CustomerEmail),
-		LineItems:         []*stripe.CheckoutSessionCreateLineItemParams{lineItem},
+		AllowPromotionCodes: stripe.Bool(true),
+		Mode:                stripe.String(string(stripe.CheckoutSessionModePayment)),
+		SuccessURL:          stripe.String(successUrl),
+		CancelURL:           stripe.String(cancelUrl),
+		ClientReferenceID:   stripe.String(request.UserID),
+		CustomerEmail:       stripe.String(request.CustomerEmail),
+		LineItems:           []*stripe.CheckoutSessionCreateLineItemParams{lineItem},
 		Metadata: map[string]string{
 			"transaction_id": request.TransactionID,
 			"user_id":        request.UserID,
