@@ -28,6 +28,7 @@ type RouterParams struct {
 	HealthHandler        *handlers.HealthHandler
 	ProfileHandler       *handlers.ProfileHandler
 	AdminHandler         *handlers.AdminHandler
+	ExecProfileHandler   *handlers.ExecProfileHandler
 	MembershipHandler    *handlers.MembershipHandler
 	StripeWebhookHandler *handlers.StripeWebhookHandler
 	Limen                *limen.Limen
@@ -47,6 +48,7 @@ func provideRouter(params RouterParams) *chi.Mux {
 	r.Get("/health", params.HealthHandler.IsDatabaseHealthy)
 	r.Get("/membership/tiers", params.MembershipHandler.GetPublicTiersWithPrices)
 	r.Post("/webhooks/stripe", params.StripeWebhookHandler.Handle)
+	r.Get("/exec-profiles", params.ExecProfileHandler.GetExecProfiles)
 
 	// All protected routes
 	r.Group(func(r chi.Router) {
@@ -85,6 +87,18 @@ func provideRouter(params RouterParams) *chi.Mux {
 		r.Get("/admin/audit-logs/export", params.AdminHandler.ExportAuditLogsCSV)
 		r.Post("/admin/membership/add/{id}", params.AdminHandler.AddMembershipToUser)
 		r.Get("/admin/memberships/eligible/{id}", params.AdminHandler.GetEligibleTiersWithPricesById)
+		r.Patch("/admin/exec-profile/{id}", params.AdminHandler.UpdateExecProfile)
+	})
+
+	// All exec profile routes
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RequireAuth(params.Limen))
+		r.Use(auth.RequireExecGroup())
+
+		r.Post("/exec-profile/social-links", params.ExecProfileHandler.AddExecSocialLink)
+		r.Patch("/exec-profile/social-links", params.ExecProfileHandler.UpdateExecSocialLink)
+		r.Delete("/exec-profile/social-links", params.ExecProfileHandler.DeleteExecSocialLink)
+		r.Patch("/exec-profile/title", params.ExecProfileHandler.UpdateExecProfileTitle)
 	})
 
 	return r
