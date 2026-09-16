@@ -368,6 +368,7 @@ type MembershipTier struct {
 	Benefits        []string
 	ProgramID       pgtype.UUID
 	ExpirationType  MembershipExpirationType
+	Limitations     []string
 }
 
 type MembershipTierPrice struct {
