@@ -58,6 +58,7 @@ export function AssignedPassCard({ tier, checkoutPending, onCheckout }: Assigned
         <PurchaseButton
           tier={tier}
           isSignedIn
+          needsOnboarding={false}
           checkoutPending={checkoutPending}
           onCheckout={onCheckout}
           onSignIn={() => undefined}

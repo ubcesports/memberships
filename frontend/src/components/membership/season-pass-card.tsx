@@ -14,6 +14,7 @@ type SeasonPassCardProps = {
   eligibleTier?: EligibleMembershipTier;
   checkoutPending: boolean;
   isSignedIn: boolean;
+  needsOnboarding: boolean;
   onCheckout: (tier: EligibleMembershipTier) => void;
   onSignIn: () => void;
   signInPending: boolean;
@@ -24,6 +25,7 @@ export function SeasonPassCard({
   eligibleTier,
   checkoutPending,
   isSignedIn,
+  needsOnboarding,
   onCheckout,
   onSignIn,
   signInPending,
@@ -101,6 +103,7 @@ export function SeasonPassCard({
           <PurchaseButton
             tier={eligibleTier}
             isSignedIn={isSignedIn}
+            needsOnboarding={needsOnboarding}
             checkoutPending={checkoutPending}
             onCheckout={onCheckout}
             onSignIn={onSignIn}
