@@ -14,6 +14,7 @@ import (
 	"github.com/thecodearcher/limen"
 	"github.com/ubcesports/memberships/internal/auth"
 	"github.com/ubcesports/memberships/internal/handlers"
+	"github.com/ubcesports/memberships/internal/repository"
 	"go.uber.org/fx"
 )
 
@@ -31,6 +32,7 @@ type RouterParams struct {
 	ExecProfileHandler   *handlers.ExecProfileHandler
 	MembershipHandler    *handlers.MembershipHandler
 	StripeWebhookHandler *handlers.StripeWebhookHandler
+	AdminRepository      *repository.AdminRepository
 	Limen                *limen.Limen
 }
 
@@ -93,7 +95,7 @@ func provideRouter(params RouterParams) *chi.Mux {
 	// All exec profile routes
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAuth(params.Limen))
-		r.Use(auth.RequireExecGroup())
+		r.Use(auth.RequireExecGroup(params.AdminRepository))
 
 		r.Post("/exec-profile/social-links", params.ExecProfileHandler.AddExecSocialLink)
 		r.Patch("/exec-profile/social-links", params.ExecProfileHandler.UpdateExecSocialLink)

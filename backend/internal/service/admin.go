@@ -237,10 +237,7 @@ func (s *AdminService) GetUserByID(ctx context.Context, userId string) (*dto.Pro
 }
 
 func (s *AdminService) UpdateExecProfile(ctx context.Context, actorId string, targetId string, title pgtype.Text, displayOrder pgtype.Int4, displayGroup db.NullGroupType, requestId string) (db.GetExecProfileByUserIDRow, error) {
-	nullDisplayGroup := db.NullExecDisplayGroupType{
-		ExecDisplayGroupType: defaultDisplayGroupType[displayGroup.GroupType],
-		Valid:                true,
-	}
+	nullDisplayGroup := toNullExecDisplayGroupType(displayGroup)
 
 	updatedProfile, err := s.adminRepository.UpdateExecProfile(ctx, targetId, title, displayOrder, nullDisplayGroup)
 
@@ -1256,4 +1253,14 @@ func (s *AdminService) getAdminAuditLogs(ctx context.Context, params db.GetAdmin
 	}
 
 	return logs, nil
+}
+
+func toNullExecDisplayGroupType(value db.NullGroupType) db.NullExecDisplayGroupType {
+	if !value.Valid {
+		return db.NullExecDisplayGroupType{}
+	}
+	return db.NullExecDisplayGroupType{
+		ExecDisplayGroupType: defaultDisplayGroupType[value.GroupType],
+		Valid:                true,
+	}
 }

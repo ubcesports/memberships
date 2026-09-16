@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ubcesports/memberships/internal/database/db"
 	"github.com/ubcesports/memberships/internal/dto"
 	"github.com/ubcesports/memberships/internal/service"
@@ -476,18 +475,9 @@ func (h *AdminHandler) UpdateExecProfile(w http.ResponseWriter, r *http.Request)
 		r.Context(),
 		actorId,
 		targetUserId,
-		pgtype.Text{
-			String: *updateExecProfileRequest.Title,
-			Valid:  updateExecProfileRequest.Title != nil,
-		},
-		pgtype.Int4{
-			Int32: *updateExecProfileRequest.DisplayOrder,
-			Valid: updateExecProfileRequest.DisplayOrder != nil,
-		},
-		db.NullGroupType{
-			GroupType: db.GroupType(*updateExecProfileRequest.DisplayGroup),
-			Valid:     updateExecProfileRequest.DisplayGroup != nil,
-		},
+		util.ToPgText(updateExecProfileRequest.Title),
+		util.ToPgInt4(updateExecProfileRequest.DisplayOrder),
+		util.ToNullGroupType(updateExecProfileRequest.DisplayGroup),
 		requestId,
 	)
 	if err != nil {

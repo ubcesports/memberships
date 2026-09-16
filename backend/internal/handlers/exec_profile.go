@@ -86,16 +86,23 @@ func (h *ExecProfileHandler) AddExecSocialLink(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Parse query parameters
-	platform := r.URL.Query().Get("platform")
-	url := r.URL.Query().Get("url")
+	var request dto.ExecProfileSocialLinkDTO
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again", requestId)
+	}
 
-	if platform == "" || url == "" {
-		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Missing required query parameters: platform and url are required", requestId)
+	if request.Platform == "" || request.URL == "" {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Missing required fields: platform and url are required", requestId)
 		return
 	}
 
-	err := h.execProfileService.AddExecSocialLink(r.Context(), userId, db.ExecSocialPlatformType(platform), url)
+	err := h.execProfileService.AddExecSocialLink(
+		r.Context(),
+		userId,
+		db.ExecSocialPlatformType(request.Platform),
+		request.URL,
+	)
+
 	if err != nil {
 		slog.ErrorContext(r.Context(), "unable to add social link",
 			"error", err,
@@ -138,16 +145,18 @@ func (h *ExecProfileHandler) UpdateExecSocialLink(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Parse query parameters
-	platform := r.URL.Query().Get("platform")
-	url := r.URL.Query().Get("url")
-
-	if platform == "" || url == "" {
-		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Missing required query parameters: platform and url are required", requestId)
+	var request dto.ExecProfileSocialLinkDTO
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again.", requestId)
 		return
 	}
 
-	err := h.execProfileService.UpdateExecSocialLink(r.Context(), userId, db.ExecSocialPlatformType(platform), url)
+	if request.Platform == "" || request.URL == "" {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Missing required fields: platform and url are required", requestId)
+		return
+	}
+
+	err := h.execProfileService.UpdateExecSocialLink(r.Context(), userId, db.ExecSocialPlatformType(request.Platform), request.URL)
 	if err != nil {
 		slog.ErrorContext(r.Context(), "unable to update social link",
 			"error", err,
@@ -189,15 +198,20 @@ func (h *ExecProfileHandler) DeleteExecSocialLink(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Parse query parameters
-	platform := r.URL.Query().Get("platform")
+	var request struct {
+		Platform db.ExecSocialPlatformType `json:"platform"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again.", requestId)
+		return
+	}
 
-	if platform == "" {
+	if request.Platform == "" {
 		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Missing required query parameters: platform is required", requestId)
 		return
 	}
 
-	err := h.execProfileService.DeleteExecSocialLink(r.Context(), userId, db.ExecSocialPlatformType(platform))
+	err := h.execProfileService.DeleteExecSocialLink(r.Context(), userId, db.ExecSocialPlatformType(request.Platform))
 	if err != nil {
 		slog.ErrorContext(r.Context(), "unable to delete social link",
 			"error", err,
@@ -239,15 +253,21 @@ func (h *ExecProfileHandler) UpdateExecProfileTitle(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Parse query parameters
-	title := r.URL.Query().Get("title")
+	var request struct {
+		Title string `json:"title"`
+	}
 
-	if title == "" {
-		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Missing required query parameters: title is required", requestId)
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body. Please try again.", requestId)
 		return
 	}
 
-	_, err := h.execProfileService.UpdateExecProfileTitle(r.Context(), userId, title)
+	if request.Title == "" {
+		util.WriteApiResponse(w, http.StatusBadRequest, "INVALID_REQUEST", "Missing required field: title is required", requestId)
+		return
+	}
+
+	_, err := h.execProfileService.UpdateExecProfileTitle(r.Context(), userId, request.Title)
 	if err != nil {
 		slog.ErrorContext(r.Context(), "unable to update exec profile title",
 			"error", err,

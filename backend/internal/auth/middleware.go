@@ -14,6 +14,9 @@ type requestMetadataKey struct{}
 type RequestMetadata struct {
 	UserID string
 }
+type ExecGroupChecker interface {
+	HasExecGroup(ctx context.Context, userID string) (bool, error)
+}
 
 const sessionKey contextKey = "session"
 
@@ -82,14 +85,7 @@ func RequireOnboarded(next http.Handler) http.Handler {
 	})
 }
 
-func RequireExecGroup() func(http.Handler) http.Handler {
-	allowed := map[string]bool{
-		"executive": true,
-		"director":  true,
-		"board":     true,
-		"president": true,
-	}
-
+func RequireExecGroup(checker ExecGroupChecker) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session := SessionFromContext((r.Context()))
@@ -98,15 +94,21 @@ func RequireExecGroup() func(http.Handler) http.Handler {
 				return
 			}
 
-			groups, _ := session.User.Raw()["groups"].([]any)
-			for _, g := range groups {
-				if name, ok := g.(string); ok && allowed[name] {
-					next.ServeHTTP(w, r)
-					return
-				}
+			userID, ok := session.User.ID.(string)
+			if !ok || userID == "" {
+				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
 			}
 
-			writeError(w, http.StatusForbidden, "FORBIDDEN", "Forbidden")
+			hasExecGroup, err := checker.HasExecGroup(r.Context(), userID)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unable to verify executive group")
+			}
+
+			if !hasExecGroup {
+				writeError(w, http.StatusForbidden, "FORBIDDEN", "Forbidden")
+			}
+
+			next.ServeHTTP(w, r)
 		})
 	}
 }
