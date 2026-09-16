@@ -12,6 +12,7 @@ type AdditionalTierCardProps = {
   eligibleTier?: EligibleMembershipTier;
   checkoutPending: boolean;
   isSignedIn: boolean;
+  needsOnboarding: boolean;
   onCheckout: (tier: EligibleMembershipTier) => void;
   onSignIn: () => void;
   signInPending: boolean;
@@ -22,6 +23,7 @@ export function AdditionalTierCard({
   eligibleTier,
   checkoutPending,
   isSignedIn,
+  needsOnboarding,
   onCheckout,
   onSignIn,
   signInPending,
@@ -73,6 +75,7 @@ export function AdditionalTierCard({
         <PurchaseButton
           tier={eligibleTier}
           isSignedIn={isSignedIn}
+          needsOnboarding={needsOnboarding}
           checkoutPending={checkoutPending}
           onCheckout={onCheckout}
           onSignIn={onSignIn}
